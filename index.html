@@ -407,10 +407,10 @@
     window.addTransaction = () => {  
     const opI = document.getElementById("operatorSelect").value;
     const tyI = document.getElementById("typeSelect").value;
-    const amt = parseFloat(document.getElementById("amount").value) || 0;
+    const amtSIM = parseFloat(document.getElementById("amount").value) || 0; // Montant sur la SIM
     const cur = document.getElementById("currency").value;
     
-    // Récupération des détails Cash et Commissions
+    // Récupération des détails Cash (Ce qui touche réellement le tiroir)
     const mixUSD = parseFloat(document.getElementById("mixUSD").value) || 0;
     const mixCDF = parseFloat(document.getElementById("mixCDF").value) || 0;
     const commUSD = parseFloat(document.getElementById("commUSD").value) || 0;
@@ -424,58 +424,51 @@
 
     if(!ty || !op) return;
 
-    // Détermination du flux financier (Valeurs réelles)
-    const realUSD = (mixUSD > 0) ? mixUSD : (cur === "USD" ? amt : 0);
-    const realCDF = (mixCDF > 0) ? mixCDF : (cur === "CDF" ? amt : 0);
+    // Calcul de l'argent Réel (Cash + Commission)
+    const netCashUSD = mixUSD + commUSD;
+    const netCashCDF = mixCDF + commCDF;
 
     const t = createTransaction({
         typeNom: ty.name,
         operator: op.name,
         mode,
-        amt, // Montant nominal (SIM)
+        amt: amtSIM, // On garde le montant SIM pour l'impact Opérateur
         cur,
         person,
         stk: parseInt(document.getElementById("stkMove").value) || 0,
-        mix: { USD: realUSD, CDF: realCDF }
+        mix: { USD: mixUSD, CDF: mixCDF } 
     });
 
-    // --- SÉCURITÉ : VÉRIFICATION SAISIE CASH ---
-    // On vérifie si l'utilisateur a rempli au moins un champ du "Détail Cash"
-    const aSaisiCash = (mixUSD > 0 || mixCDF > 0);
+    // --- LOGIQUE D'IMPACT STRICTE ---
     
-    // Si pas de saisie cash, la direction d'impact (dir) devient 0 pour la caisse
+    // 1. Impact SIM : Toujours basé sur "Montant Opération"
+    t.impacts.operator.USD = (cur === "USD" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
+    t.impacts.operator.CDF = (cur === "CDF" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
+
+    // 2. Impact CAISSE : Basé UNIQUEMENT sur le "Détail Cash"
+    const aSaisiCash = (mixUSD > 0 || mixCDF > 0 || commUSD > 0 || commCDF > 0);
     const dirCaisse = aSaisiCash ? (parseInt(ty.impC) || 0) : 0;
 
-    // Application de l'impact Caisse (seulement si aSaisiCash est vrai)
-    t.impacts.caisse.USD = (realUSD + commUSD) * dirCaisse;
-    t.impacts.caisse.CDF = (realCDF + commCDF) * dirCaisse;
-
-    // L'impact SIM (Airtel/Momo) reste inchangé (lié au champ "Montant Opération")
-    t.impacts.operator.USD = (cur === "USD" ? amt : 0) * (parseInt(ty.impO) || 0);
-    t.impacts.operator.CDF = (cur === "CDF" ? amt : 0) * (parseInt(ty.impO) || 0);
+    t.impacts.caisse.USD = netCashUSD * dirCaisse;
+    t.impacts.caisse.CDF = netCashCDF * dirCaisse;
 
     applyImpacts(t);
 
+    // Sauvegarde avec distinction SIM vs CASH pour l'historique
     data.transactions.unshift({
         ...t,
         date: new Date().toLocaleString(),
         desc: `${ty.name} - ${op.name} (${person ? 'NOM: '+person+' | ' : ''}${motif})${!aSaisiCash ? ' [SANS CASH]' : ''}`,
-        usd: realUSD,
-        cdf: realCDF
+        amtSIM: amtSIM, // Le montant "Virtuel"
+        curSIM: cur,
+        usdCash: netCashUSD, // Le montant "Physique"
+        cdfCash: netCashCDF
     });
 
     save();
-    
-    // Message de confirmation personnalisé
-    if (!aSaisiCash && (parseInt(ty.impC) !== 0)) {
-        alert("Opération enregistrée : La SIM a été touchée, mais la CAISSE est restée intacte (Détail vide).");
-    } else {
-        alert("Opération enregistrée avec succès !");
-    }
-
+    alert(aSaisiCash ? "Opération enregistrée (SIM & Caisse)" : "Opération enregistrée (SIM uniquement)");
     render();
     
-    // Nettoyage des champs
     ["amount","mixUSD","mixCDF","commUSD","commCDF","motif","personName"].forEach(id => {
         if(document.getElementById(id)) document.getElementById(id).value = "";
     });
@@ -592,8 +585,7 @@ window.settleAccount = () => {
   
     let html = `<div style="display:flex; flex-direction:column; gap:12px;">`;  
   
-    html += filtered.map((t, idxInFiltered) => {  
-        // On récupère l'index réel dans data.transactions pour les boutons annuler/supprimer
+    html += filtered.map((t) => {  
         const realIdx = data.transactions.indexOf(t);
         const desc = t.desc || "";  
 
@@ -676,6 +668,11 @@ window.settleAccount = () => {
         else if(normalize(type).includes("vente")) icon = "🛒";  
         else if(normalize(type).includes("reglement")) icon = "✔";  
   
+        // Calcul des montants pour l'affichage double
+        const montantSIM = t.amtSIM || t.amt || 0;
+        const deviseSIM = t.curSIM || t.cur || "USD";
+        const hasCash = (t.usdCash > 0 || t.cdfCash > 0);
+
         return `  
         <div style="background:#ffffff; border-radius:16px; padding:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); border-left:5px solid #0ea5e9;">  
             ${isAdmin ? `  
@@ -683,16 +680,22 @@ window.settleAccount = () => {
                 <button onclick="cancelTransaction(${realIdx})" style="background:#f59e0b;color:#fff;border:none;padding:5px 10px;border-radius:8px;font-size:10px;cursor:pointer;">↩ Annuler</button>  
                 <button onclick="deleteTransaction(${realIdx})" style="background:#ef4444;color:#fff;border:none;padding:5px 10px;border-radius:8px;font-size:10px;cursor:pointer;">Suppr</button>  
             </div>` : ""}  
-            <div style="display:grid; grid-template-columns: 1.2fr 1fr 1fr 1.6fr 1fr 1fr; gap:6px; align-items:center; font-size:12px;">  
+            <div style="display:grid; grid-template-columns: 1.2fr 1fr 1fr 1.6fr 1.5fr 1fr; gap:6px; align-items:center; font-size:12px;">  
                 <div style="color:#64748b;">${t.date}</div>  
                 <div style="font-weight:600;">${opName || "-"}</div>  
                 <div style="background:#e2e8f0; padding:3px 6px; border-radius:6px; text-align:center; font-size:11px;">  
                     ${icon} ${type || "-"} ${stockDisplay} 
                 </div>  
                 <div style="color:#334155;">${motif || "-"}</div>  
-                <div style="font-weight:bold; color:${(t.usd > 0 || t.cdf > 0) ? "#16a34a" : "#dc2626"};">  
-                    ${fmt(t.usd || 0)}$ | ${fmt(t.cdf || 0)}FC
+                
+                <div style="line-height:1.3;">  
+                    <div style="font-weight:bold; color:#1e293b;">SIM: ${fmt(montantSIM)} ${deviseSIM}</div>
+                    ${hasCash ? 
+                        `<div style="color:#16a34a; font-size:10px; font-weight:600;">CASH: ${fmt(t.usdCash || 0)}$ | ${fmt(t.cdfCash || 0)}FC</div>` : 
+                        `<div style="color:#94a3b8; font-size:9px; font-style:italic;">Aucun Cash</div>`
+                    }
                 </div>  
+
                 <div style="font-weight:bold; color:${resteColor};">${resteTxt}</div>  
             </div>  
         </div>`;  
