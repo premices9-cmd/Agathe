@@ -349,51 +349,51 @@
     };  
 }
 
-  function applyImpacts(t, reverse = false) {
+    function applyImpacts(t, reverse = false) {
     const factor = reverse ? -1 : 1;
 
-    // 1. CAISSE : On ajoute toujours TOUT l'argent reçu (Capital + Gain)
+    // 1. CAISSE
     if (t.impacts.caisse) {
         data.caisse.USD += (t.impacts.caisse.USD || 0) * factor;
         data.caisse.CDF += (t.impacts.caisse.CDF || 0) * factor;
     }
 
-    // 2. OPÉRATEURS (Airtel, Momo)
+    // 2. OPÉRATEURS (Argent SIM + STOCK)
     let op = data.operators.find(o => o.name === t.operator);
     if (op) {
+        // Impact sur le solde monétaire de la SIM
         op.USD += (t.impacts.operator.USD || 0) * factor;
         op.CDF += (t.impacts.operator.CDF || 0) * factor;
+        
+        // --- CORRECTION : Impact sur le Stock Physique ---
+        if (t.impacts.stock) {
+            // Si c'est une vente, t.impacts.stock sera -1, donc op.stock diminue.
+            op.stock += (t.impacts.stock * factor);
+        }
     }
 
-    // 3. DETTES (C'est ici que le gain VNC se joue)
+    // 3. DETTES
     if (t.person && t.typeDette) {
         const key = `${normalize(t.typeDette)}_${normalize(t.person)}`;
         if (!data.debts[key]) data.debts[key] = { USD: 0, CDF: 0 };
 
         const isReglement = t.typeNom === "REGLEMENT" || (t.desc && t.desc.includes("REGLEMENT"));
 
-        // --- LE BOUCLIER VNC ---
         let impUSD = (t.impacts.dette.USD || 0) * factor;
         let impCDF = (t.impacts.dette.CDF || 0) * factor;
 
         if (isReglement && !reverse) {
-            // SI REMBOURSEMENT : On ne peut pas retirer plus que ce que le client doit
-            // Exemple Vvv : Dette 100$, Payé 150$. On ne retire que 100$ de la dette.
             if (impUSD < 0) impUSD = Math.max(impUSD, -data.debts[key].USD);
             if (impCDF < 0) impCDF = Math.max(impCDF, -data.debts[key].CDF);
         }
 
-        // Mise à jour Fiche Individuelle
         data.debts[key].USD += impUSD;
         data.debts[key].CDF += impCDF;
 
-        // Mise à jour Compte Global (Celui qui calcule la VNC)
         let typeGlobal = t.typeDette.includes("client") ? "dette client" : "dette moi";
         let opG = data.operators.find(o => normalize(o.name).includes(typeGlobal));
 
         if (opG) {
-            // On applique l'impact LIMITÉ (impUSD) au total global
-            // Ainsi : +150$ caisse - 100$ dette = +50$ VNC (GAIN !)
             const isSame = opG.name === t.operator;
             if (!isSame || isReglement) {
                 opG.USD += impUSD;
@@ -403,13 +403,14 @@
     }
 }
 
+
     window.addTransaction = () => {  
     const opI = document.getElementById("operatorSelect").value;
     const tyI = document.getElementById("typeSelect").value;
     const amt = parseFloat(document.getElementById("amount").value) || 0;
     const cur = document.getElementById("currency").value;
     
-    // Détail Cash et Commissions
+    // Récupération des détails Cash et Commissions
     const mixUSD = parseFloat(document.getElementById("mixUSD").value) || 0;
     const mixCDF = parseFloat(document.getElementById("mixCDF").value) || 0;
     const commUSD = parseFloat(document.getElementById("commUSD").value) || 0;
@@ -423,7 +424,7 @@
 
     if(!ty || !op) return;
 
-    // Détermination du flux financier (Si Mix est vide, on prend le montant simple)
+    // Détermination du flux financier (Valeurs réelles)
     const realUSD = (mixUSD > 0) ? mixUSD : (cur === "USD" ? amt : 0);
     const realCDF = (mixCDF > 0) ? mixCDF : (cur === "CDF" ? amt : 0);
 
@@ -431,19 +432,25 @@
         typeNom: ty.name,
         operator: op.name,
         mode,
-        amt, // Montant nominal pour la SIM
+        amt, // Montant nominal (SIM)
         cur,
         person,
         stk: parseInt(document.getElementById("stkMove").value) || 0,
         mix: { USD: realUSD, CDF: realCDF }
     });
 
-    // Application directionnelle (impC: 1 pour Entrée, -1 pour Sortie)
-    const dir = parseInt(ty.impC) || 0;
-    t.impacts.caisse.USD = (realUSD + commUSD) * dir;
-    t.impacts.caisse.CDF = (realCDF + commCDF) * dir;
+    // --- SÉCURITÉ : VÉRIFICATION SAISIE CASH ---
+    // On vérifie si l'utilisateur a rempli au moins un champ du "Détail Cash"
+    const aSaisiCash = (mixUSD > 0 || mixCDF > 0);
+    
+    // Si pas de saisie cash, la direction d'impact (dir) devient 0 pour la caisse
+    const dirCaisse = aSaisiCash ? (parseInt(ty.impC) || 0) : 0;
 
-    // La balance SIM est toujours impactée par le montant nominal (amt)
+    // Application de l'impact Caisse (seulement si aSaisiCash est vrai)
+    t.impacts.caisse.USD = (realUSD + commUSD) * dirCaisse;
+    t.impacts.caisse.CDF = (realCDF + commCDF) * dirCaisse;
+
+    // L'impact SIM (Airtel/Momo) reste inchangé (lié au champ "Montant Opération")
     t.impacts.operator.USD = (cur === "USD" ? amt : 0) * (parseInt(ty.impO) || 0);
     t.impacts.operator.CDF = (cur === "CDF" ? amt : 0) * (parseInt(ty.impO) || 0);
 
@@ -452,14 +459,23 @@
     data.transactions.unshift({
         ...t,
         date: new Date().toLocaleString(),
-        desc: `${ty.name} - ${op.name} (${person ? 'NOM: '+person+' | ' : ''}${motif})`,
+        desc: `${ty.name} - ${op.name} (${person ? 'NOM: '+person+' | ' : ''}${motif})${!aSaisiCash ? ' [SANS CASH]' : ''}`,
         usd: realUSD,
         cdf: realCDF
     });
 
     save();
-    alert("Opération enregistrée !");
+    
+    // Message de confirmation personnalisé
+    if (!aSaisiCash && (parseInt(ty.impC) !== 0)) {
+        alert("Opération enregistrée : La SIM a été touchée, mais la CAISSE est restée intacte (Détail vide).");
+    } else {
+        alert("Opération enregistrée avec succès !");
+    }
+
     render();
+    
+    // Nettoyage des champs
     ["amount","mixUSD","mixCDF","commUSD","commCDF","motif","personName"].forEach(id => {
         if(document.getElementById(id)) document.getElementById(id).value = "";
     });
@@ -548,7 +564,9 @@ window.settleAccount = () => {
     const list = document.getElementById("fullHistoryList");  
   
     document.querySelectorAll(".nav-hist button").forEach(b => b.classList.remove("active"));    
-    document.getElementById("btn-h-" + filter).classList.add("active");    
+    if(document.getElementById("btn-h-" + filter)) {
+        document.getElementById("btn-h-" + filter).classList.add("active");    
+    }
   
     let filtered = data.transactions;    
   
@@ -574,9 +592,42 @@ window.settleAccount = () => {
   
     let html = `<div style="display:flex; flex-direction:column; gap:12px;">`;  
   
-    html += filtered.map((t, i) => {  
-  
+    html += filtered.map((t, idxInFiltered) => {  
+        // On récupère l'index réel dans data.transactions pour les boutons annuler/supprimer
+        const realIdx = data.transactions.indexOf(t);
         const desc = t.desc || "";  
+
+        // --- DESIGN SPECIAL POUR LES TRANSFERTS ---
+        if (t.mode === 'transfert' && t.transferDetails) {
+            const d = t.transferDetails;
+            return `
+            <div style="background:#f0f9ff; border-radius:16px; padding:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); border-left:5px solid #0ea5e9;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <span style="font-size:11px; color:#64748b;">${t.date}</span>
+                    ${isAdmin ? `
+                    <div style="display:flex; gap:5px;">
+                        <button onclick="cancelTransaction(${realIdx})" style="background:#f59e0b;color:#fff;border:none;padding:4px 8px;border-radius:6px;font-size:10px;cursor:pointer;">↩ Annuler</button>
+                        <button onclick="deleteTransaction(${realIdx})" style="background:#ef4444;color:#fff;border:none;padding:4px 8px;border-radius:6px;font-size:10px;cursor:pointer;">Suppr</button>
+                    </div>` : ""}
+                </div>
+                <div style="display:flex; justify-content:space-around; align-items:center; background:white; padding:10px; border-radius:10px;">
+                    <div style="text-align:center;">
+                        <div style="font-size:9px; color:#64748b;">SOURCE</div>
+                        <div style="font-weight:bold; font-size:13px;">${d.sourceName}</div>
+                        <div style="color:#ef4444; font-weight:bold;">-${fmt(d.sAmt)} ${d.sc}</div>
+                    </div>
+                    <div style="font-size:20px; color:#0ea5e9;">➔</div>
+                    <div style="text-align:center;">
+                        <div style="font-size:9px; color:#64748b;">DESTINATION</div>
+                        <div style="font-weight:bold; font-size:13px;">${d.destName}</div>
+                        <div style="color:#16a34a; font-weight:bold;">+${fmt(d.dAmt)} ${d.dc}</div>
+                    </div>
+                </div>
+                <div style="font-size:10px; margin-top:5px; color:#0369a1; text-align:center; font-style:italic;">${desc}</div>
+            </div>`;
+        }
+
+        // --- DESIGN CLASSIQUE POUR LES AUTRES OPERATIONS ---
         const parts = desc.split("-");  
         const type = parts[0] ? parts[0].trim() : "";  
         const rest = parts[1] ? parts[1].trim() : "";  
@@ -591,162 +642,97 @@ window.settleAccount = () => {
             opName = rest;  
         }  
   
-        // NOM PERSONNE  
         let person = "";  
         if(motif.includes("NOM:")) {  
             person = motif.split("NOM:")[1].split("|")[0].trim();  
         }  
   
-        // TYPE DETTE  
         let debtType = "";  
-        if(t.mode === "dette_client" || normalize(desc).includes("dette client")) {  
-            debtType = "dette client";  
-        }   
-        else if(t.mode === "dette_moi" || normalize(desc).includes("dette moi")) {  
-            debtType = "dette moi";  
-        }  
+        if(t.mode === "dette_client" || normalize(desc).includes("dette client")) { debtType = "dette client"; }   
+        else if(t.mode === "dette_moi" || normalize(desc).includes("dette moi")) { debtType = "dette moi"; }  
   
-        // CALCUL RESTE  
         let resteUSD = 0, resteCDF = 0;  
-  
         if(person && debtType) {  
             const debtKey = `${normalize(debtType)}_${normalize(person)}`;  
             const d = data.debts[debtKey];  
-  
-            if(d) {  
-                resteUSD = d.USD || 0;  
-                resteCDF = d.CDF || 0;  
-            }  
+            if(d) { resteUSD = d.USD || 0; resteCDF = d.CDF || 0; }  
         }  
   
-        // 🔥 NOUVEAU AFFICHAGE INTELLIGENT  
-        let resteTxt = "";  
-        let resteColor = "#64748b";  
+        let resteTxt = ""; let resteColor = "#64748b";  
+        if(resteUSD === 0 && resteCDF === 0) { resteTxt = "✔ Payé"; resteColor = "#16a34a"; }  
+        else if(resteUSD > 0 || resteCDF > 0) { resteTxt = `Reste : ${fmt(resteUSD)}$ ${resteCDF ? "| " + fmt(resteCDF) + "FC" : ""}`; resteColor = "#dc2626"; }  
+        else if(resteUSD < 0 || resteCDF < 0) { resteTxt = `Avance : ${fmt(Math.abs(resteUSD))}$ ${resteCDF ? "| " + fmt(Math.abs(resteCDF)) + "FC" : ""}`; resteColor = "#0ea5e9"; }  
   
-        if(resteUSD === 0 && resteCDF === 0) {  
-            resteTxt = "✔ Payé";  
-            resteColor = "#16a34a";  
-        }  
-        else if(resteUSD > 0 || resteCDF > 0) {  
-            resteTxt = `Reste : ${fmt(resteUSD)}$ ${resteCDF ? "| " + fmt(resteCDF) + "FC" : ""}`;  
-            resteColor = "#dc2626";  
-        }  
-        else if(resteUSD < 0 || resteCDF < 0) {  
-            resteTxt = `Avance : ${fmt(Math.abs(resteUSD))}$ ${resteCDF ? "| " + fmt(Math.abs(resteCDF)) + "FC" : ""}`;  
-            resteColor = "#0ea5e9";  
-        }  
-  
-        // ICONES  
-        let icon = "📄";  
+        let icon = "📄"; let stockDisplay = "";
+        const qteStock = t.stk || (t.impacts && t.impacts.stock) || 0;
+        if(qteStock !== 0) {
+            const sColor = qteStock > 0 ? "#16a34a" : "#ef4444";
+            const sSign = qteStock > 0 ? "+" : "";
+            stockDisplay = `<div style="color:${sColor}; font-weight:bold; font-size:10px; margin-top:2px;">Stock: ${sSign}${qteStock}</div>`;
+        }
+
         if(normalize(type).includes("retrait")) icon = "💸";  
         else if(normalize(type).includes("depot")) icon = "💰";  
         else if(normalize(type).includes("vente")) icon = "🛒";  
         else if(normalize(type).includes("reglement")) icon = "✔";  
   
         return `  
-        <div style="  
-            background:#ffffff;  
-            border-radius:16px;  
-            padding:12px;  
-            box-shadow:0 6px 18px rgba(0,0,0,0.06);  
-            border-left:5px solid #0ea5e9;  
-            animation:fadeIn 0.3s ease;  
-        ">  
-  
+        <div style="background:#ffffff; border-radius:16px; padding:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); border-left:5px solid #0ea5e9;">  
             ${isAdmin ? `  
-<div style="display:flex; gap:6px; justify-content:flex-end;">  
-  
-    <button onclick="cancelTransaction(${data.transactions.indexOf(t)})"  
-        style="background:#f59e0b;color:#fff;border:none;padding:5px 10px;border-radius:8px;font-size:10px;">  
-        ↩ Annuler  
-    </button>  
-  
-    <button onclick="deleteTransaction(${data.transactions.indexOf(t)})"  
-        style="background:#ef4444;color:#fff;border:none;padding:5px 10px;border-radius:8px;font-size:10px;">  
-        Suppr  
-    </button>  
-  
-</div>  
-` : ""}  
-  
-            <div style="  
-                display:grid;  
-                grid-template-columns: 1.2fr 1fr 1fr 1.6fr 1fr 1fr;  
-                gap:6px;  
-                align-items:center;  
-                font-size:12px;  
-            ">  
-  
-                <div style="color:#64748b;">  
-                    ${t.date}  
+            <div style="display:flex; gap:6px; justify-content:flex-end; margin-bottom: 5px;">  
+                <button onclick="cancelTransaction(${realIdx})" style="background:#f59e0b;color:#fff;border:none;padding:5px 10px;border-radius:8px;font-size:10px;cursor:pointer;">↩ Annuler</button>  
+                <button onclick="deleteTransaction(${realIdx})" style="background:#ef4444;color:#fff;border:none;padding:5px 10px;border-radius:8px;font-size:10px;cursor:pointer;">Suppr</button>  
+            </div>` : ""}  
+            <div style="display:grid; grid-template-columns: 1.2fr 1fr 1fr 1.6fr 1fr 1fr; gap:6px; align-items:center; font-size:12px;">  
+                <div style="color:#64748b;">${t.date}</div>  
+                <div style="font-weight:600;">${opName || "-"}</div>  
+                <div style="background:#e2e8f0; padding:3px 6px; border-radius:6px; text-align:center; font-size:11px;">  
+                    ${icon} ${type || "-"} ${stockDisplay} 
                 </div>  
-  
-                <div style="font-weight:600;">  
-                    ${opName || "-"}  
-                </div>  
-  
-                <div style="  
-                    background:#e2e8f0;  
-                    padding:3px 6px;  
-                    border-radius:6px;  
-                    text-align:center;  
-                    font-size:11px;  
-                ">  
-                    ${icon} ${type || "-"}  
-                </div>  
-  
-                <div style="color:#334155;">  
-                    ${motif || "-"}  
-                </div>  
-  
-                <div style="  
-                    font-weight:bold;  
-                    color:${t.amt > 0 ? "#16a34a" : "#dc2626"};  
-                ">  
+                <div style="color:#334155;">${motif || "-"}</div>  
+                <div style="font-weight:bold; color:${(t.usd > 0 || t.cdf > 0) ? "#16a34a" : "#dc2626"};">  
                     ${fmt(t.usd || 0)}$ | ${fmt(t.cdf || 0)}FC
                 </div>  
-  
-                <div style="  
-                    font-weight:bold;  
-                    color:${resteColor};  
-                ">  
-                    ${resteTxt}  
-                </div>  
-  
+                <div style="font-weight:bold; color:${resteColor};">${resteTxt}</div>  
             </div>  
-        </div>  
-        `;  
+        </div>`;  
     }).join("");  
   
     html += `</div>`;  
-  
     list.innerHTML = html;  
-  
     document.getElementById("historyModal").classList.remove("hidden");     
-};  
-  
+};
+
 window.cancelTransaction = (index) => {  
-  
     if(!confirm("Annuler cette opération ?")) return;  
   
     const t = data.transactions[index];  
-    if(!t || !t.impacts){  
-        alert("Ancienne transaction non annulable correctement");  
-        return;  
-    }  
-  
-    // 🔥 ANNULATION PARFAITE  
-    applyImpacts(t, true);  
+    if(!t) return;
+
+    // Cas spécifique du transfert
+    if(t.mode === 'transfert' && t.impacts && t.impacts.isTransfer) {
+        const { source, dest } = t.impacts;
+
+        // On remet l'argent à la source
+        if(source.idx === "caisse") data.caisse[source.cur] += source.amt;
+        else if(data.operators[source.idx]) data.operators[source.idx][source.cur] += source.amt;
+
+        // On retire l'argent de la destination
+        if(dest.idx === "caisse") data.caisse[dest.cur] -= dest.amt;
+        else if(data.operators[dest.idx]) data.operators[dest.idx][dest.cur] -= dest.amt;
+
+        alert("Transfert inversé avec succès ✅");
+    } else {
+        // Logique normale pour les autres transactions
+        applyImpacts(t, true);
+    }
   
     data.transactions.splice(index, 1);  
-  
     save();  
     render();  
     showFullHistory("general");  
-  
-    alert("Annulation parfaite ✅");  
-};  
-  
+};
+
     window.quickEditOp = (i) => {    
         const op = data.operators[i];    
         const nName = prompt("Nom :", op.name), nUSD = prompt("USD :", op.USD), nCDF = prompt("CDF :", op.CDF), nStk = prompt("SIM :", op.stock);    
@@ -759,16 +745,68 @@ window.cancelTransaction = (index) => {
         document.getElementById("destAmt").value = ((sc==="USD" && dc==="CDF") ? amt * t : (sc==="CDF" && dc==="USD") ? amt / t : amt).toFixed(2);    
     };    
   
-    window.executeGlobalChange = () => {    
-        const sIdx = document.getElementById("srcWallet").value, dIdx = document.getElementById("destWallet").value;    
-        const sAmt = parseFloat(document.getElementById("srcAmt").value) || 0, dAmt = parseFloat(document.getElementById("destAmt").value) || 0;    
-        const sc = document.getElementById("srcCurr").value, dc = document.getElementById("destCurr").value;    
-        if(!sAmt) return;    
-        if(sIdx === "caisse") data.caisse[sc] -= sAmt; else data.operators[sIdx][sc] -= sAmt;    
-        if(dIdx === "caisse") data.caisse[dc] += dAmt; else data.operators[dIdx][dc] += dAmt;    
-        data.transactions.unshift({ date: new Date().toLocaleString(), desc: `TRANSFERT INTERNE`, amt: sAmt, cur: sc, mode: 'transfert' });    
-        save(); alert("Transfert effectué");    
-    };    
+  window.executeGlobalChange = () => {    
+    const sIdx = document.getElementById("srcWallet").value;
+    const dIdx = document.getElementById("destWallet").value;    
+    const sAmt = parseFloat(document.getElementById("srcAmt").value) || 0;
+    const dAmt = parseFloat(document.getElementById("destAmt").value) || 0;    
+    const sc = document.getElementById("srcCurr").value;
+    const dc = document.getElementById("destCurr").value;
+    const motif = document.getElementById("transferMotif").value || "Change/Transfert";
+
+    // --- NOUVELLE CONDITION DE SÉCURITÉ ---
+    // On bloque si : 
+    // 1. Le montant est 0
+    // 2. OU SI (le compte est le même ET la devise est la même)
+    if (!sAmt || (sIdx === dIdx && sc === dc)) {
+        alert("Action impossible : vous essayez de transférer la même devise sur le même compte.");
+        return;
+    }
+
+    const sourceName = sIdx === "caisse" ? "Caisse" : data.operators[sIdx].name;
+    const destName = dIdx === "caisse" ? "Caisse" : data.operators[dIdx].name;
+
+    // Retrait de la source
+    if(sIdx === "caisse") {
+        data.caisse[sc] -= sAmt; 
+    } else {
+        data.operators[sIdx][sc] -= sAmt;
+    }
+
+    // Ajout à la destination
+    if(dIdx === "caisse") {
+        data.caisse[dc] += dAmt; 
+    } else {
+        data.operators[dIdx][dc] += dAmt;
+    }
+
+    const t = { 
+        id: Date.now(),
+        date: new Date().toLocaleString(), 
+        desc: sIdx === dIdx ? `CHANGE: ${sourceName} (${sc} ➔ ${dc})` : `TRANSFERT: ${sourceName} ➔ ${destName}`, 
+        amt: sAmt, 
+        cur: sc, 
+        mode: 'transfert',
+        transferDetails: {
+            sIdx, dIdx, sAmt, dAmt, sc, dc, sourceName, destName
+        },
+        impacts: {
+            isTransfer: true,
+            source: { idx: sIdx, amt: sAmt, cur: sc },
+            dest: { idx: dIdx, amt: dAmt, cur: dc }
+        }
+    };
+
+    data.transactions.unshift(t);    
+    save(); 
+    render();
+    
+    // Nettoyage
+    document.getElementById("srcAmt").value = "";
+    document.getElementById("destAmt").value = "";
+    
+    alert(sIdx === dIdx ? "Change effectué avec succès ✅" : "Transfert effectué ✅");
+};
   
     window.updateAdminBasics = () => {    
         const tX = document.getElementById("newTaux").value, uX = document.getElementById("editCashUSD").value, cX = document.getElementById("editCashCDF").value;    
