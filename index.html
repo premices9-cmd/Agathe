@@ -493,14 +493,14 @@
 window.settleAccountV2 = () => {  
     const opIdx = document.getElementById("settleOpIdx").value;
     const person = document.getElementById("debtPersonName").value.trim();
+    const destIdx = document.getElementById("settleDest").value; // Récupère la destination choisie (Caisse ou SIM)
     const opDette = data.operators[opIdx];
     const taux = parseFloat(data.taux) || 1;
 
-    // 1. Récupération des 4 nouveaux champs de détail
-    const pOnUsd_USD = parseFloat(document.getElementById("payOnUsd_USD").value) || 0; // $ payés pour dette USD
-    const pOnUsd_CDF = parseFloat(document.getElementById("payOnUsd_CDF").value) || 0; // FC payés pour dette USD
-    const pOnCdf_USD = parseFloat(document.getElementById("payOnCdf_USD").value) || 0; // $ payés pour dette CDF
-    const pOnCdf_CDF = parseFloat(document.getElementById("payOnCdf_CDF").value) || 0; // FC payés pour dette CDF
+    const pOnUsd_USD = parseFloat(document.getElementById("payOnUsd_USD").value) || 0;
+    const pOnUsd_CDF = parseFloat(document.getElementById("payOnUsd_CDF").value) || 0;
+    const pOnCdf_USD = parseFloat(document.getElementById("payOnCdf_USD").value) || 0;
+    const pOnCdf_CDF = parseFloat(document.getElementById("payOnCdf_CDF").value) || 0;
 
     if(!opDette || !person) {
         alert("Sélectionnez un opérateur et entrez le nom de la personne.");
@@ -509,22 +509,19 @@ window.settleAccountV2 = () => {
 
     const key = `${normalize(opDette.name)}_${normalize(person)}`;
 
-    // 2. Calcul de la réduction réelle sur la fiche de dette (Impact VNC)
-    // Ce qui est payé pour la dette USD est converti en USD
+    // Réduction sur la fiche de dette
     const reductionUSD = pOnUsd_USD + (pOnUsd_CDF / taux);
-    // Ce qui est payé pour la dette CDF est converti en CDF
     const reductionCDF = pOnCdf_CDF + (pOnCdf_USD * taux);
 
-    // 3. Calcul du cash TOTAL qui entre réellement en caisse
+    // Argent total transféré
     const totalCashUSD = pOnUsd_USD + pOnCdf_USD;
     const totalCashCDF = pOnUsd_CDF + pOnCdf_CDF;
 
     if (totalCashUSD === 0 && totalCashCDF === 0) {
-        alert("Veuillez saisir au moins un montant de paiement.");
+        alert("Veuillez saisir au moins un montant.");
         return;
     }
 
-    // Création de la transaction
     const t = createTransaction({
         typeNom: "REGLEMENT",
         operator: opDette.name,
@@ -535,54 +532,55 @@ window.settleAccountV2 = () => {
         mix: { USD: totalCashUSD, CDF: totalCashCDF }
     });
 
-    // --- IMPACTS PRÉCIS ---
     const isMoi = normalize(opDette.name).includes("moi");
+    const direction = isMoi ? -1 : 1; // Si c'est "Moi", l'argent sort (-). Si c'est "Client", l'argent entre (+).
     
-    // Impact sur la fiche de dette (On enlève ce qui a été payé)
+    // 1. Impact sur la fiche de dette (Réduction)
     t.impacts.dette.USD = -reductionUSD;
     t.impacts.dette.CDF = -reductionCDF;
 
-    // Impact sur la caisse (On ajoute l'argent physique reçu)
-    t.impacts.caisse.USD = isMoi ? -totalCashUSD : totalCashUSD;
-    t.impacts.caisse.CDF = isMoi ? -totalCashCDF : totalCashCDF;
-
-    // Pas d'impact sur le solde de l'opérateur lui-même
-    t.impacts.operator.USD = 0;
-    t.impacts.operator.CDF = 0;
+    // 2. LOGIQUE DE DESTINATION DYNAMIQUE
+    if(destIdx === "caisse") {
+        // L'argent touche la caisse physique
+        t.impacts.caisse.USD = totalCashUSD * direction;
+        t.impacts.caisse.CDF = totalCashCDF * direction;
+        t.impacts.operator.USD = 0;
+        t.impacts.operator.CDF = 0;
+    } else {
+        // L'argent touche une autre SIM (Airtel, Orange, etc.)
+        t.impacts.caisse.USD = 0;
+        t.impacts.caisse.CDF = 0;
+        
+        // On cible la SIM de destination
+        const targetSim = data.operators[destIdx];
+        if(targetSim) {
+            targetSim.USD += totalCashUSD * direction;
+            targetSim.CDF += totalCashCDF * direction;
+        }
+        // Pas d'impact sur l'opérateur de dette lui-même (déjà géré par impacts.dette)
+        t.impacts.operator.USD = 0;
+        t.impacts.operator.CDF = 0;
+    }
 
     applyImpacts(t);
 
-    // 4. Calcul du reste pour l'historique (Après impact)
     const currentDebt = data.debts[key] || { USD: 0, CDF: 0 };
-    const resteUSD = currentDebt.USD;
-    const resteCDF = currentDebt.CDF;
-    
-    // Détermination du message de statut (Solde ou Reste)
-    let statusFinal = "";
-    if (resteUSD <= 0.01 && resteCDF <= 10) {
-        statusFinal = "SOLDE TOUTE LA DETTE ✅";
-    } else {
-        statusFinal = `RESTE À PAYER : ${fmt(resteUSD)}$ | ${fmt(resteCDF)}FC`;
-    }
-
-    // Description détaillée pour l'historique
-    const detailPay = `(Payé sur $:${fmt(reductionUSD)}$ | sur FC:${fmt(reductionCDF)}FC)`;
+    const destName = destIdx === "caisse" ? "CAISSE" : data.operators[destIdx].name;
 
     data.transactions.unshift({
         ...t,
         date: new Date().toLocaleString(),
-        desc: `RÈGLEMENT: ${person} ${detailPay} | ${statusFinal}`,
+        desc: `RÈGLEMENT: ${person} vers ${destName} | Reste: ${fmt(currentDebt.USD)}$`,
         usdCash: totalCashUSD,
         cdfCash: totalCashCDF
     });
 
     save();
-    alert("Règlement enregistré avec succès !");
+    alert(`Règlement enregistré vers ${destName} !`);
     render();
     
-    // Vider les champs
     ["payOnUsd_USD","payOnUsd_CDF","payOnCdf_USD","payOnCdf_CDF"].forEach(id => {
-        document.getElementById(id).value = "";
+        if(document.getElementById(id)) document.getElementById(id).value = "";
     });
 };
 
