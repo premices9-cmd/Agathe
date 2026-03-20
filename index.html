@@ -74,19 +74,35 @@
 
     <hr>    
     <div id="debtSettlementBox" style="background:#fefce8; border:2px solid #eab308; padding:15px; border-radius:12px; margin-bottom:15px;">  
-        <h4 style="margin:0 0 5px 0; color:#854d0e;">💰 Remboursement / Paiement Dettes</h4>  
-        <div id="debtStatus" class="debt-alert hidden"></div>  
+    <h4 style="margin:0 0 5px 0; color:#854d0e;">💰 Règlement Précis des Dettes</h4>  
+    <div id="debtStatus" class="debt-alert hidden"></div>  
+    
+    <div class="grid-2">
         <select id="settleOpIdx" onchange="checkDebtBalance()"></select>    
-        <input type="text" id="debtPersonName" placeholder="NOM DE LA PERSONNE" oninput="checkDebtBalance()">  
-        <div class="grid-2">    
-            <input type="number" id="settleUSD" placeholder="Montant $">    
-            <input type="number" id="settleCDF" placeholder="Montant FC">    
-        </div>    
-        <label class="label-sm" style="color:#16a34a;">Provenance/Destination :</label>  
-        <select id="settleDest" style="border: 1px solid #16a34a;"></select>  
-        <input type="text" id="settleMotif" placeholder="Motif additionnel">  
-        <button onclick="settleAccount()" style="background:#eab308; color:black;">VALIDER LE RÈGLEMENT</button>    
-    </div>  
+        <input type="text" id="debtPersonName" placeholder="NOM DU CLIENT" oninput="checkDebtBalance()">  
+    </div>
+
+    <div style="background:#fef9c3; border:1px dashed #eab308; padding:10px; border-radius:8px; margin-top:10px;">
+        <span class="label-sm" style="color:#a16207;">Paiement sur Dette USD ($)</span>
+        <div class="grid-2">
+            <input type="number" id="payOnUsd_USD" placeholder="Payé en $">
+            <input type="number" id="payOnUsd_CDF" placeholder="Payé en FC">
+        </div>
+    </div>
+
+    <div style="background:#fef9c3; border:1px dashed #eab308; padding:10px; border-radius:8px; margin-top:8px;">
+        <span class="label-sm" style="color:#a16207;">Paiement sur Dette CDF (FC)</span>
+        <div class="grid-2">
+            <input type="number" id="payOnCdf_USD" placeholder="Payé en $">
+            <input type="number" id="payOnCdf_CDF" placeholder="Payé en FC">
+        </div>
+    </div>
+
+    <label class="label-sm" style="color:#16a34a; margin-top:10px;">Destination des fonds :</label>  
+    <select id="settleDest" style="border: 1px solid #16a34a;"></select>  
+    
+    <button onclick="settleAccountV2()" style="background:#eab308; color:black; font-weight:bold; margin-top:10px;">VALIDER LE RÈGLEMENT DÉTAILLÉ</button>    
+    </div>
 
     <hr>    
     <h2>Opérations Clients</h2>    
@@ -474,81 +490,100 @@
     });
 };
 
-window.settleAccount = () => {  
+window.settleAccountV2 = () => {  
     const opIdx = document.getElementById("settleOpIdx").value;
     const person = document.getElementById("debtPersonName").value.trim();
-    const sUSD = parseFloat(document.getElementById("settleUSD").value) || 0;
-    const sCDF = parseFloat(document.getElementById("settleCDF").value) || 0;
     const opDette = data.operators[opIdx];
     const taux = parseFloat(data.taux) || 1;
 
-    if(!opDette || !person) return;
+    // 1. Récupération des 4 nouveaux champs de détail
+    const pOnUsd_USD = parseFloat(document.getElementById("payOnUsd_USD").value) || 0; // $ payés pour dette USD
+    const pOnUsd_CDF = parseFloat(document.getElementById("payOnUsd_CDF").value) || 0; // FC payés pour dette USD
+    const pOnCdf_USD = parseFloat(document.getElementById("payOnCdf_USD").value) || 0; // $ payés pour dette CDF
+    const pOnCdf_CDF = parseFloat(document.getElementById("payOnCdf_CDF").value) || 0; // FC payés pour dette CDF
+
+    if(!opDette || !person) {
+        alert("Sélectionnez un opérateur et entrez le nom de la personne.");
+        return;
+    }
 
     const key = `${normalize(opDette.name)}_${normalize(person)}`;
-    const currentDebt = { ...data.debts[key] } || { USD: 0, CDF: 0 };
 
-    // --- LOGIQUE DE FUSION (Multi-Devise) ---
-    // 1. On calcule la valeur totale que le client donne (convertie en USD)
-    let valeurPaiementRestanteUSD = sUSD + (sCDF / taux);
-    
-    // 2. On calcule la valeur totale de ce qu'il doit (convertie en USD)
-    const valeurDetteTotaleUSD = currentDebt.USD + (currentDebt.CDF / taux);
+    // 2. Calcul de la réduction réelle sur la fiche de dette (Impact VNC)
+    // Ce qui est payé pour la dette USD est converti en USD
+    const reductionUSD = pOnUsd_USD + (pOnUsd_CDF / taux);
+    // Ce qui est payé pour la dette CDF est converti en CDF
+    const reductionCDF = pOnCdf_CDF + (pOnCdf_USD * taux);
 
-    // --- ÉTAPE DE REMBOURSEMENT ---
-    let recupUSD = 0;
-    let recupCDF = 0;
+    // 3. Calcul du cash TOTAL qui entre réellement en caisse
+    const totalCashUSD = pOnUsd_USD + pOnCdf_USD;
+    const totalCashCDF = pOnUsd_CDF + pOnCdf_CDF;
 
-    // A. On s'attaque d'abord à la dette en Dollars
-    if (currentDebt.USD > 0) {
-        let payeSurUSD = Math.min(valeurPaiementRestanteUSD, currentDebt.USD);
-        recupUSD = payeSurUSD;
-        valeurPaiementRestanteUSD -= payeSurUSD;
+    if (totalCashUSD === 0 && totalCashCDF === 0) {
+        alert("Veuillez saisir au moins un montant de paiement.");
+        return;
     }
 
-    // B. S'il reste de la valeur dans le paiement, on s'attaque à la dette en FC
-    if (currentDebt.CDF > 0 && valeurPaiementRestanteUSD > 0) {
-        let payeSurCDF_enUSD = Math.min(valeurPaiementRestanteUSD, currentDebt.CDF / taux);
-        recupCDF = payeSurCDF_enUSD * taux;
-        valeurPaiementRestanteUSD -= payeSurCDF_enUSD;
-    }
-
-    // --- CRÉATION DE LA TRANSACTION ---
+    // Création de la transaction
     const t = createTransaction({
         typeNom: "REGLEMENT",
         operator: opDette.name,
         mode: normalize(opDette.name).includes("moi") ? "dette_moi" : "dette_client",
-        amt: sUSD, cur: "USD", person, mix: { USD: sUSD, CDF: sCDF }
+        amt: totalCashUSD, 
+        cur: "USD", 
+        person, 
+        mix: { USD: totalCashUSD, CDF: totalCashCDF }
     });
 
-    // IMPACT VNC : On retire EXACTEMENT ce qui a été épongé sur la fiche client
-    t.impacts.dette.USD = -recupUSD;
-    t.impacts.dette.CDF = -recupCDF;
-
-    // IMPACT CAISSE : On encaisse TOUT (Argent réel en main)
+    // --- IMPACTS PRÉCIS ---
     const isMoi = normalize(opDette.name).includes("moi");
-    t.impacts.caisse.USD = isMoi ? -sUSD : sUSD;
-    t.impacts.caisse.CDF = isMoi ? -sCDF : sCDF;
+    
+    // Impact sur la fiche de dette (On enlève ce qui a été payé)
+    t.impacts.dette.USD = -reductionUSD;
+    t.impacts.dette.CDF = -reductionCDF;
 
-    // Neutraliser l'opérateur de base
+    // Impact sur la caisse (On ajoute l'argent physique reçu)
+    t.impacts.caisse.USD = isMoi ? -totalCashUSD : totalCashUSD;
+    t.impacts.caisse.CDF = isMoi ? -totalCashCDF : totalCashCDF;
+
+    // Pas d'impact sur le solde de l'opérateur lui-même
     t.impacts.operator.USD = 0;
     t.impacts.operator.CDF = 0;
 
     applyImpacts(t);
 
-    // Description avec calcul du Gain Net
-    const gainVNC = Math.max(0, (sUSD + (sCDF / taux)) - (recupUSD + (recupCDF / taux)));
+    // 4. Calcul du reste pour l'historique (Après impact)
+    const currentDebt = data.debts[key] || { USD: 0, CDF: 0 };
+    const resteUSD = currentDebt.USD;
+    const resteCDF = currentDebt.CDF;
+    
+    // Détermination du message de statut (Solde ou Reste)
+    let statusFinal = "";
+    if (resteUSD <= 0.01 && resteCDF <= 10) {
+        statusFinal = "SOLDE TOUTE LA DETTE ✅";
+    } else {
+        statusFinal = `RESTE À PAYER : ${fmt(resteUSD)}$ | ${fmt(resteCDF)}FC`;
+    }
+
+    // Description détaillée pour l'historique
+    const detailPay = `(Payé sur $:${fmt(reductionUSD)}$ | sur FC:${fmt(reductionCDF)}FC)`;
 
     data.transactions.unshift({
         ...t,
         date: new Date().toLocaleString(),
-        desc: `RÈGLEMENT: ${person} ${gainVNC > 0.01 ? '(GAIN: +' + gainVNC.toFixed(2) + '$)' : ''}`,
-        usd: sUSD, 
-        cdf: sCDF
+        desc: `RÈGLEMENT: ${person} ${detailPay} | ${statusFinal}`,
+        usdCash: totalCashUSD,
+        cdfCash: totalCashCDF
     });
 
     save();
-    alert("Dette mise à jour avec conversion automatique ✅");
+    alert("Règlement enregistré avec succès !");
     render();
+    
+    // Vider les champs
+    ["payOnUsd_USD","payOnUsd_CDF","payOnCdf_USD","payOnCdf_CDF"].forEach(id => {
+        document.getElementById(id).value = "";
+    });
 };
 
     // RESTAURATION DE LA LOGIQUE D'HISTORIQUE PAR MOTS-CLÉS  
