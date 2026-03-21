@@ -375,41 +375,51 @@
     function applyImpacts(t, reverse = false) {
     const factor = reverse ? -1 : 1;
 
-    // 1. CAISSE
+    // 1. GESTION DE LA CAISSE (Entrée/Sortie physique)
     if (t.impacts.caisse) {
         data.caisse.USD += (t.impacts.caisse.USD || 0) * factor;
         data.caisse.CDF += (t.impacts.caisse.CDF || 0) * factor;
     }
 
-    // 2. OPÉRATEURS (Argent SIM + STOCK)
+    // 2. GESTION DE L'OPÉRATEUR SOURCE (SIM, STOCK)
+    // C'est ici que l'argent diminue de votre SIM (Airtel, Orange, etc.)
     let op = data.operators.find(o => o.name === t.operator);
     if (op) {
-        // Impact sur le solde monétaire de la SIM
+        // Impact sur le solde monétaire de la SIM (ex: -10$ pour un retrait)
         op.USD += (t.impacts.operator.USD || 0) * factor;
         op.CDF += (t.impacts.operator.CDF || 0) * factor;
-        
-        // --- AMÉLIORATION : Gestion précise du Stock (Décimales autorisées) ---
+
+        // Gestion du Stock SIM (ex: -1 SIM pour une vente)
         if (t.impacts.stock !== undefined && t.impacts.stock !== 0) {
-            // On s'assure que la valeur est traitée comme un nombre décimal (ex: 0.5)
-            const qty = parseFloat(t.impacts.stock);
-            // On ajoute ou retranche au stock existant
-            op.stock = (parseFloat(op.stock) || 0) + (qty * factor);
-            
-            // Sécurité : Arrondi à 2 décimales pour éviter les erreurs de calcul JS (ex: 0.1 + 0.2 = 0.300000004)
+            op.stock = (parseFloat(op.stock) || 0) + (parseFloat(t.impacts.stock) * factor);
             op.stock = Math.round(op.stock * 100) / 100;
         }
     }
 
-    // 3. DETTES
-    if (t.person && t.typeDette) {
+    // 3. LOGIQUE SPÉCIALE : TRANSFERT VERS LE COMPTE DÉPENSES
+    // Si la transaction a le flag "isDepense", on impacte AUSSI le compte Dépenses
+    if (t.isDepense && t.depenseTarget) {
+        let depOp = data.operators.find(o => o.name === t.depenseTarget);
+        if (depOp) {
+            // On ajoute le montant consommé au compteur des dépenses
+            // (On inverse l'impact opérateur car une perte pour la SIM est un gain pour le compteur Dépense)
+            const valUSD = t.realUSD || (Math.abs(t.impacts.operator.USD) || 0);
+            const valCDF = t.realCDF || (Math.abs(t.impacts.operator.CDF) || 0);
+            
+            depOp.USD += valUSD * factor;
+            depOp.CDF += valCDF * factor;
+        }
+    }
+
+    // 4. GESTION DES DETTES (Contrôlée)
+    if (t.person && t.typeDette && (t.mode === "dette_client" || t.mode === "dette_moi" || t.isReglement)) {
         const key = `${normalize(t.typeDette)}_${normalize(t.person)}`;
         if (!data.debts[key]) data.debts[key] = { USD: 0, CDF: 0 };
-
-        const isReglement = t.typeNom === "REGLEMENT" || (t.desc && t.desc.includes("REGLEMENT"));
 
         let impUSD = (t.impacts.dette.USD || 0) * factor;
         let impCDF = (t.impacts.dette.CDF || 0) * factor;
 
+        const isReglement = t.typeNom === "REGLEMENT" || t.isReglement;
         if (isReglement && !reverse) {
             if (impUSD < 0) impUSD = Math.max(impUSD, -data.debts[key].USD);
             if (impCDF < 0) impCDF = Math.max(impCDF, -data.debts[key].CDF);
@@ -418,12 +428,9 @@
         data.debts[key].USD += impUSD;
         data.debts[key].CDF += impCDF;
 
-        let typeGlobal = t.typeDette.includes("client") ? "dette client" : "dette moi";
-        let opG = data.operators.find(o => normalize(o.name).includes(typeGlobal));
-
+        let opG = data.operators.find(o => normalize(o.name).includes(t.typeDette));
         if (opG) {
-            const isSame = opG.name === t.operator;
-            if (!isSame || isReglement) {
+            if (opG.name !== t.operator || isReglement) {
                 opG.USD += impUSD;
                 opG.CDF += impCDF;
             }
@@ -450,10 +457,10 @@ window.addTransaction = () => {
 
     if(!ty || !op) return;
 
-    // --- LOGIQUE DE CAISSE AMÉLIORÉE ---
+    // --- CRÉATION DE LA TRANSACTION ---
     const t = createTransaction({
         typeNom: ty.name,
-        operator: op.name,
+        operator: op.name, 
         mode,
         amt: amtSIM, 
         cur,
@@ -462,34 +469,71 @@ window.addTransaction = () => {
         mix: { USD: mixUSD, CDF: mixCDF } 
     });
 
-    // 1. Impact SIM (dépend du type d'opération : + ou -)
-    t.impacts.operator.USD = (cur === "USD" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
-    t.impacts.operator.CDF = (cur === "CDF" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
+    // Initialisation du tracker pour l'annulation (IMPORTANT)
+    t.impacts.virtuel = { opIdx: null, USD: 0, CDF: 0 };
 
-    // 2. Impact CAISSE (Le "Cœur" de votre demande)
-    const dirCaisse = (parseInt(ty.impC) || 0);
-    
-    // Le montant de base suit la règle du type (ex: Retrait = - / Dépôt = +)
-    // MAIS les commissions sont TOUJOURS ajoutées (+) à la caisse
-    t.impacts.caisse.USD = (mixUSD * dirCaisse) + commUSD;
-    t.impacts.caisse.CDF = (mixCDF * dirCaisse) + commCDF;
+    // --- LOGIQUE D'IMPACT SELON LE MODE ---
+
+    if (mode === "depense") {
+        const depOp = data.operators.find(o => normalize(o.name).includes("depense"));
+        if (!depOp) { alert("Erreur : Créez un compte nommé 'DEPENSES'."); return; }
+
+        t.isDepense = true;
+        t.depenseTarget = depOp.name;
+        t.realUSD = mixUSD;
+        t.realCDF = mixCDF;
+
+        t.impacts.caisse.USD = -mixUSD + commUSD; 
+        t.impacts.caisse.CDF = -mixCDF + commCDF;
+        t.impacts.operator.USD = (cur === "USD" ? amtSIM : 0) * (parseInt(ty.impO) || -1);
+        t.impacts.operator.CDF = (cur === "CDF" ? amtSIM : 0) * (parseInt(ty.impO) || -1);
+        
+    } else if (mode === "virtuel") {
+        const paySimIdx = document.getElementById("paySimSelect").value;
+        const simSource = data.operators[paySimIdx];
+        
+        if (simSource) {
+            const vUSD = (cur === "USD" ? amtSIM : 0);
+            const vCDF = (cur === "CDF" ? amtSIM : 0);
+            
+            // On déduit immédiatement de la SIM source
+            simSource.USD -= vUSD;
+            simSource.CDF -= vCDF;
+
+            // ON SAUVEGARDE L'INDEX pour l'annulation (La clé est ici !)
+            t.impacts.virtuel = { opIdx: paySimIdx, USD: vUSD, CDF: vCDF };
+        }
+        
+        t.impacts.caisse.USD = commUSD;
+        t.impacts.caisse.CDF = commCDF;
+        t.impacts.operator.USD = (cur === "USD" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
+        t.impacts.operator.CDF = (cur === "CDF" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
+
+    } else {
+        const dirCaisse = (parseInt(ty.impC) || 0);
+        t.impacts.operator.USD = (cur === "USD" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
+        t.impacts.operator.CDF = (cur === "CDF" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
+        
+        t.impacts.caisse.USD = (mixUSD * dirCaisse) + commUSD;
+        t.impacts.caisse.CDF = (mixCDF * dirCaisse) + commCDF;
+    }
 
     applyImpacts(t);
 
-    // --- ENREGISTREMENT HISTORIQUE ---
+    // --- ENREGISTREMENT ---
     data.transactions.unshift({
         ...t,
         date: new Date().toLocaleString(),
-        desc: `${ty.name} - ${op.name} (${person ? 'NOM: '+person+' | ' : ''}${motif})`,
+        desc: `${mode === "depense" ? 'DÉPENSE' : ty.name} - ${op.name} (${person ? 'NOM: '+person+' | ' : ''}${motif})`,
         amtSIM: amtSIM, 
         curSIM: cur,
-        usdCash: mixUSD, // On garde le cash de base
+        usdCash: mixUSD,
         cdfCash: mixCDF,
-        commission: { usd: commUSD, cdf: commCDF } // On stocke la commission à part pour l'affichage
+        commission: { usd: commUSD, cdf: commCDF }
     });
 
     save();
-    alert("Opération et commissions enregistrées !");
+    alert(mode === "depense" ? "Dépense enregistrée !" : "Opération enregistrée !");
     render();
     
     ["amount","mixUSD","mixCDF","commUSD","commCDF","motif","personName", "stkMove"].forEach(id => {
@@ -813,11 +857,22 @@ window.cancelTransaction = (index) => {
     const t = data.transactions[index];  
     if(!t) return;
 
-    // Cas spécifique du transfert
+    // 1. GESTION DU MODE VIRTUEL (INTER-SIM) - CRUCIAL
+    // Si l'opération a utilisé une autre SIM pour payer, on rend l'argent à cette SIM
+    if(t.impacts && t.impacts.virtuel && t.impacts.virtuel.opIdx !== null) {
+        const v = t.impacts.virtuel;
+        const opSourceSecondaire = data.operators[v.opIdx];
+        if(opSourceSecondaire) {
+            opSourceSecondaire.USD += v.USD; // On remet les USD
+            opSourceSecondaire.CDF += v.CDF; // On remet les FC
+        }
+    }
+
+    // 2. CAS SPÉCIFIQUE DU TRANSFERT / CHANGE
     if(t.mode === 'transfert' && t.impacts && t.impacts.isTransfer) {
         const { source, dest } = t.impacts;
 
-        // On remet l'argent à la source
+        // On remet l'argent à la source initiale
         if(source.idx === "caisse") data.caisse[source.cur] += source.amt;
         else if(data.operators[source.idx]) data.operators[source.idx][source.cur] += source.amt;
 
@@ -825,16 +880,21 @@ window.cancelTransaction = (index) => {
         if(dest.idx === "caisse") data.caisse[dest.cur] -= dest.amt;
         else if(data.operators[dest.idx]) data.operators[dest.idx][dest.cur] -= dest.amt;
 
-        alert("Transfert inversé avec succès ✅");
-    } else {
-        // Logique normale pour les autres transactions
+        alert("Transfert/Change inversé avec succès ✅");
+    } 
+    else {
+        // 3. LOGIQUE NORMALE (Vente, Retrait, Dépôt, Dette, Dépense)
+        // Le paramètre "true" inverse les impacts dans applyImpacts
         applyImpacts(t, true);
     }
   
+    // Suppression définitive de la transaction
     data.transactions.splice(index, 1);  
+    
     save();  
     render();  
     showFullHistory("general");  
+    alert("Opération annulée et soldes mis à jour !");
 };
 
     window.quickEditOp = (i) => {    
@@ -960,18 +1020,19 @@ window.cancelTransaction = (index) => {
     document.getElementById("caisseCDF").innerText = fmt(data.caisse.CDF);    
     document.getElementById("rateM").innerText = t;    
 
-    // 1. Valeur du Tiroir (Cash)
+    // 1. Valeur du Tiroir (Cash réel)
     let totalCaisse = (parseFloat(data.caisse.USD) || 0) + ((parseFloat(data.caisse.CDF) || 0) / t);    
     
-    let totalSims = 0;     // Argent dans les SIM (Airtel, Orange, Momo...)
-    let totalDetteClient = 0; // Argent dehors chez les clients (Actif)
-    let totalDetteMoi = 0;    // Argent que je dois aux autres (Passif)
-    let totalS = 0;           // Nombre de SIM en stock
+    let totalSims = 0;        // Capital dans les SIM + Valeur de leur stock
+    let totalDetteClient = 0; // Ce que les clients vous doivent (Actif)
+    let totalDetteMoi = 0;    // Ce que vous devez (Passif)
+    let totalS = 0;           // Nombre total de SIM en stock
 
+    // 2. Calcul et Affichage des Balances Opérateurs
     document.getElementById("operatorBalances").innerHTML = data.operators.map((o, i) => {    
         const usd = parseFloat(o.USD) || 0;
         const cdf = parseFloat(o.CDF) || 0;
-        const stk = parseInt(o.stock) || 0;
+        const stk = parseFloat(o.stock) || 0; // Acceptation des décimales pour le stock
         const px = parseFloat(o.prixAchat) || 0;    
         const n = normalize(o.name);
         const valEquivUSD = usd + (cdf / t);    
@@ -983,30 +1044,32 @@ window.cancelTransaction = (index) => {
             totalDetteMoi += valEquivUSD; 
         }     
         else if(n.includes("dette client")) { 
-            cardClass = "negative"; // Rouge car l'argent n'est pas là, mais c'est un BIEN
+            cardClass = "negative"; 
             totalDetteClient += valEquivUSD; 
         }     
         else if(n.includes("depense")) {
             cardClass = "negative";
-            // Les dépenses ne sont pas stockées dans la VNC (elles sont déjà déduites de la caisse)
+            // IMPORTANT : On ne l'ajoute nulle part dans la VNC. 
+            // C'est de l'argent déjà "perdu" ou consommé.
         }
         else { 
-            // C'est un compte actif (Airtel, Orange, etc.)
+            // Compte actif standard (Airtel, Orange, etc.)
+            // On ajoute le solde cash de la SIM + la valeur marchande du stock de cartes
             totalSims += (valEquivUSD + (stk * px)); 
         }    
         
         totalS += stk;    
-        return `<div class="card ${cardClass}"><b>${o.name}</b>: ${fmt(o.USD)}$ | ${fmt(o.CDF)}FC<br><small>Stock: ${o.stock} SIM</small></div>`;    
+        return `<div class="card ${cardClass}"><b>${o.name}</b>: ${fmt(o.USD)}$ | ${fmt(o.CDF)}FC<br><small>Stock: ${fmt(o.stock)} SIM</small></div>`;    
     }).join("");    
 
-    // 🔥 LA FORMULE COMPTABLE MIRACLE :
-    // VNC = (Cash) + (Soldes SIM + Valeur Stock) + (Dettes des Clients) - (Dettes que je dois)
+    // 3. LA FORMULE DE LA VALEUR NETTE COMPTABLE (VNC)
+    // VNC = (Cash Tiroir) + (Capital SIM & Stock) + (Dettes Clients) - (Dettes à payer)
     const vncFinale = totalCaisse + totalSims + totalDetteClient - totalDetteMoi;
 
     document.getElementById("totalVNC").innerText = fmt(vncFinale) + " $";    
-    document.getElementById("totalStock").innerText = totalS;    
+    document.getElementById("totalStock").innerText = fmt(totalS);    
 
-    // Mise à jour des listes déroulantes (Select)
+    // 4. Mise à jour des listes déroulantes (Menus Select)
     const opOps = data.operators.map((o, i) => `<option value="${i}">${o.name}</option>`).join("");    
     document.getElementById("operatorSelect").innerHTML = opOps;    
     document.getElementById("srcWallet").innerHTML = '<option value="caisse">Caisse</option>' + opOps;    
@@ -1015,6 +1078,7 @@ window.cancelTransaction = (index) => {
     document.getElementById("settleOpIdx").innerHTML = opOps;    
     document.getElementById("settleDest").innerHTML = '<option value="caisse">🏠 CAISSE (CASH)</option>' + opOps;  
     
+    // 5. Interface Administration
     document.getElementById("adminOpEditList").innerHTML = data.operators.map((o,i) => `
         <div class="card">
             ${o.name}
