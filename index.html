@@ -193,22 +193,29 @@
                     <input type="number" id="editCashCDF" placeholder="Caisse FC">    
                 </div>    
                 <button onclick="updateAdminBasics()" style="background:#0f172a">APPLIQUER</button>    
-            </div>    
+                </div>    
 
-            <div style="background:white; padding:10px; border-radius:8px; margin-bottom:10px; color:black;">    
-                <h4>Nouveau Compte</h4>    
-                <input type="text" id="newOpName" placeholder="Nom">    
-                <div class="grid-2">    
-                    <input type="number" id="initUSD" placeholder="USD">    
-                    <input type="number" id="initCDF" placeholder="CDF">    
-                </div>    
-                <div class="grid-2">    
-                    <input type="number" id="initStock" placeholder="SIM">    
-                    <input type="number" id="initPrice" placeholder="P.A. SIM $">    
-                </div>    
-                <button onclick="addOperator()" style="background:#b91c1c">CREER COMPTE</button>    
-            </div>    
-            <div id="adminOpEditList" style="margin-top:10px; color:black;"></div>    
+            <div style="background:white; padding:10px; border-radius:8px; margin-bottom:10px; color:black; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">    
+                <h4 style="margin-top:0; margin-bottom:10px; color:#b91c1c;">Nouveau Compte</h4>    
+    
+                <input type="text" id="newOpName" placeholder="Nom du compte (ex: Airtel 01)" style="width:100%; margin-bottom:8px; padding:8px; border:1px solid #ccc; border-radius:4px;">    
+    
+                <div class="grid-2" style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:8px;">    
+                    <input type="number" id="initUSD" placeholder="Solde Initial $" step="any" style="padding:8px; border:1px solid #ccc; border-radius:4px;">    
+                    <input type="number" id="initCDF" placeholder="Solde Initial FC" step="any" style="padding:8px; border:1px solid #ccc; border-radius:4px;">    
+               </div>    
+    
+               <div class="grid-2" style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:10px;">    
+                  <input type="number" id="initStock" placeholder="Stock SIM initial" step="any" style="padding:8px; border:1px solid #ccc; border-radius:4px;">    
+                  <input type="number" id="initPrice" placeholder="Prix Achat SIM $" step="any" style="padding:8px; border:1px solid #ccc; border-radius:4px;">    
+               </div>    
+    
+               <button onclick="addOperator()" style="background:#b91c1c; color:white; width:100%; padding:10px; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">
+        🚀 CRÉER LE COMPTE
+                </button>    
+               </div>
+    
+               <div id="adminOpEditList" style="margin-top:10px; color:black;"></div>    
         </div>    
     </div>    
 </div>
@@ -381,10 +388,15 @@
         op.USD += (t.impacts.operator.USD || 0) * factor;
         op.CDF += (t.impacts.operator.CDF || 0) * factor;
         
-        // --- CORRECTION : Impact sur le Stock Physique ---
-        if (t.impacts.stock) {
-            // Si c'est une vente, t.impacts.stock sera -1, donc op.stock diminue.
-            op.stock += (t.impacts.stock * factor);
+        // --- AMÉLIORATION : Gestion précise du Stock (Décimales autorisées) ---
+        if (t.impacts.stock !== undefined && t.impacts.stock !== 0) {
+            // On s'assure que la valeur est traitée comme un nombre décimal (ex: 0.5)
+            const qty = parseFloat(t.impacts.stock);
+            // On ajoute ou retranche au stock existant
+            op.stock = (parseFloat(op.stock) || 0) + (qty * factor);
+            
+            // Sécurité : Arrondi à 2 décimales pour éviter les erreurs de calcul JS (ex: 0.1 + 0.2 = 0.300000004)
+            op.stock = Math.round(op.stock * 100) / 100;
         }
     }
 
@@ -419,14 +431,12 @@
     }
 }
 
-
-    window.addTransaction = () => {  
+window.addTransaction = () => {  
     const opI = document.getElementById("operatorSelect").value;
     const tyI = document.getElementById("typeSelect").value;
-    const amtSIM = parseFloat(document.getElementById("amount").value) || 0; // Montant sur la SIM
+    const amtSIM = parseFloat(document.getElementById("amount").value) || 0; 
     const cur = document.getElementById("currency").value;
     
-    // Récupération des détails Cash (Ce qui touche réellement le tiroir)
     const mixUSD = parseFloat(document.getElementById("mixUSD").value) || 0;
     const mixCDF = parseFloat(document.getElementById("mixCDF").value) || 0;
     const commUSD = parseFloat(document.getElementById("commUSD").value) || 0;
@@ -440,52 +450,49 @@
 
     if(!ty || !op) return;
 
-    // Calcul de l'argent Réel (Cash + Commission)
-    const netCashUSD = mixUSD + commUSD;
-    const netCashCDF = mixCDF + commCDF;
-
+    // --- LOGIQUE DE CAISSE AMÉLIORÉE ---
     const t = createTransaction({
         typeNom: ty.name,
         operator: op.name,
         mode,
-        amt: amtSIM, // On garde le montant SIM pour l'impact Opérateur
+        amt: amtSIM, 
         cur,
         person,
-        stk: parseInt(document.getElementById("stkMove").value) || 0,
+        stk: parseFloat(document.getElementById("stkMove").value) || 0,
         mix: { USD: mixUSD, CDF: mixCDF } 
     });
 
-    // --- LOGIQUE D'IMPACT STRICTE ---
-    
-    // 1. Impact SIM : Toujours basé sur "Montant Opération"
+    // 1. Impact SIM (dépend du type d'opération : + ou -)
     t.impacts.operator.USD = (cur === "USD" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
     t.impacts.operator.CDF = (cur === "CDF" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
 
-    // 2. Impact CAISSE : Basé UNIQUEMENT sur le "Détail Cash"
-    const aSaisiCash = (mixUSD > 0 || mixCDF > 0 || commUSD > 0 || commCDF > 0);
-    const dirCaisse = aSaisiCash ? (parseInt(ty.impC) || 0) : 0;
-
-    t.impacts.caisse.USD = netCashUSD * dirCaisse;
-    t.impacts.caisse.CDF = netCashCDF * dirCaisse;
+    // 2. Impact CAISSE (Le "Cœur" de votre demande)
+    const dirCaisse = (parseInt(ty.impC) || 0);
+    
+    // Le montant de base suit la règle du type (ex: Retrait = - / Dépôt = +)
+    // MAIS les commissions sont TOUJOURS ajoutées (+) à la caisse
+    t.impacts.caisse.USD = (mixUSD * dirCaisse) + commUSD;
+    t.impacts.caisse.CDF = (mixCDF * dirCaisse) + commCDF;
 
     applyImpacts(t);
 
-    // Sauvegarde avec distinction SIM vs CASH pour l'historique
+    // --- ENREGISTREMENT HISTORIQUE ---
     data.transactions.unshift({
         ...t,
         date: new Date().toLocaleString(),
-        desc: `${ty.name} - ${op.name} (${person ? 'NOM: '+person+' | ' : ''}${motif})${!aSaisiCash ? ' [SANS CASH]' : ''}`,
-        amtSIM: amtSIM, // Le montant "Virtuel"
+        desc: `${ty.name} - ${op.name} (${person ? 'NOM: '+person+' | ' : ''}${motif})`,
+        amtSIM: amtSIM, 
         curSIM: cur,
-        usdCash: netCashUSD, // Le montant "Physique"
-        cdfCash: netCashCDF
+        usdCash: mixUSD, // On garde le cash de base
+        cdfCash: mixCDF,
+        commission: { usd: commUSD, cdf: commCDF } // On stocke la commission à part pour l'affichage
     });
 
     save();
-    alert(aSaisiCash ? "Opération enregistrée (SIM & Caisse)" : "Opération enregistrée (SIM uniquement)");
+    alert("Opération et commissions enregistrées !");
     render();
     
-    ["amount","mixUSD","mixCDF","commUSD","commCDF","motif","personName"].forEach(id => {
+    ["amount","mixUSD","mixCDF","commUSD","commCDF","motif","personName", "stkMove"].forEach(id => {
         if(document.getElementById(id)) document.getElementById(id).value = "";
     });
 };
@@ -493,7 +500,7 @@
 window.settleAccountV2 = () => {  
     const opIdx = document.getElementById("settleOpIdx").value;
     const person = document.getElementById("debtPersonName").value.trim();
-    const destIdx = document.getElementById("settleDest").value; // Récupère la destination choisie (Caisse ou SIM)
+    const destIdx = document.getElementById("settleDest").value;
     const opDette = data.operators[opIdx];
     const taux = parseFloat(data.taux) || 1;
 
@@ -508,12 +515,12 @@ window.settleAccountV2 = () => {
     }
 
     const key = `${normalize(opDette.name)}_${normalize(person)}`;
+    // ON GARDE LES ANCIENS SOLDES POUR L'HISTORIQUE
+    const oldDebt = JSON.parse(JSON.stringify(data.debts[key] || { USD: 0, CDF: 0 }));
 
-    // Réduction sur la fiche de dette
     const reductionUSD = pOnUsd_USD + (pOnUsd_CDF / taux);
     const reductionCDF = pOnCdf_CDF + (pOnCdf_USD * taux);
 
-    // Argent total transféré
     const totalCashUSD = pOnUsd_USD + pOnCdf_USD;
     const totalCashCDF = pOnUsd_CDF + pOnCdf_CDF;
 
@@ -526,60 +533,64 @@ window.settleAccountV2 = () => {
         typeNom: "REGLEMENT",
         operator: opDette.name,
         mode: normalize(opDette.name).includes("moi") ? "dette_moi" : "dette_client",
-        amt: totalCashUSD, 
+        amt: totalCashUSD, // On garde le total USD pour la cohérence
         cur: "USD", 
         person, 
         mix: { USD: totalCashUSD, CDF: totalCashCDF }
     });
 
     const isMoi = normalize(opDette.name).includes("moi");
-    const direction = isMoi ? -1 : 1; // Si c'est "Moi", l'argent sort (-). Si c'est "Client", l'argent entre (+).
+    const direction = isMoi ? -1 : 1; 
     
     // 1. Impact sur la fiche de dette (Réduction)
     t.impacts.dette.USD = -reductionUSD;
     t.impacts.dette.CDF = -reductionCDF;
 
-    // 2. LOGIQUE DE DESTINATION DYNAMIQUE
+    // 2. Destination des fonds
+    const destName = destIdx === "caisse" ? "CAISSE" : data.operators[destIdx].name;
+
     if(destIdx === "caisse") {
-        // L'argent touche la caisse physique
         t.impacts.caisse.USD = totalCashUSD * direction;
         t.impacts.caisse.CDF = totalCashCDF * direction;
         t.impacts.operator.USD = 0;
         t.impacts.operator.CDF = 0;
     } else {
-        // L'argent touche une autre SIM (Airtel, Orange, etc.)
         t.impacts.caisse.USD = 0;
         t.impacts.caisse.CDF = 0;
-        
-        // On cible la SIM de destination
         const targetSim = data.operators[destIdx];
         if(targetSim) {
             targetSim.USD += totalCashUSD * direction;
             targetSim.CDF += totalCashCDF * direction;
         }
-        // Pas d'impact sur l'opérateur de dette lui-même (déjà géré par impacts.dette)
         t.impacts.operator.USD = 0;
         t.impacts.operator.CDF = 0;
     }
 
     applyImpacts(t);
+    const newDebt = data.debts[key];
 
-    const currentDebt = data.debts[key] || { USD: 0, CDF: 0 };
-    const destName = destIdx === "caisse" ? "CAISSE" : data.operators[destIdx].name;
-
+    // SAUVEGARDE ENRICHIE POUR L'HISTORIQUE
     data.transactions.unshift({
         ...t,
         date: new Date().toLocaleString(),
-        desc: `RÈGLEMENT: ${person} vers ${destName} | Reste: ${fmt(currentDebt.USD)}$`,
+        desc: `RÈGLEMENT: ${person} vers ${destName}`,
+        isReglement: true,
+        debtBefore: oldDebt,
+        debtAfter: newDebt,
+        payDetail: {
+            onUsd: { usd: pOnUsd_USD, cdf: pOnUsd_CDF },
+            onCdf: { usd: pOnCdf_USD, cdf: pOnCdf_CDF }
+        },
         usdCash: totalCashUSD,
         cdfCash: totalCashCDF
     });
 
     save();
-    alert(`Règlement enregistré vers ${destName} !`);
+    alert(`Règlement de ${person} vers ${destName} enregistré !`);
     render();
     
-    ["payOnUsd_USD","payOnUsd_CDF","payOnCdf_USD","payOnCdf_CDF"].forEach(id => {
+    // Nettoyage des champs
+    ["payOnUsd_USD","payOnUsd_CDF","payOnCdf_USD","payOnCdf_CDF","debtPersonName"].forEach(id => {
         if(document.getElementById(id)) document.getElementById(id).value = "";
     });
 };
@@ -622,7 +633,7 @@ window.settleAccountV2 = () => {
         const realIdx = data.transactions.indexOf(t);
         const desc = t.desc || "";  
 
-        // --- DESIGN SPECIAL POUR LES TRANSFERTS ---
+        // --- 1. DESIGN SPÉCIAL POUR LES TRANSFERTS ---
         if (t.mode === 'transfert' && t.transferDetails) {
             const d = t.transferDetails;
             return `
@@ -652,7 +663,54 @@ window.settleAccountV2 = () => {
             </div>`;
         }
 
-        // --- DESIGN CLASSIQUE POUR LES AUTRES OPERATIONS ---
+        // --- 2. DESIGN SPÉCIAL POUR LES RÈGLEMENTS DE DETTES ---
+        if (t.isReglement && t.debtBefore) {
+            const b = t.debtBefore;
+            const a = t.debtAfter;
+            const p = t.payDetail;
+            const estSolde = (Math.abs(a.USD) < 0.1 && Math.abs(a.CDF) < 100);
+
+            return `
+            <div style="background:#fff7ed; border-radius:16px; padding:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); border-left:5px solid #eab308;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <span style="font-size:11px; color:#64748b;">${t.date}</span>
+                    <span style="font-weight:bold; color:#854d0e; font-size:12px;">💰 RÈGLEMENT DETTE</span>
+                    ${isAdmin ? `
+                        <button onclick="cancelTransaction(${realIdx})" style="background:#f59e0b;color:#fff;border:none;padding:4px 8px;border-radius:6px;font-size:10px;cursor:pointer;">↩ Annuler</button>
+                    ` : ""}
+                </div>
+                
+                <div style="display:grid; grid-template-columns: 1fr 1.5fr 1fr; gap:8px; align-items:center; background:white; padding:10px; border-radius:10px;">
+                    <div style="text-align:center;">
+                        <div style="font-size:9px; color:#9a3412; font-weight:bold;">ÉTAIT DÛ</div>
+                        <div style="font-weight:bold; font-size:13px; color:#0f172a;">${fmt(b.USD)}$</div>
+                        <div style="font-size:11px; color:#475569;">${fmt(b.CDF)} FC</div>
+                    </div>
+
+                    <div style="font-size:10px; border-left:1px solid #fed7aa; border-right:1px solid #fed7aa; padding:0 8px;">
+                        <div style="font-weight:bold; color:#166534; margin-bottom:3px; text-transform:uppercase;">Payé par ${t.person} :</div>
+                        <div style="display:flex; justify-content:space-between;">
+                            <span>Sur $:</span> <b>${fmt(p.onUsd.usd)}$ + ${fmt(p.onUsd.cdf)}FC</b>
+                        </div>
+                        <div style="display:flex; justify-content:space-between;">
+                            <span>Sur FC:</span> <b>${fmt(p.onCdf.usd)}$ + ${fmt(p.onCdf.cdf)}FC</b>
+                        </div>
+                    </div>
+
+                    <div style="text-align:center;">
+                        ${estSolde ? 
+                            `<div style="background:#16a34a; color:white; padding:6px; border-radius:8px; font-weight:bold; font-size:12px; border:2px solid #bcf0da;">SOLDE</div>` : 
+                            `<div style="font-size:9px; color:#64748b; font-weight:bold;">RESTE À PAYER</div>
+                             <div style="font-weight:bold; font-size:13px; color:#dc2626;">${fmt(a.USD)}$</div>
+                             <div style="font-size:11px; color:#dc2626;">${fmt(a.CDF)} FC</div>`
+                        }
+                    </div>
+                </div>
+                <div style="font-size:10px; margin-top:5px; color:#9a3412; text-align:center; font-style:italic;">${desc}</div>
+            </div>`;
+        }
+
+        // --- 3. DESIGN CLASSIQUE POUR LES AUTRES OPERATIONS ---
         const parts = desc.split("-");  
         const type = parts[0] ? parts[0].trim() : "";  
         const rest = parts[1] ? parts[1].trim() : "";  
@@ -688,12 +746,15 @@ window.settleAccountV2 = () => {
         else if(resteUSD > 0 || resteCDF > 0) { resteTxt = `Reste : ${fmt(resteUSD)}$ ${resteCDF ? "| " + fmt(resteCDF) + "FC" : ""}`; resteColor = "#dc2626"; }  
         else if(resteUSD < 0 || resteCDF < 0) { resteTxt = `Avance : ${fmt(Math.abs(resteUSD))}$ ${resteCDF ? "| " + fmt(Math.abs(resteCDF)) + "FC" : ""}`; resteColor = "#0ea5e9"; }  
   
-        let icon = "📄"; let stockDisplay = "";
-        const qteStock = t.stk || (t.impacts && t.impacts.stock) || 0;
+        let icon = "📄"; 
+        let stockDisplay = "";
+
+        // --- AMÉLIORATION : Gestion du stock décimal dans l'historique ---
+        const qteStock = parseFloat(t.stk || (t.impacts && t.impacts.stock) || 0);
         if(qteStock !== 0) {
             const sColor = qteStock > 0 ? "#16a34a" : "#ef4444";
             const sSign = qteStock > 0 ? "+" : "";
-            stockDisplay = `<div style="color:${sColor}; font-weight:bold; font-size:10px; margin-top:2px;">Stock: ${sSign}${qteStock}</div>`;
+            stockDisplay = `<div style="color:${sColor}; font-weight:bold; font-size:10px; margin-top:2px;">Stock: ${sSign}${fmt(qteStock)}</div>`;
         }
 
         if(normalize(type).includes("retrait")) icon = "💸";  
@@ -701,10 +762,13 @@ window.settleAccountV2 = () => {
         else if(normalize(type).includes("vente")) icon = "🛒";  
         else if(normalize(type).includes("reglement")) icon = "✔";  
   
-        // Calcul des montants pour l'affichage double
         const montantSIM = t.amtSIM || t.amt || 0;
         const deviseSIM = t.curSIM || t.cur || "USD";
         const hasCash = (t.usdCash > 0 || t.cdfCash > 0);
+
+        // --- NOUVEAUTÉ : Affichage de la Commission ---
+        const cUSD = (t.commission && t.commission.usd) ? t.commission.usd : 0;
+        const cCDF = (t.commission && t.commission.cdf) ? t.commission.cdf : 0;
 
         return `  
         <div style="background:#ffffff; border-radius:16px; padding:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); border-left:5px solid #0ea5e9;">  
@@ -726,6 +790,10 @@ window.settleAccountV2 = () => {
                     ${hasCash ? 
                         `<div style="color:#16a34a; font-size:10px; font-weight:600;">CASH: ${fmt(t.usdCash || 0)}$ | ${fmt(t.cdfCash || 0)}FC</div>` : 
                         `<div style="color:#94a3b8; font-size:9px; font-style:italic;">Aucun Cash</div>`
+                    }
+                    ${(cUSD > 0 || cCDF > 0) ? 
+                        `<div style="color:#0ea5e9; font-size:10px; font-weight:bold; background:#f0f9ff; border-radius:4px; padding:1px 3px;">+ COM: ${fmt(cUSD)}$ | ${fmt(cCDF)}FC</div>` : 
+                        ""
                     }
                 </div>  
 
@@ -851,10 +919,31 @@ window.cancelTransaction = (index) => {
     };  
   
     window.addOperator = () => {    
-        const op = { name: document.getElementById("newOpName").value, USD: parseFloat(document.getElementById("initUSD").value) || 0, CDF: parseFloat(document.getElementById("initCDF").value) || 0, stock: parseInt(document.getElementById("initStock").value) || 0, prixAchat: parseFloat(document.getElementById("initPrice").value) || 0 };    
-        if(op.name) { data.operators.push(op); save(); alert("Compte créé"); }    
+    const op = { 
+        name: document.getElementById("newOpName").value.trim(), 
+        USD: parseFloat(document.getElementById("initUSD").value) || 0, 
+        CDF: parseFloat(document.getElementById("initCDF").value) || 0, 
+        // --- AMÉLIORATION : Accepter les stocks décimaux (ex: 0.5) ---
+        stock: parseFloat(document.getElementById("initStock").value) || 0, 
+        prixAchat: parseFloat(document.getElementById("initPrice").value) || 0 
     };    
-  
+
+    if(op.name) { 
+        data.operators.push(op); 
+        save(); 
+        alert(`Compte "${op.name}" créé avec succès`); 
+        
+        // --- AMÉLIORATION : Vider les champs après création ---
+        ["newOpName", "initUSD", "initCDF", "initStock", "initPrice"].forEach(id => {
+            if(document.getElementById(id)) document.getElementById(id).value = "";
+        });
+
+        render(); // Mettre à jour l'affichage immédiatement
+    } else {
+        alert("Veuillez entrer au moins un nom pour le compte.");
+    }
+};
+    
     window.addType = () => {    
         const name = document.getElementById("newTypeName").value, impO = parseInt(document.getElementById("impO").value), impC = parseInt(document.getElementById("impC").value), impS = parseInt(document.getElementById("impS").value);    
         if(name) { data.types.push({ name, impO, impC, impS }); save(); alert("Type créé"); }    
