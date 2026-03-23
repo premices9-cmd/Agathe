@@ -423,21 +423,22 @@
         data.caisse.CDF += (t.impacts.caisse.CDF || 0) * factor;
     }
 
-    // 2. GESTION DE L'OPÉRATEUR SOURCE (SIM, STOCK)
-    let op = data.operators.find(o => o.name === t.operator);
+    // 2. GESTION DE L'OPÉRATEUR SOURCE (Recherche insensible à la casse)
+    let op = data.operators.find(o => normalize(o.name) === normalize(t.operator));
     if (op && t.impacts && t.impacts.operator) {
         op.USD += (t.impacts.operator.USD || 0) * factor;
         op.CDF += (t.impacts.operator.CDF || 0) * factor;
 
         if (t.stk !== undefined && t.stk !== 0) {
             op.stock = (parseFloat(op.stock) || 0) + (parseFloat(t.stk) * factor);
+            // On garde l'arrondi pour éviter les erreurs de virgule flottante
             op.stock = Math.round(op.stock * 100) / 100;
         }
     }
 
-    // 3. LOGIQUE DÉPENSES
+    // 3. LOGIQUE DÉPENSES (Maintenue depuis votre code actuel)
     if (t.isDepense && t.depenseTarget) {
-        let depOp = data.operators.find(o => o.name === t.depenseTarget);
+        let depOp = data.operators.find(o => normalize(o.name) === normalize(t.depenseTarget));
         if (depOp) {
             const valUSD = t.realUSD || Math.abs(t.impacts.operator.USD || 0);
             const valCDF = t.realCDF || Math.abs(t.impacts.operator.CDF || 0);
@@ -446,25 +447,22 @@
         }
     }
 
-    // 4. GESTION DES DETTES (Synchronisée avec addTransaction)
-    // On vérifie t.isDette (défini dans addTransaction) ou t.isReglement
+    // 4. GESTION DES DETTES (Sécurité majuscules + Synchronisation)
     if (t.person && t.typeDette && (t.isDette || t.isReglement)) {
         const key = `${normalize(t.typeDette)}_${normalize(t.person)}`;
         if (!data.debts[key]) data.debts[key] = { USD: 0, CDF: 0 };
 
-        // CORRECTION ICI : On utilise les montants calculés par addTransaction
-        // Si c'est un règlement, on utilise les impacts spécifiques, sinon la dette brute
         let impUSD = (t.isReglement ? t.impacts.dette.USD : (t.detteUSD || 0)) * factor;
         let impCDF = (t.isReglement ? t.impacts.dette.CDF : (t.detteCDF || 0)) * factor;
 
         data.debts[key].USD += impUSD;
         data.debts[key].CDF += impCDF;
 
-        // Mise à jour du compte global (Compte "DETTE CLIENT" ou "DETTE MOI")
+        // Mise à jour du compte global (ex: "DETTE CLIENT")
         let opG = data.operators.find(o => normalize(o.name).includes(normalize(t.typeDette)));
         if (opG) {
-            // On n'impacte le compte global que si ce n'est pas déjà l'opérateur source
-            if (opG.name !== t.operator || t.isReglement) {
+            // On n'impacte le compte global que si ce n'est pas déjà l'opérateur source ou si c'est un règlement
+            if (normalize(opG.name) !== normalize(t.operator) || t.isReglement) {
                 opG.USD += impUSD;
                 opG.CDF += impCDF;
             }
@@ -619,82 +617,80 @@ window.settleAccountV2 = () => {
         return;
     }
 
-    const key = `${normalize(opDette.name)}_${normalize(person)}`;
-    // ON GARDE LES ANCIENS SOLDES POUR L'HISTORIQUE
+    // --- LOGIQUE DE CLÉ (SÉCURISÉE) ---
+    const typeDette = normalize(opDette.name).includes("moi") ? "dette moi" : "dette client";
+    const key = `${normalize(typeDette)}_${normalize(person)}`;
+    
+    // ON GARDE L'ANCIEN SOLDE (Important pour ton journal !)
     const oldDebt = JSON.parse(JSON.stringify(data.debts[key] || { USD: 0, CDF: 0 }));
 
+    // --- CALCULS ---
     const reductionUSD = pOnUsd_USD + (pOnUsd_CDF / taux);
     const reductionCDF = pOnCdf_CDF + (pOnCdf_USD * taux);
-
     const totalCashUSD = pOnUsd_USD + pOnCdf_USD;
     const totalCashCDF = pOnUsd_CDF + pOnCdf_CDF;
 
     if (totalCashUSD === 0 && totalCashCDF === 0) {
-        alert("Veuillez saisir au moins un montant.");
+        alert("Veuillez saisir un montant.");
         return;
     }
 
-    const t = createTransaction({
+    const direction = typeDette === "dette moi" ? -1 : 1;
+
+    // --- CONSTRUCTION DE LA TRANSACTION ---
+    const t = {
+        id: Date.now(),
+        date: new Date().toLocaleString(),
         typeNom: "REGLEMENT",
         operator: opDette.name,
-        mode: normalize(opDette.name).includes("moi") ? "dette_moi" : "dette_client",
-        amt: totalCashUSD, // On garde le total USD pour la cohérence
-        cur: "USD", 
-        person, 
-        mix: { USD: totalCashUSD, CDF: totalCashCDF }
-    });
+        person: person,
+        typeDette: typeDette,
+        isReglement: true,
+        amt: totalCashUSD,
+        cur: "USD",
+        impacts: {
+            caisse: { USD: 0, CDF: 0 },
+            dette: { USD: -reductionUSD, CDF: -reductionCDF },
+            operator: { USD: 0, CDF: 0 }
+        },
+        usdCash: totalCashUSD,
+        cdfCash: totalCashCDF,
+        payDetail: {
+            onUsd: { usd: pOnUsd_USD, cdf: pOnUsd_CDF },
+            onCdf: { usd: pOnCdf_USD, cdf: pOnCdf_CDF }
+        },
+        debtBefore: oldDebt // On réintègre cette ligne !
+    };
 
-    const isMoi = normalize(opDette.name).includes("moi");
-    const direction = isMoi ? -1 : 1; 
-    
-    // 1. Impact sur la fiche de dette (Réduction)
-    t.impacts.dette.USD = -reductionUSD;
-    t.impacts.dette.CDF = -reductionCDF;
-
-    // 2. Destination des fonds
+    // --- DESTINATION DES FONDS ---
     const destName = destIdx === "caisse" ? "CAISSE" : data.operators[destIdx].name;
 
     if(destIdx === "caisse") {
         t.impacts.caisse.USD = totalCashUSD * direction;
         t.impacts.caisse.CDF = totalCashCDF * direction;
-        t.impacts.operator.USD = 0;
-        t.impacts.operator.CDF = 0;
     } else {
-        t.impacts.caisse.USD = 0;
-        t.impacts.caisse.CDF = 0;
-        const targetSim = data.operators[destIdx];
+        let targetSim = data.operators[destIdx];
         if(targetSim) {
             targetSim.USD += totalCashUSD * direction;
             targetSim.CDF += totalCashCDF * direction;
+            // On note l'impact sur l'opérateur de destination pour le suivi
+            t.impacts.operator.USD = totalCashUSD * direction;
+            t.impacts.operator.CDF = totalCashCDF * direction;
         }
-        t.impacts.operator.USD = 0;
-        t.impacts.operator.CDF = 0;
     }
 
+    // --- EXECUTION ---
     applyImpacts(t);
-    const newDebt = data.debts[key];
+    
+    t.desc = `RÈGLEMENT: ${person.toUpperCase()} vers ${destName}`;
+    t.debtAfter = data.debts[key]; // On garde le nouveau solde
 
-    // SAUVEGARDE ENRICHIE POUR L'HISTORIQUE
-    data.transactions.unshift({
-        ...t,
-        date: new Date().toLocaleString(),
-        desc: `RÈGLEMENT: ${person} vers ${destName}`,
-        isReglement: true,
-        debtBefore: oldDebt,
-        debtAfter: newDebt,
-        payDetail: {
-            onUsd: { usd: pOnUsd_USD, cdf: pOnUsd_CDF },
-            onCdf: { usd: pOnCdf_USD, cdf: pOnCdf_CDF }
-        },
-        usdCash: totalCashUSD,
-        cdfCash: totalCashCDF
-    });
-
+    data.transactions.unshift(t);
     save();
-    alert(`Règlement de ${person} vers ${destName} enregistré !`);
     render();
     
-    // Nettoyage des champs
+    alert(`Règlement de ${person} vers ${destName} enregistré !`);
+    
     ["payOnUsd_USD","payOnUsd_CDF","payOnCdf_USD","payOnCdf_CDF","debtPersonName"].forEach(id => {
         if(document.getElementById(id)) document.getElementById(id).value = "";
     });
