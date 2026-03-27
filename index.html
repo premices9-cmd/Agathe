@@ -1,14 +1,19 @@
 <!DOCTYPE html>  <html lang="fr">    <head>    
-    <meta charset="UTF-8">    
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">    
-    <meta name="apple-mobile-web-app-capable" content="yes">    
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">    
-    <title>MKA Pro Business V5.3.0 - Full Logic</title>    
-        <meta name="theme-color" content="#0f172a">  
-    <link rel="apple-touch-icon" href="logo.png">
-    <link rel="icon" href="logo.png">
+   <meta charset="UTF-8">    
+   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">    
 
-    <meta name="mobile-web-app-capable" content="yes">  <style>    
+   <link rel="manifest" href="manifest.json">
+
+   <meta name="apple-mobile-web-app-capable" content="yes">    
+   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+   <meta name="apple-mobile-web-app-title" content="MKA Shop">
+   <link rel="apple-touch-icon" href="icon.png">
+   <link rel="icon" href="icon.png"> <title>MKA Pro Business V5.3.0 - Full Logic</title>    
+   <meta name="theme-color" content="#0f172a">  
+
+   <meta name="mobile-web-app-capable" content="yes">
+
+ <style>    
     body { font-family: 'Segoe UI', sans-serif; background: #0f172a; margin: 0; color: white; padding-bottom: 50px; }    
     .container { background: white; color: black; margin: 10px; padding: 15px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }    
     input, select, button { padding: 12px; margin: 5px 0; border-radius: 8px; border: 1px solid #cbd5e1; width: 100%; box-sizing: border-box; font-size: 15px; }    
@@ -42,6 +47,12 @@
         <h1 style="margin: 12px 0 0 0; font-size: 22px; color: #facc15; text-transform: uppercase; letter-spacing: 1px; font-weight: 800;">
             MKA SHOP V5.3.0
         </h1>
+    </div>
+    
+    <div style="text-align: center; margin: 15px auto;">
+    <button id="installBtn" style="display: none; background: #3b82f6; color: white; border: none; padding: 12px 20px; border-radius: 25px; font-size: 14px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">
+      📲 Installer MKA Shop V5.3.0
+     </button>
     </div>
 
     <div class="container">    
@@ -247,9 +258,19 @@
         <div id="fullHistoryList"></div>    
     </div>    
 </div>    <script type="module">    
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";    
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";    
     import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-database.js";    
-  
+
+    // --- 1. ENREGISTREMENT DU SERVICE WORKER (AJOUTÉ) ---
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js')
+                .then(reg => console.log('MKA Shop : Service Worker prêt !'))
+                .catch(err => console.log('Erreur SW :', err));
+        });
+    }
+
+    // --- 2. CONFIGURATION FIREBASE ---
     const firebaseConfig = {    
         apiKey: "AIzaSyDSK9sIPu8fvGebZQG9EdHBhlf7nl8Dmzs",    
         authDomain: "mka-mobile-money.firebaseapp.com",    
@@ -1303,6 +1324,52 @@ window.deleteType = function(index){
     render();
 };
 
+  let deferredPrompt;
+const installBtn = document.getElementById('installBtn');
+
+// 1. Écouter l'événement d'installation de Chrome
+window.addEventListener('beforeinstallprompt', (e) => {
+  // Empêche l'affichage automatique
+  e.preventDefault();
+  // Stocke l'événement
+  deferredPrompt = e;
+  
+  // Affiche le bouton d'installation maintenant qu'on sait que c'est possible
+  if (installBtn) {
+    installBtn.style.display = 'block';
+  }
+  
+  console.log("MKA Shop : Prêt pour l'installation manuelle.");
+});
+
+// 2. Action quand on clique sur le bouton
+if (installBtn) {
+  installBtn.addEventListener('click', async () => {
+    if (deferredPrompt) {
+      // Affiche la fenêtre système d'installation
+      deferredPrompt.prompt();
+      
+      // Attend la réponse de l'utilisateur
+      const { outcome } = await deferredPrompt.userChoice;
+      console.log(`Réponse de l'utilisateur : ${outcome}`);
+      
+      // On cache le bouton car l'invitation a été traitée
+      deferredPrompt = null;
+      installBtn.style.display = 'none';
+    }
+  });
+}
+
+// 3. Cacher le bouton si l'app est déjà installée
+window.addEventListener('appinstalled', () => {
+  console.log('MKA Shop : Installation réussie !');
+  if (installBtn) {
+    installBtn.style.display = 'none';
+  }
+  deferredPrompt = null;
+});
+
+  
 </script>  </body>    
 </html>   
 
