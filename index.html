@@ -247,7 +247,7 @@
         <div id="fullHistoryList"></div>    
     </div>    
 </div>    <script type="module">    
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";    
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";    
     import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-database.js";    
   
     const firebaseConfig = {    
@@ -260,46 +260,44 @@
     const app = initializeApp(firebaseConfig);    
     const db = getDatabase(app);    
     
-    // --- SÉCURITÉ ANTI-ÉCRASEMENT ---
+    // --- ÉTAT INITIAL ---
     let data = { caisse:{USD:0, CDF:0}, operators:[], types:[], transactions:[], taux:2800, config: { pinAdmin: "1234", pinUser: "0000" }, debts: {} };    
     let isDataLoaded = false; 
 
     // RÉCEPTION DES DONNÉES SÉCURISÉE
     onValue(ref(db, 'mka_data'), (snap) => {     
-        if(snap.val()) {     
-            data = snap.val();     
+        const incomingData = snap.val();
+        if(incomingData) {     
+            data = incomingData;     
             if(!data.transactions) data.transactions = [];     
             if(!data.types) data.types = [];  
             if(!data.operators) data.operators = [];  
             if(!data.config) data.config = { pinAdmin: "1234", pinUser: "0000" };  
             if(!data.debts) data.debts = {};  
             
-            isDataLoaded = true; // Synchro confirmée !
+            isDataLoaded = true; 
+            console.log("Données synchronisées");
             render();     
         }     
     });    
         
-    // SAUVEGARDE PAR FUSION (NE SUPPRIME PLUS LES AJOUTS ADMIN)
+    // --- UNIQUE FONCTION DE SAUVEGARDE SÉCURISÉE ---
     const save = () => {
         if (isDataLoaded && data.config) {
             update(ref(db, 'mka_data'), data)
-                .catch((err) => alert("Erreur de connexion : " + err));
+                .then(() => console.log("Sauvegarde réussie (Update)"))
+                .catch((err) => {
+                    console.error("Erreur Firebase:", err);
+                    alert("Erreur de connexion : " + err.message);
+                });
+        } else {
+            console.warn("Sauvegarde ignorée : données non chargées");
         }
     };
 
-        // --- NOUVELLE SAUVEGARDE SÉCURISÉE (FUSION) ---
-    const save = () => {
-        if (isDataLoaded && data.config) {
-            update(ref(db, 'mka_data'), data)
-                .then(() => console.log("Mise à jour réussie"))
-                .catch((err) => alert("Erreur de connexion : " + err));
-        }
-    };
-
-    // --- ON GARDE VOS OUTILS DE CALCUL (NE PAS SUPPRIMER) ---
     const fmt = (n) => parseFloat(n || 0).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).replace(/,/g, '.');    
     const normalize = (str) => str ? str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : "";
-    
+
     window.login = () => {    
         const p = document.getElementById("pinInput").value;    
         if(p === data.config.pinAdmin) {    
