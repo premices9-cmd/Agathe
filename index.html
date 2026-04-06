@@ -244,7 +244,10 @@
 </div>    <div id="historyModal" class="modal hidden">    
     <div class="modal-content">    
         <button onclick="closeHistory()" style="background:#ef4444; float:right;">X</button>    
-        <button onclick="exportHistory()" style="background:#16a34a; float:left; width:auto; padding:8px 15px;">TXT</button>    
+        <button onclick="exportHistory()" style="background:#16a34a; float:left; width:auto; padding:8px 15px;">TXT</button>
+
+        <button onclick="exportHistory()" style="background:#16a34a; float:left; width:auto; padding:8px 15px;">EXCEL (CSV)</button>
+    
         <div style="clear:both;"></div>    
         <h2 id="histTitle" style="text-align:center; margin:10px 0;">Historique</h2>    
         <div class="nav-hist">    
@@ -287,20 +290,26 @@
 
     // RÉCEPTION DES DONNÉES SÉCURISÉE
     onValue(ref(db, 'mka_data'), (snap) => {     
-        const incomingData = snap.val();
-        if(incomingData) {     
-            data = incomingData;     
-            if(!data.transactions) data.transactions = [];     
-            if(!data.types) data.types = [];  
-            if(!data.operators) data.operators = [];  
-            if(!data.config) data.config = { pinAdmin: "1234", pinUser: "0000" };  
-            if(!data.debts) data.debts = {};  
-            
-            isDataLoaded = true; 
-            console.log("Données synchronisées");
-            render();     
-        }     
-    });    
+    const incomingData = snap.val();
+    if(incomingData) {     
+        data = incomingData;     
+        if(!data.transactions) data.transactions = [];     
+        if(!data.types) data.types = [];  
+        if(!data.operators) data.operators = [];  
+        if(!data.config) data.config = { pinAdmin: "1234", pinUser: "0000" };  
+        if(!data.debts) data.debts = {};  
+        
+        isDataLoaded = true; 
+        console.log("Données synchronisées");
+        
+        // 1. On affiche d'abord les données
+        render();     
+        
+        // 2. On vérifie immédiatement si un nettoyage est nécessaire
+        window.checkPurgeStatus(); 
+    }     
+});
+
         
     // --- UNIQUE FONCTION DE SAUVEGARDE SÉCURISÉE ---
     const save = () => {
@@ -1222,8 +1231,44 @@ window.cancelTransaction = (index) => {
     window.deleteTransaction = (idx) => { if(confirm("Supprimer ?")) { data.transactions.splice(idx, 1); save(); window.showFullHistory('general'); } };  
     window.closeHistory = () => document.getElementById("historyModal").classList.add("hidden");    
     window.updateDefaultStockMove = () => { const ty = data.types[document.getElementById("typeSelect").value]; if(ty) document.getElementById("stkMove").value = ty.impS || 0; };  
-    window.exportHistory = () => { let content = "MKA PRO - HISTORIQUE\n"; data.transactions.forEach(t => content += `${t.date} | ${t.desc} | ${t.amt} ${t.cur}\n`); const blob = new Blob([content], {type:"text/plain"}); const a = document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="mka_history.txt"; a.click(); };  
-  
+    window.exportHistory = () => {
+    if (!data.transactions || data.transactions.length === 0) {
+        alert("Aucune donnée à exporter.");
+        return;
+    }
+
+    const headers = ["Date", "Type", "Description", "Entrée (USD)", "Sortie (USD)", "Entrée (CDF)", "Sortie (CDF)", "Client"];
+    
+    const rows = data.transactions.map(t => {
+        const date = t.date || new Date(t.id).toLocaleString('fr-FR');
+        const desc = (t.desc || "Opération").replace(/;/g, ",");
+        
+        // Détection Entrée ou Sortie
+        const isSortie = t.mode === 'depense' || t.mode === 'sortie' || (t.impacts?.caisse?.USD < 0) || (t.impacts?.operator?.USD < 0);
+
+        return [
+            date,
+            t.typeNom || t.mode || "Auto",
+            desc,
+            (!isSortie ? (t.realUSD || t.amtSIM || 0) : 0), // Entrée USD
+            (isSortie ? (t.realUSD || t.amtSIM || 0) : 0),  // Sortie USD
+            (!isSortie ? (t.realCDF || 0) : 0),             // Entrée CDF
+            (isSortie ? (t.realCDF || 0) : 0),              // Sortie CDF
+            t.person || t.operator || "-"
+        ].join(";");
+    });
+
+    const csvContent = "\uFEFF" + headers.join(";") + "\n" + rows.join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `MKA_SHOP_ARCHIVE_${new Date().toLocaleDateString()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+};
+
     function render() {    
     const t = parseFloat(data.taux) || 1;    
     document.getElementById("caisseUSD").innerText = fmt(data.caisse.USD);    
@@ -1305,6 +1350,77 @@ window.cancelTransaction = (index) => {
         </div>`
     ).join("");    
 }
+
+    // 1. VÉRIFIER SI LE MÉNAGE EST NÉCESSAIRE (Appelé au démarrage)
+window.checkPurgeStatus = () => {
+    const maintenant = Date.now();
+    const H72 = 259200000;  const H120 = 432000000; const H240 = 864000000;
+
+    // On compte combien d'opérations devraient être supprimées
+    const aSupprimer = data.transactions.filter(t => {
+        const age = maintenant - t.id;
+        const estSolde = t.snapshotDette && (Math.abs(t.snapshotDette.USD) < 0.1 && Math.abs(t.snapshotDette.CDF) < 100);
+        const estUneDepense = t.mode === 'depense' || (t.operator && t.operator.toLowerCase().includes("depense"));
+
+        if (t.isReglement || estSolde) return age >= H72;
+        if (t.person && !estSolde) return false; // On garde précieusement les dettes non payées
+        if (estUneDepense) return age >= H240;
+        return age >= H120;
+    });
+
+    if (aSupprimer.length > 0) {
+        showPurgeAlert(aSupprimer.length);
+    }
+};
+
+// 2. AFFICHER L'ALERTE (Interface visuelle)
+function showPurgeAlert(nb) {
+    let alertDiv = document.getElementById('purgeAlert');
+    if(!alertDiv) {
+        alertDiv = document.createElement('div');
+        alertDiv.id = 'purgeAlert';
+        // Style adapté pour mobile (bien visible en haut)
+        alertDiv.style = "background:#fef3c7; border-bottom:3px solid #f59e0b; padding:15px; text-align:center; position:sticky; top:0; z-index:10000; color:#92400e; font-size:13px; font-weight:bold;";
+        document.body.prepend(alertDiv);
+    }
+    
+    alertDiv.innerHTML = `
+        ⚠️ ${nb} opérations anciennes détectées.<br>
+        <div style="margin-top:10px; display:flex; gap:10px; justify-content:center;">
+            <button onclick="exportHistory()" style="background:#0ea5e9; width:auto; font-size:11px; padding:8px 12px; border-radius:5px; color:white; border:none;">1. TÉLÉCHARGER (EXCEL)</button>
+            <button onclick="confirmAutoPurge()" style="background:#ef4444; width:auto; font-size:11px; padding:8px 12px; border-radius:5px; color:white; border:none;">2. NETTOYER TOUT</button>
+        </div>
+    `;
+}
+
+// 3. LE NETTOYAGE (Après ta validation)
+window.confirmAutoPurge = () => {
+    if(!confirm("As-tu bien téléchargé ton fichier Excel de sauvegarde ? Les données seront supprimées définitivement de MKA SHOP.")) return;
+    
+    const maintenant = Date.now();
+    const H72 = 259200000;  const H120 = 432000000; const H240 = 864000000;
+    const initial = data.transactions.length;
+
+    data.transactions = data.transactions.filter(t => {
+        const age = maintenant - t.id;
+        const estSolde = t.snapshotDette && (Math.abs(t.snapshotDette.USD) < 0.1 && Math.abs(t.snapshotDette.CDF) < 100);
+        const estUneDepense = t.mode === 'depense' || (t.operator && t.operator.toLowerCase().includes("depense"));
+
+        // Règles de conservation (on retourne true pour GARDER)
+        if (t.isReglement || estSolde) return age < H72;
+        if (t.person && !estSolde) return true;
+        if (estUneDepense) return age < H240;
+        return age < H120;
+    });
+
+    save();   // Sauvegarde vers Firebase
+    render(); // Mise à jour de l'affichage
+    
+    const alertDiv = document.getElementById('purgeAlert');
+    if(alertDiv) alertDiv.remove();
+    
+    alert(`Nettoyage réussi : ${initial - data.transactions.length} opérations archivées.`);
+};
 
     window.deleteOperator = function(index){
     if(!confirm("Supprimer cet opérateur ?")) return;
