@@ -1241,64 +1241,81 @@ window.cancelTransaction = (index) => {
     window.closeHistory = () => document.getElementById("historyModal").classList.add("hidden");    
     window.updateDefaultStockMove = () => { const ty = data.types[document.getElementById("typeSelect").value]; if(ty) document.getElementById("stkMove").value = ty.impS || 0; };  
     window.exportHistory = async () => {
-    // 1. Initialisation de jsPDF
     const { jsPDF } = window.jspdf;
     const element = document.getElementById("fullHistoryList");
     
-    // Sécurité : Vérifier si l'élément existe et contient des données
     if (!element || element.children.length === 0) {
-        alert("L'historique est vide. Rien à exporter.");
+        alert("L'historique est vide.");
         return;
     }
 
-    // Récupérer le nom du filtre actif pour le titre du fichier
-    const filterBtn = document.querySelector(".nav-hist button.active");
-    const filterName = filterBtn ? filterBtn.innerText : "GENERAL";
-
-    alert("Génération du PDF... Cela peut prendre 3 à 5 secondes sur mobile.");
+    alert("Génération du rapport MKA SHOP (Multi-pages)...");
 
     try {
-        // 2. Conversion du HTML en Image (Canvas)
+        // 1. Capture de la totalité de la liste avec ton design
         const canvas = await html2canvas(element, {
-            scale: 2, // Améliore la netteté du texte
-            useCORS: true, // Pour charger les images externes si besoin
-            logging: false, // Désactive les logs pour plus de rapidité
+            scale: 2,
+            useCORS: true,
             backgroundColor: "#f8fafc",
-            scrollY: -window.scrollY // Règle les problèmes de décalage si on a scrollé
+            windowHeight: element.scrollHeight
         });
 
-        // 3. Configuration du document PDF (A4)
         const imgData = canvas.toDataURL('image/png');
         const pdf = new jsPDF('p', 'mm', 'a4');
         
         const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+        const pdfHeight = pdf.internal.pageSize.getHeight();
+        
+        // Largeur de l'image adaptée au PDF
+        const imgWidth = pdfWidth;
+        const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+        
+        // Hauteur disponible sur la page 1 (après l'en-tête)
+        const firstPageContentHeight = pdfHeight - 40; 
+        // Hauteur disponible sur les pages suivantes
+        const otherPageContentHeight = pdfHeight - 20;
 
-        // 4. Ajout des en-têtes personnalisés MKA SHOP
+        let heightLeft = imgHeight;
+        let position = 0;
+        let pageNumber = 1;
+
+        // --- PAGE 1 ---
+        // Ton En-tête stylisée
+        pdf.setFillColor(15, 23, 42); // Bleu sombre
+        pdf.rect(0, 0, pdfWidth, 25, 'F');
+        pdf.setTextColor(255, 255, 255);
         pdf.setFontSize(16);
-        pdf.setTextColor(15, 23, 42); // Couleur sombre #0f172a
-        pdf.text(`MKA SHOP - RAPPORT ${filterName}`, 10, 15);
+        pdf.text("MKA SHOP - HISTORIQUE COMPLET", 10, 16);
         
-        pdf.setFontSize(9);
-        pdf.setTextColor(100, 116, 139); // Gris pour la date
-        pdf.text(`Émis le : ${new Date().toLocaleString()}`, 10, 22);
-        
-        // Ligne de séparation
-        pdf.setDrawColor(242, 204, 21); // Couleur jaune #facc15
-        pdf.line(10, 25, pdfWidth - 10, 25);
+        pdf.setTextColor(100, 116, 139);
+        pdf.setFontSize(8);
+        pdf.text(`Document généré le ${new Date().toLocaleString()}`, 10, 32);
 
-        // 5. Insertion de l'image de l'historique
-        // On commence à y = 30 pour laisser de la place à l'en-tête
-        pdf.addImage(imgData, 'PNG', 0, 30, pdfWidth, pdfHeight);
+        // Ajout du début de l'image
+        pdf.addImage(imgData, 'PNG', 0, 35, imgWidth, imgHeight);
+        heightLeft -= firstPageContentHeight;
 
-        // 6. Sauvegarde avec nom dynamique
-        const timestamp = Date.now();
-        pdf.save(`MKA_Rapport_${filterName.replace(/\s+/g, '_')}_${timestamp}.pdf`);
-        
-        alert("Exportation réussie ! ✅");
+        // --- BOUCLE POUR LES PAGES SUIVANTES ---
+        while (heightLeft > 0) {
+            pageNumber++;
+            position = heightLeft - imgHeight; 
+            pdf.addPage();
+            
+            // On remet un petit rappel en haut de chaque page
+            pdf.setFontSize(7);
+            pdf.setTextColor(150);
+            pdf.text(`MKA SHOP - Page ${pageNumber}`, 10, 10);
+            
+            pdf.addImage(imgData, 'PNG', 0, position + 15, imgWidth, imgHeight);
+            heightLeft -= otherPageContentHeight;
+        }
+
+        pdf.save(`MKA_Rapport_Design_${Date.now()}.pdf`);
+        alert("PDF généré avec ton design original ! ✅");
+
     } catch (error) {
-        console.error("Erreur d'exportation PDF:", error);
-        alert("Erreur technique lors de la création du PDF. Assurez-vous d'être sur un navigateur moderne.");
+        console.error("Erreur:", error);
+        alert("Erreur lors de la génération visuelle.");
     }
 };
 
