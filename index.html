@@ -12,6 +12,9 @@
    <meta name="theme-color" content="#0f172a">  
 
    <meta name="mobile-web-app-capable" content="yes">
+   
+   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
  <style>    
     body { font-family: 'Segoe UI', sans-serif; background: #0f172a; margin: 0; color: white; padding-bottom: 50px; }    
@@ -60,7 +63,16 @@
         <h2 style="text-align:center">Connexion</h2>    
         <input type="password" id="pinInput" placeholder="Code PIN Accès">    
         <button onclick="login()">OUVRIR SESSION</button>    
-    </div>    <div id="appSection" class="hidden">    
+    </div>    <div id="appSection" class="hidden"> 
+    <div id="cleanupNotify" class="hidden" style="background: #fff7ed; border: 2px solid #ea580c; padding: 15px; border-radius: 12px; margin-bottom: 15px; text-align: center;">
+    <strong style="color: #9a3412;">🧹 Nettoyage disponible</strong><br>
+    <span style="font-size: 12px; color: #7c2d12;">Certaines vieilles opérations peuvent être archivées pour alléger l'application.</span>
+    <div class="grid-2" style="margin-top: 10px;">
+        <button onclick="showFullHistory('general')" style="background: #64748b; font-size: 11px;">1. VOIR / EXPORT PDF</button>
+        <button onclick="confirmCleanup()" style="background: #ea580c; font-size: 11px;">2. NETTOYER MAINTENANT</button>
+    </div>
+</div>
+
     <div class="vnc-box">    
         <span style="font-size: 11px; opacity: 0.8;">VALEUR NETTE COMPTABLE (VNC)</span><br>    
         <div class="vnc-val" id="totalVNC">0.00 $</div>    
@@ -244,9 +256,8 @@
 </div>    <div id="historyModal" class="modal hidden">    
     <div class="modal-content">    
         <button onclick="closeHistory()" style="background:#ef4444; float:right;">X</button>    
-        <button onclick="window.exportHistory()">EXCEL (CSV)</button>
-        <button onclick="window.generatePDF()">DESIGN (PDF)</button>
-
+        <button onclick="exportHistory()" style="background:#16a34a; float:left; width:auto; padding:8px 15px;">📥 EXPORT PDF</button>
+    
         <div style="clear:both;"></div>    
         <h2 id="histTitle" style="text-align:center; margin:10px 0;">Historique</h2>    
         <div class="nav-hist">    
@@ -287,8 +298,8 @@
     let data = { caisse:{USD:0, CDF:0}, operators:[], types:[], transactions:[], taux:2800, config: { pinAdmin: "1234", pinUser: "0000" }, debts: {} };    
     let isDataLoaded = false; 
 
-    // RÉCEPTION DES DONNÉES SÉCURISÉE
-    onValue(ref(db, 'mka_data'), (snap) => {     
+    // RÉCEPTION DES DONNÉES SÉCURISÉE AVEC NETTOYAGE AUTO
+onValue(ref(db, 'mka_data'), (snap) => {     
     const incomingData = snap.val();
     if(incomingData) {     
         data = incomingData;     
@@ -301,15 +312,14 @@
         isDataLoaded = true; 
         console.log("Données synchronisées");
         
-        // 1. On affiche d'abord les données
-        render();     
+        // 1. On dessine l'interface d'abord
+        render(); 
         
-        // 2. On vérifie immédiatement si un nettoyage est nécessaire
-        window.checkPurgeStatus(); 
+        // 2. On lance le nettoyage des vieilles opérations (Dépenses, Dettes soldées, etc.)
+        runAutoCleanup();    
     }     
 });
-
-        
+   
     // --- UNIQUE FONCTION DE SAUVEGARDE SÉCURISÉE ---
     const save = () => {
         if (isDataLoaded && data.config) {
@@ -1230,92 +1240,44 @@ window.cancelTransaction = (index) => {
     window.deleteTransaction = (idx) => { if(confirm("Supprimer ?")) { data.transactions.splice(idx, 1); save(); window.showFullHistory('general'); } };  
     window.closeHistory = () => document.getElementById("historyModal").classList.add("hidden");    
     window.updateDefaultStockMove = () => { const ty = data.types[document.getElementById("typeSelect").value]; if(ty) document.getElementById("stkMove").value = ty.impS || 0; };  
-    window.exportHistory = function() {
-    if (!data.transactions || data.transactions.length === 0) {
-        alert("Aucune donnée à exporter.");
-        return;
+    window.exportHistory = async () => {
+    const { jsPDF } = window.jspdf;
+    const element = document.getElementById("fullHistoryList");
+    const filterBtn = document.querySelector(".nav-hist button.active");
+    const filterName = filterBtn ? filterBtn.innerText : "GENERAL";
+
+    alert("Génération du PDF en cours... veuillez patienter.");
+
+    try {
+        const canvas = await html2canvas(element, {
+            scale: 2, // Haute qualité
+            useCORS: true,
+            backgroundColor: "#f8fafc"
+        });
+
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        
+        const imgProps = pdf.getImageProperties(imgData);
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+        // Entête du PDF
+        pdf.setFontSize(18);
+        pdf.setTextColor(15, 23, 42); // #0f172a
+        pdf.text(`MKA SHOP - Rapport ${filterName}`, 10, 15);
+        pdf.setFontSize(10);
+        pdf.text(`Généré le : ${new Date().toLocaleString()}`, 10, 22);
+
+        pdf.addImage(imgData, 'PNG', 0, 30, pdfWidth, pdfHeight);
+        pdf.save(`MKA_Rapport_${filterName}_${Date.now()}.pdf`);
+    } catch (error) {
+        console.error("Erreur PDF:", error);
+        alert("Erreur lors de la création du PDF.");
     }
-
-    // 1. L'astuce pour forcer les colonnes dans WPS/Excel
-    let csvContent = "sep=;\n"; 
-    csvContent += "DATE;TYPE;DESCRIPTION;ENTRÉE ($);SORTIE ($);ENTRÉE (FC);SORTIE (FC);CLIENT/MODE\n";
-
-    // 2. On boucle sur tes transactions avec tes vrais noms de variables
-    data.transactions.forEach(t => {
-        const date = t.date || new Date(t.id).toLocaleString('fr-FR');
-        const desc = (t.desc || t.description || "Opération").replace(/;/g, ",");
-        
-        // Ta logique de détection Entrée/Sortie (on la garde !)
-        const isSortie = t.mode === 'depense' || t.mode === 'sortie' || (t.impacts?.caisse?.USD < 0);
-        
-        const entreeUSD = !isSortie ? (t.realUSD || t.amtSIM || 0) : 0;
-        const sortieUSD = isSortie ? (t.realUSD || t.amtSIM || 0) : 0;
-        const entreeCDF = !isSortie ? (t.realCDF || 0) : 0;
-        const sortieCDF = isSortie ? (t.realCDF || 0) : 0;
-
-        let row = [
-            date,
-            (t.typeNom || t.mode || "AUTO").toUpperCase(),
-            desc,
-            entreeUSD,
-            sortieUSD,
-            entreeCDF,
-            sortieCDF,
-            t.person || t.operator || t.paymentMode || "-"
-        ].join(";");
-        
-        csvContent += row + "\n";
-    });
-
-    // 3. Téléchargement sécurisé pour mobile
-    const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `MKA_SHOP_RAPPORT_${new Date().getTime()}.csv`;
-    document.body.appendChild(link); // Important sur certains navigateurs mobiles
-    link.click();
-    document.body.removeChild(link);
 };
-
-    
-    window.generatePDF = function() {
-    // 1. On crée une version imprimable propre
-    const printWindow = window.open('', '_blank');
-    const content = document.getElementById('history-container').innerHTML; // Utilise l'ID de ton bloc historique
-
-    printWindow.document.write(`
-        <html>
-            <head>
-                <title>Rapport MKA SHOP - ${new Date().toLocaleDateString()}</title>
-                <style>
-                    body { font-family: sans-serif; padding: 20px; background: #fff; color: #000; }
-                    h1 { color: #1e293b; text-align: center; }
-                    /* On recrée ici un peu le design de ton appli */
-                    .transaction-card { 
-                        border: 1px solid #e2e8f0; 
-                        margin-bottom: 10px; 
-                        padding: 10px; 
-                        border-radius: 8px;
-                        border-left: 5px solid #3b82f6; /* Bleu pour le design */
-                    }
-                    .date { font-size: 12px; color: #64748b; }
-                    .amount { font-weight: bold; float: right; }
-                </style>
-            </head>
-            <body>
-                <h1>MKA SHOP - Rapport d'Activité</h1>
-                <hr>
-                ${content}
-                <script>
-                    setTimeout(() => { window.print(); window.close(); }, 500);
-                </script>
-            </body>
-        </html>
-    `);
-    printWindow.document.close();
-};
-
+  
+  
     function render() {    
     const t = parseFloat(data.taux) || 1;    
     document.getElementById("caisseUSD").innerText = fmt(data.caisse.USD);    
@@ -1398,76 +1360,53 @@ window.cancelTransaction = (index) => {
     ).join("");    
 }
 
-    // 1. VÉRIFIER SI LE MÉNAGE EST NÉCESSAIRE (Appelé au démarrage)
-window.checkPurgeStatus = () => {
-    const maintenant = Date.now();
-    const H72 = 259200000;  const H120 = 432000000; const H240 = 864000000;
+    let pendingCleanup = []; // Stockage temporaire des données à garder
 
-    // On compte combien d'opérations devraient être supprimées
-    const aSupprimer = data.transactions.filter(t => {
-        const age = maintenant - t.id;
-        const estSolde = t.snapshotDette && (Math.abs(t.snapshotDette.USD) < 0.1 && Math.abs(t.snapshotDette.CDF) < 100);
-        const estUneDepense = t.mode === 'depense' || (t.operator && t.operator.toLowerCase().includes("depense"));
+const runAutoCleanup = () => {
+    if (!data.transactions || data.transactions.length === 0) return;
 
-        if (t.isReglement || estSolde) return age >= H72;
-        if (t.person && !estSolde) return false; // On garde précieusement les dettes non payées
-        if (estUneDepense) return age >= H240;
-        return age >= H120;
-    });
+    const now = Date.now();
+    const H240 = 240 * 60 * 60 * 1000; 
+    const H120 = 120 * 60 * 60 * 1000; 
+    const H72 = 72 * 60 * 60 * 1000;   
 
-    if (aSupprimer.length > 0) {
-        showPurgeAlert(aSupprimer.length);
-    }
-};
+    // On prépare ce qui DEVRAIT rester après nettoyage
+    const filtered = data.transactions.filter(t => {
+        const tDate = new Date(t.date).getTime();
+        if (isNaN(tDate)) return true; 
+        const age = now - tDate;
+        const opName = t.operator ? t.operator.toLowerCase() : "";
+        const isDepenseAny = t.mode === 'depense' || t.isDepense === true || opName.includes("depense");
 
-// 2. AFFICHER L'ALERTE (Interface visuelle)
-function showPurgeAlert(nb) {
-    let alertDiv = document.getElementById('purgeAlert');
-    if(!alertDiv) {
-        alertDiv = document.createElement('div');
-        alertDiv.id = 'purgeAlert';
-        // Style adapté pour mobile (bien visible en haut)
-        alertDiv.style = "background:#fef3c7; border-bottom:3px solid #f59e0b; padding:15px; text-align:center; position:sticky; top:0; z-index:10000; color:#92400e; font-size:13px; font-weight:bold;";
-        document.body.prepend(alertDiv);
-    }
-    
-    alertDiv.innerHTML = `
-        ⚠️ ${nb} opérations anciennes détectées.<br>
-        <div style="margin-top:10px; display:flex; gap:10px; justify-content:center;">
-            <button onclick="exportHistory()" style="background:#0ea5e9; width:auto; font-size:11px; padding:8px 12px; border-radius:5px; color:white; border:none;">1. TÉLÉCHARGER (EXCEL)</button>
-            <button onclick="confirmAutoPurge()" style="background:#ef4444; width:auto; font-size:11px; padding:8px 12px; border-radius:5px; color:white; border:none;">2. NETTOYER TOUT</button>
-        </div>
-    `;
-}
-
-// 3. LE NETTOYAGE (Après ta validation)
-window.confirmAutoPurge = () => {
-    if(!confirm("As-tu bien téléchargé ton fichier Excel de sauvegarde ? Les données seront supprimées définitivement de MKA SHOP.")) return;
-    
-    const maintenant = Date.now();
-    const H72 = 259200000;  const H120 = 432000000; const H240 = 864000000;
-    const initial = data.transactions.length;
-
-    data.transactions = data.transactions.filter(t => {
-        const age = maintenant - t.id;
-        const estSolde = t.snapshotDette && (Math.abs(t.snapshotDette.USD) < 0.1 && Math.abs(t.snapshotDette.CDF) < 100);
-        const estUneDepense = t.mode === 'depense' || (t.operator && t.operator.toLowerCase().includes("depense"));
-
-        // Règles de conservation (on retourne true pour GARDER)
-        if (t.isReglement || estSolde) return age < H72;
-        if (t.person && !estSolde) return true;
-        if (estUneDepense) return age < H240;
+        if (isDepenseAny) return age < H240;
+        if (t.isReglement || (t.mode && t.mode.includes("dette"))) {
+            const isSolded = t.snapshotDette && Math.abs(t.snapshotDette.USD) < 0.1 && Math.abs(t.snapshotDette.CDF) < 100;
+            if (isSolded) return age < H72;
+        }
         return age < H120;
     });
 
-    save();   // Sauvegarde vers Firebase
-    render(); // Mise à jour de l'affichage
-    
-    const alertDiv = document.getElementById('purgeAlert');
-    if(alertDiv) alertDiv.remove();
-    
-    alert(`Nettoyage réussi : ${initial - data.transactions.length} opérations archivées.`);
+    // Si le nombre de transactions après filtre est différent, on montre la notif
+    if (filtered.length !== data.transactions.length) {
+        pendingCleanup = filtered; // On stocke le résultat du filtre
+        document.getElementById("cleanupNotify").classList.remove("hidden");
+    } else {
+        document.getElementById("cleanupNotify").classList.add("hidden");
+    }
 };
+
+// Nouvelle fonction pour valider après ton export PDF
+window.confirmCleanup = () => {
+    if(confirm("As-tu bien téléchargé ton PDF ? Les vieilles transactions seront définitivement supprimées.")) {
+        data.transactions = pendingCleanup;
+        save();
+        document.getElementById("cleanupNotify").classList.add("hidden");
+        alert("Application allégée avec succès !");
+        render();
+    }
+};
+
+
 
     window.deleteOperator = function(index){
     if(!confirm("Supprimer cet opérateur ?")) return;
@@ -1535,5 +1474,4 @@ window.addEventListener('appinstalled', () => {
   
 </script>  </body>    
 </html>   
-
 
