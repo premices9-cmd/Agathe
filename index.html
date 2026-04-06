@@ -244,10 +244,9 @@
 </div>    <div id="historyModal" class="modal hidden">    
     <div class="modal-content">    
         <button onclick="closeHistory()" style="background:#ef4444; float:right;">X</button>    
-        <button onclick="exportHistory()" style="background:#16a34a; float:left; width:auto; padding:8px 15px;">TXT</button>
+        <button onclick="window.exportHistory()">EXCEL (CSV)</button>
+        <button onclick="window.generatePDF()">DESIGN (PDF)</button>
 
-        <button onclick="exportHistory()" style="background:#16a34a; float:left; width:auto; padding:8px 15px;">EXCEL (CSV)</button>
-    
         <div style="clear:both;"></div>    
         <h2 id="histTitle" style="text-align:center; margin:10px 0;">Historique</h2>    
         <div class="nav-hist">    
@@ -1231,42 +1230,90 @@ window.cancelTransaction = (index) => {
     window.deleteTransaction = (idx) => { if(confirm("Supprimer ?")) { data.transactions.splice(idx, 1); save(); window.showFullHistory('general'); } };  
     window.closeHistory = () => document.getElementById("historyModal").classList.add("hidden");    
     window.updateDefaultStockMove = () => { const ty = data.types[document.getElementById("typeSelect").value]; if(ty) document.getElementById("stkMove").value = ty.impS || 0; };  
-    window.exportHistory = () => {
+    window.exportHistory = function() {
     if (!data.transactions || data.transactions.length === 0) {
         alert("Aucune donnée à exporter.");
         return;
     }
 
-    const headers = ["Date", "Type", "Description", "Entrée (USD)", "Sortie (USD)", "Entrée (CDF)", "Sortie (CDF)", "Client"];
-    
-    const rows = data.transactions.map(t => {
-        const date = t.date || new Date(t.id).toLocaleString('fr-FR');
-        const desc = (t.desc || "Opération").replace(/;/g, ",");
-        
-        // Détection Entrée ou Sortie
-        const isSortie = t.mode === 'depense' || t.mode === 'sortie' || (t.impacts?.caisse?.USD < 0) || (t.impacts?.operator?.USD < 0);
+    // 1. L'astuce pour forcer les colonnes dans WPS/Excel
+    let csvContent = "sep=;\n"; 
+    csvContent += "DATE;TYPE;DESCRIPTION;ENTRÉE ($);SORTIE ($);ENTRÉE (FC);SORTIE (FC);CLIENT/MODE\n";
 
-        return [
+    // 2. On boucle sur tes transactions avec tes vrais noms de variables
+    data.transactions.forEach(t => {
+        const date = t.date || new Date(t.id).toLocaleString('fr-FR');
+        const desc = (t.desc || t.description || "Opération").replace(/;/g, ",");
+        
+        // Ta logique de détection Entrée/Sortie (on la garde !)
+        const isSortie = t.mode === 'depense' || t.mode === 'sortie' || (t.impacts?.caisse?.USD < 0);
+        
+        const entreeUSD = !isSortie ? (t.realUSD || t.amtSIM || 0) : 0;
+        const sortieUSD = isSortie ? (t.realUSD || t.amtSIM || 0) : 0;
+        const entreeCDF = !isSortie ? (t.realCDF || 0) : 0;
+        const sortieCDF = isSortie ? (t.realCDF || 0) : 0;
+
+        let row = [
             date,
-            t.typeNom || t.mode || "Auto",
+            (t.typeNom || t.mode || "AUTO").toUpperCase(),
             desc,
-            (!isSortie ? (t.realUSD || t.amtSIM || 0) : 0), // Entrée USD
-            (isSortie ? (t.realUSD || t.amtSIM || 0) : 0),  // Sortie USD
-            (!isSortie ? (t.realCDF || 0) : 0),             // Entrée CDF
-            (isSortie ? (t.realCDF || 0) : 0),              // Sortie CDF
-            t.person || t.operator || "-"
+            entreeUSD,
+            sortieUSD,
+            entreeCDF,
+            sortieCDF,
+            t.person || t.operator || t.paymentMode || "-"
         ].join(";");
+        
+        csvContent += row + "\n";
     });
 
-    const csvContent = "\uFEFF" + headers.join(";") + "\n" + rows.join("\n");
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    // 3. Téléchargement sécurisé pour mobile
+    const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `MKA_SHOP_ARCHIVE_${new Date().toLocaleDateString()}.csv`);
-    document.body.appendChild(link);
+    link.href = url;
+    link.download = `MKA_SHOP_RAPPORT_${new Date().getTime()}.csv`;
+    document.body.appendChild(link); // Important sur certains navigateurs mobiles
     link.click();
     document.body.removeChild(link);
+};
+
+    
+    window.generatePDF = function() {
+    // 1. On crée une version imprimable propre
+    const printWindow = window.open('', '_blank');
+    const content = document.getElementById('history-container').innerHTML; // Utilise l'ID de ton bloc historique
+
+    printWindow.document.write(`
+        <html>
+            <head>
+                <title>Rapport MKA SHOP - ${new Date().toLocaleDateString()}</title>
+                <style>
+                    body { font-family: sans-serif; padding: 20px; background: #fff; color: #000; }
+                    h1 { color: #1e293b; text-align: center; }
+                    /* On recrée ici un peu le design de ton appli */
+                    .transaction-card { 
+                        border: 1px solid #e2e8f0; 
+                        margin-bottom: 10px; 
+                        padding: 10px; 
+                        border-radius: 8px;
+                        border-left: 5px solid #3b82f6; /* Bleu pour le design */
+                    }
+                    .date { font-size: 12px; color: #64748b; }
+                    .amount { font-weight: bold; float: right; }
+                </style>
+            </head>
+            <body>
+                <h1>MKA SHOP - Rapport d'Activité</h1>
+                <hr>
+                ${content}
+                <script>
+                    setTimeout(() => { window.print(); window.close(); }, 500);
+                </script>
+            </body>
+        </html>
+    `);
+    printWindow.document.close();
 };
 
     function render() {    
