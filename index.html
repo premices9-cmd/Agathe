@@ -1241,43 +1241,67 @@ window.cancelTransaction = (index) => {
     window.closeHistory = () => document.getElementById("historyModal").classList.add("hidden");    
     window.updateDefaultStockMove = () => { const ty = data.types[document.getElementById("typeSelect").value]; if(ty) document.getElementById("stkMove").value = ty.impS || 0; };  
     window.exportHistory = async () => {
+    // 1. Initialisation de jsPDF
     const { jsPDF } = window.jspdf;
     const element = document.getElementById("fullHistoryList");
+    
+    // Sécurité : Vérifier si l'élément existe et contient des données
+    if (!element || element.children.length === 0) {
+        alert("L'historique est vide. Rien à exporter.");
+        return;
+    }
+
+    // Récupérer le nom du filtre actif pour le titre du fichier
     const filterBtn = document.querySelector(".nav-hist button.active");
     const filterName = filterBtn ? filterBtn.innerText : "GENERAL";
 
-    alert("Génération du PDF en cours... veuillez patienter.");
+    alert("Génération du PDF... Cela peut prendre 3 à 5 secondes sur mobile.");
 
     try {
+        // 2. Conversion du HTML en Image (Canvas)
         const canvas = await html2canvas(element, {
-            scale: 2, // Haute qualité
-            useCORS: true,
-            backgroundColor: "#f8fafc"
+            scale: 2, // Améliore la netteté du texte
+            useCORS: true, // Pour charger les images externes si besoin
+            logging: false, // Désactive les logs pour plus de rapidité
+            backgroundColor: "#f8fafc",
+            scrollY: -window.scrollY // Règle les problèmes de décalage si on a scrollé
         });
 
+        // 3. Configuration du document PDF (A4)
         const imgData = canvas.toDataURL('image/png');
         const pdf = new jsPDF('p', 'mm', 'a4');
         
-        const imgProps = pdf.getImageProperties(imgData);
         const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
 
-        // Entête du PDF
-        pdf.setFontSize(18);
-        pdf.setTextColor(15, 23, 42); // #0f172a
-        pdf.text(`MKA SHOP - Rapport ${filterName}`, 10, 15);
-        pdf.setFontSize(10);
-        pdf.text(`Généré le : ${new Date().toLocaleString()}`, 10, 22);
+        // 4. Ajout des en-têtes personnalisés MKA SHOP
+        pdf.setFontSize(16);
+        pdf.setTextColor(15, 23, 42); // Couleur sombre #0f172a
+        pdf.text(`MKA SHOP - RAPPORT ${filterName}`, 10, 15);
+        
+        pdf.setFontSize(9);
+        pdf.setTextColor(100, 116, 139); // Gris pour la date
+        pdf.text(`Émis le : ${new Date().toLocaleString()}`, 10, 22);
+        
+        // Ligne de séparation
+        pdf.setDrawColor(242, 204, 21); // Couleur jaune #facc15
+        pdf.line(10, 25, pdfWidth - 10, 25);
 
+        // 5. Insertion de l'image de l'historique
+        // On commence à y = 30 pour laisser de la place à l'en-tête
         pdf.addImage(imgData, 'PNG', 0, 30, pdfWidth, pdfHeight);
-        pdf.save(`MKA_Rapport_${filterName}_${Date.now()}.pdf`);
+
+        // 6. Sauvegarde avec nom dynamique
+        const timestamp = Date.now();
+        pdf.save(`MKA_Rapport_${filterName.replace(/\s+/g, '_')}_${timestamp}.pdf`);
+        
+        alert("Exportation réussie ! ✅");
     } catch (error) {
-        console.error("Erreur PDF:", error);
-        alert("Erreur lors de la création du PDF.");
+        console.error("Erreur d'exportation PDF:", error);
+        alert("Erreur technique lors de la création du PDF. Assurez-vous d'être sur un navigateur moderne.");
     }
 };
-  
-  
+
     function render() {    
     const t = parseFloat(data.taux) || 1;    
     document.getElementById("caisseUSD").innerText = fmt(data.caisse.USD);    
