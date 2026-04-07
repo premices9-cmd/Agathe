@@ -261,7 +261,8 @@
         <div style="clear:both;"></div>    
         <h2 id="histTitle" style="text-align:center; margin:10px 0;">Historique</h2>    
         <div class="nav-hist">    
-            <button id="btn-h-general" onclick="showFullHistory('general')">GÉNÉRAL</button>    
+            <button id="btn-h-general" onclick="showFullHistory('general')">GÉNÉRAL</button>
+            <button id="btn-h-money" onclick="showFullHistory('money')" style="background: #16a34a; font-weight: bold;">📊 MONEY SERVICE</button>  
             <button id="btn-h-ventes" onclick="showFullHistory('ventes')">VENTES</button>    
             <button id="btn-h-dette_client" onclick="showFullHistory('dette_client')">DETTES CLIENTS</button>    
             <button id="btn-h-dette_moi" onclick="showFullHistory('dette_moi')">DETTES MOI</button> 
@@ -437,8 +438,23 @@ onValue(ref(db, 'mka_data'), (snap) => {
     cur,  
     person,  
     stk,
-    mix // Nouveau paramètre pour le multi-devise
+    mix
 }){  
+
+    // 🔥 1. SÉCURISATION DU MODE (ANTI "CRÉDIT PUR")
+    let safeMode = normalize(mode || "");
+
+    if (safeMode.includes("credit")) {
+        mode = "dette_client";
+    } else if (safeMode.includes("dette moi")) {
+        mode = "dette_moi";
+    } else if (safeMode.includes("cash")) {
+        mode = "cash";
+    } else if (safeMode.includes("virtuel") || safeMode.includes("sim")) {
+        mode = "virtuel";
+    }
+
+    // 🔥 2. STRUCTURE DES IMPACTS
     const impacts = {  
         caisse: { USD:0, CDF:0 },  
         operator: { USD:0, CDF:0 },  
@@ -446,39 +462,47 @@ onValue(ref(db, 'mka_data'), (snap) => {
         stock: stk || 0  
     };  
 
+    // 🔥 3. DÉTECTION TYPE DETTE SÉCURISÉE
     let typeDette = "";
-    if(mode === "dette_client") typeDette = "dette client";
-    else if(mode === "dette_moi") typeDette = "dette moi";
+    const modeNorm = normalize(mode);
+    const opNorm = normalize(operator);
+
+    if (modeNorm === "dette_client") {
+        typeDette = "dette client";
+    } 
+    else if (modeNorm === "dette_moi") {
+        typeDette = "dette moi";
+    } 
     else {
-        const opNorm = normalize(operator);
-        if(opNorm.includes("dette client")) typeDette = "dette client";
-        else if(opNorm.includes("dette moi")) typeDette = "dette moi";
+        if (opNorm.includes("dette client")) typeDette = "dette client";
+        else if (opNorm.includes("dette moi")) typeDette = "dette moi";
     }
 
-    // On utilise les valeurs mixtes si elles existent, sinon on prend le montant simple
+    // 🔥 4. GESTION MULTI-DEVISE
     const finalUSD = (mix && mix.USD) ? mix.USD : (cur === "USD" ? amt : 0);
     const finalCDF = (mix && mix.CDF) ? mix.CDF : (cur === "CDF" ? amt : 0);
 
-    // Si c'est un RÈGLEMENT, on inverse l'impact pour diminuer la dette
-    const isReglement = (typeNom === "REGLEMENT");
+    // 🔥 5. DÉTECTION RÈGLEMENT
+    const isReglement = normalize(typeNom).includes("reglement");
     const mult = isReglement ? -1 : 1;
 
+    // 🔥 6. IMPACT DETTE
     if(typeDette && person){
         impacts.dette.USD = finalUSD * mult;
         impacts.dette.CDF = finalCDF * mult;
     }
 
+    // 🔥 7. RETURN FINAL SÉCURISÉ
     return {  
         id: Date.now(),  
         typeNom,  
         operator,  
-        mode,  
+        mode, // ✅ maintenant sécurisé
         amt: (cur === "USD" ? finalUSD : finalCDF), 
         cur,  
         person,  
         typeDette,
         impacts,
-        // On stocke les valeurs réelles pour l'historique
         realUSD: finalUSD,
         realCDF: finalCDF
     };  
@@ -561,7 +585,22 @@ window.addTransaction = () => {
     const commUSD = parseFloat(document.getElementById("commUSD").value) || 0;
     const commCDF = parseFloat(document.getElementById("commCDF").value) || 0;
     
-    const mode = document.getElementById("payMode").value;
+    let mode = document.getElementById("payMode").value;
+    const modeNorm = normalize(mode);
+
+// 🔥 TABLE DE CONVERSION PROPRE
+if (modeNorm.includes("credit")) {
+    mode = "dette_client";
+}
+else if (modeNorm.includes("dette moi")) {
+    mode = "dette_moi";
+}
+else if (modeNorm.includes("cash")) {
+    mode = "cash";
+}
+else if (modeNorm.includes("virtuel") || modeNorm.includes("sim")) {
+    mode = "virtuel";
+}
     const motif = document.getElementById("motif").value;
     const person = document.getElementById("personName").value.trim();
     const stkM = parseFloat(document.getElementById("stkMove").value) || 0; 
@@ -841,7 +880,34 @@ window.showFullHistory = (filter) => {
             normalize(t.desc || "").includes("depense")
         );
     }
-  
+         // --- NOUVEAU FILTRE : MONEY SERVICE ---
+    else if(filter === 'money') {
+        filtered = data.transactions.filter(t => {
+            const type = normalize(t.typeNom || "");
+            const desc = normalize(t.desc || "");
+            const op = normalize(t.operator || "");
+            const mode = normalize(t.mode || "");
+
+            // 1. Toute opération de type Retrait ou Dépôt
+            const isFinancial = type.includes("retrait") || type.includes("depot");
+
+            // 2. Règlement ou transfert lié à "Money" ou "Pesa"
+            const isMoneyKeyword = desc.includes("money") || desc.includes("pesa") || op.includes("money") || op.includes("pesa");
+
+            // 3. Mode de règlement via une autre SIM contenant "Money" ou "Pesa"
+            let isVirtualMoney = false;
+            if(t.mode === "virtuel" && t.impacts && t.impacts.virtuel && t.impacts.virtuel.opIdx !== null) {
+                const sourceSim = data.operators[t.impacts.virtuel.opIdx];
+                if(sourceSim) {
+                    const simName = normalize(sourceSim.name);
+                    isVirtualMoney = simName.includes("money") || simName.includes("pesa");
+                }
+            }
+
+            return isFinancial || isMoneyKeyword || isVirtualMoney;
+        });
+    }
+
     let html = `<div style="display:flex; flex-direction:column; gap:12px;">`;  
   
     html += filtered.map((t) => {  
@@ -1038,40 +1104,145 @@ else if (finalPerson && isModeDette) {
         else if(normalize(type).includes("vente")) icon = "🛒";  
         else if(isModeDette) icon = "📝";
 
-        const hasCash = (t.usdCash > 0 || t.cdfCash > 0);
-        const cUSD = (t.commission && t.commission.usd) ? t.commission.usd : 0;
-        const cCDF = (t.commission && t.commission.cdf) ? t.commission.cdf : 0;
+// --- 1. CALCULS DES COMMISSIONS ---
+const cUSD = (t.commission && t.commission.usd) ? t.commission.usd : 0;
+const cCDF = (t.commission && t.commission.cdf) ? t.commission.cdf : 0;
 
-        return `  
-        <div style="background:#ffffff; border-radius:16px; padding:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); border-left:5px solid ${isModeDette ? '#f59e0b' : '#0ea5e9'};">  
-            ${isAdmin ? `  
-            <div style="display:flex; gap:6px; justify-content:flex-end; margin-bottom: 5px;">  
-                <button onclick="cancelTransaction(${realIdx})" style="background:#f59e0b;color:#fff;border:none;padding:5px 10px;border-radius:8px;font-size:10px;cursor:pointer;">↩ Annuler</button>  
-                <button onclick="deleteTransaction(${realIdx})" style="background:#ef4444;color:#fff;border:none;padding:5px 10px;border-radius:8px;font-size:10px;cursor:pointer;">Suppr</button>  
-            </div>` : ""}  
-            <div style="display:grid; grid-template-columns: 1.2fr 1fr 1fr 1.6fr 1.5fr 1fr; gap:6px; align-items:center; font-size:12px;">  
-                <div style="color:#64748b;">${t.date}</div>  
-                <div style="font-weight:bold; color:#1e293b;">${t.operator || opNameFromDesc}</div>  
-                <div style="background:#f1f5f9; padding:3px 6px; border-radius:6px; text-align:center; font-size:10px; border:1px solid #e2e8f0;">  
-                    ${icon} ${type || "-"} ${stockDisplay} 
-                </div>  
-                <div style="color:#475569; font-weight:500;">${motif || "-"}</div>  
+// --- 2. DÉTECTION SOURCE SIM ---
+let simSourceName = "";
+if (t.impacts && t.impacts.virtuel && t.impacts.virtuel.opIdx !== null) {
+    const sourceOp = data.operators[t.impacts.virtuel.opIdx];
+    simSourceName = sourceOp ? ` (via ${sourceOp.name})` : " (SIM inconnue)";
+}
+
+// --- 3. NORMALISATION DU MODE (CORRECTION PRINCIPALE) ---
+let rawMode = normalize(t.mode || "");
+
+// 🔥 1. SUPPRESSION DÉFINITIVE "CRÉDIT PUR"
+if (rawMode.includes("credit")) {
+    rawMode = "dette_client";
+}
+
+// 🔥 2. DÉTECTION AUTOMATIQUE SI MODE VIDE OU MAL FORMÉ
+if (!rawMode || rawMode === "-") {
+
+    // 💵 CAS CASH
+    if ((t.usdCash || 0) > 0 || (t.cdfCash || 0) > 0) {
+        rawMode = "cash";
+    }
+
+    // 📱 CAS SIM / VIRTUEL
+    else if (t.impacts && t.impacts.virtuel) {
+        rawMode = "virtuel";
+    }
+
+    // 🧾 CAS DETTE
+    else if (isModeDette) {
+        rawMode = "dette_client";
+    }
+
+    // 🔄 FALLBACK
+    else {
+        rawMode = "cash";
+    }
+}
+
+// 🔥 3. LABELS PROPRES
+const modeLabel = {
+    "cash": "💵 CASH",
+    "virtuel": `📱 INTER-SIM${simSourceName}`,
+    "depense": "🚫 DÉPENSE",
+    "dette_client": "📝 DETTE CLIENT",
+    "dette_moi": "📝 DETTE MOI",
+    "transfert": "🔄 TRANSFERT"
+};
+
+let displayMode = modeLabel[rawMode] || "❓ MODE INCONNU";
+
+let finalCashDisplay = ""; 
+
+// 🔥 PRIORITÉ : toujours afficher le MODE utilisé
+const badgeColor = isModeDette ? "#ef4444" : "#475569"; 
+
+finalCashDisplay = `<div style="
+    color:${badgeColor}; 
+    font-size:10px; 
+    font-weight:bold; 
+    background:#f1f5f9; 
+    padding:4px 8px; 
+    border-radius:6px; 
+    display:inline-block; 
+    border:1px solid ${badgeColor}44; 
+    text-transform: uppercase;">
+    ${displayMode}
+</div>`;
+
+// 🔥 SI cash existe → on ajoute en PLUS (pas remplacer)
+if (t.usdCash > 0 || t.cdfCash > 0) {
+    finalCashDisplay += `<div style="color:#16a34a; font-size:10px; font-weight:700;">
+        CASH: ${fmt(t.usdCash || 0)}$ | ${fmt(t.cdfCash || 0)}FC
+    </div>`;
+}
+
+// 🔥 SI virtuel → info en plus
+if (t.mode === "virtuel") {
+    finalCashDisplay += `<div style="color:#64748b; font-size:9px; font-style:italic;">
+        Via SIM
+    </div>`;
+}
+
+// --- 5. RETURN FINAL ---
+return `  
+<div style="background:#ffffff; border-radius:16px; padding:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); border-left:5px solid ${isModeDette ? '#f59e0b' : '#0ea5e9'};">  
+
+    ${isAdmin ? `  
+    <div style="display:flex; gap:6px; justify-content:flex-end; margin-bottom: 5px;">  
+        <button onclick="cancelTransaction(${realIdx})" style="background:#f59e0b;color:#fff;border:none;padding:5px 10px;border-radius:8px;font-size:10px;cursor:pointer;">↩ Annuler</button>  
+        <button onclick="deleteTransaction(${realIdx})" style="background:#ef4444;color:#fff;border:none;padding:5px 10px;border-radius:8px;font-size:10px;cursor:pointer;">Suppr</button>  
+    </div>` : ""}  
+
+    <div style="display:grid; grid-template-columns: 1.2fr 1fr 1fr 1.6fr 1.5fr 1fr; gap:6px; align-items:center; font-size:12px;">  
+
+        <div style="color:#64748b;">${t.date}</div>  
+
+        <div style="font-weight:bold; color:#1e293b;">
+            ${t.operator || opNameFromDesc}
+        </div>  
+
+        <div style="background:#f1f5f9; padding:3px 6px; border-radius:6px; text-align:center; font-size:10px; border:1px solid #e2e8f0;">  
+            ${icon} ${type || "-"} ${stockDisplay} 
+        </div>  
+
+        <div style="color:#475569; font-weight:500;">
+            ${motif || "-"}
+        </div>  
+        
+        <div style="line-height:1.3;">  
+
+            <div style="font-weight:bold; color:#0f172a;">
+                SIM: ${fmt(t.amtSIM || t.amt)} ${t.curSIM || t.cur}
+            </div>
                 
-                <div style="line-height:1.3;">  
-                    <div style="font-weight:bold; color:#0f172a;">SIM: ${fmt(t.amtSIM || t.amt)} ${t.curSIM || t.cur}</div>
-                    ${hasCash ? 
-                        `<div style="color:#16a34a; font-size:10px; font-weight:700;">CASH: ${fmt(t.usdCash || 0)}$ | ${fmt(t.cdfCash || 0)}FC</div>` : 
-                        `<div style="color:#94a3b8; font-size:9px; font-style:italic;">Crédit pur</div>`
-                    }
-                    ${(cUSD > 0 || cCDF > 0) ? 
-                        `<div style="color:#0ea5e9; font-size:10px; font-weight:bold; background:#f0f9ff; border-radius:4px; padding:1px 3px;">+ COM: ${fmt(cUSD)}$ | ${fmt(cCDF)}FC</div>` : 
-                        ""
-                    }
-                </div>  
+            ${finalCashDisplay}
 
-                <div style="font-weight:800; color:${resteColor}; text-align:right; font-size:11px;">${resteTxt}</div>  
-            </div>  
-        </div>`;  
+            ${(cUSD > 0 || cCDF > 0) ? 
+                `<div style="color:#0ea5e9; font-size:10px; font-weight:bold; background:#f0f9ff; border-radius:4px; padding:1px 3px;">
+                    + COM: ${fmt(cUSD)}$ | ${fmt(cCDF)}FC
+                </div>` 
+                : ""
+            }
+
+        </div>  
+
+        <div style="font-weight:800; color:${resteColor}; text-align:right; font-size:11px;">
+            ${resteTxt}
+        </div>  
+
+    </div>  
+
+</div>`;
+
+ 
     }).join("");  
   
     html += `</div>`;  
@@ -1319,7 +1490,32 @@ window.cancelTransaction = (index) => {
     }
 };
 
-    function render() {    
+    function render() {
+
+    // 🔥 NETTOYAGE CORRIGÉ
+    data.transactions.forEach(t => {
+
+        if (!t.mode) return;
+
+        const m = normalize(t.mode);
+
+        if (m.includes("credit")) {
+            t.mode = "dette_client";
+        }
+        else if (m.includes("dette moi")) {
+            t.mode = "dette_moi";
+        }
+        else if (m.includes("cash")) {
+            t.mode = "cash";
+        }
+        else if (m.includes("virtuel") || m.includes("sim")) {
+            t.mode = "virtuel";
+        }
+
+    });
+
+    // 👇 ton reste de code render ici
+   
     const t = parseFloat(data.taux) || 1;    
     document.getElementById("caisseUSD").innerText = fmt(data.caisse.USD);    
     document.getElementById("caisseCDF").innerText = fmt(data.caisse.CDF);    
