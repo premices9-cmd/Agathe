@@ -144,9 +144,14 @@
         <select id="typeSelect" onchange="updateDefaultStockMove()"></select>    
     </div>    
     <div class="grid-2">    
-        <input type="number" id="amount" placeholder="Montant Opération">    
-        <input type="number" id="stkMove" placeholder="Stock (+/-)" value="0">    
-    </div>    
+    <input type="number" id="amount" placeholder="Montant Opération">    
+    <div style="display:flex; gap:2px;">
+        <input type="number" id="opTaux" placeholder="Taux (ex: 2850)">
+        <button type="button" onclick="document.getElementById('opTaux').value = data.taux" style="width:45px; background:#64748b; font-size:10px;">DEFAUT</button>
+        </div>
+    </div>
+        <input type="number" id="stkMove" placeholder="Stock (+/-)" value="0" style="margin-top:5px;">
+    
     <select id="currency" style="margin-bottom: 10px;"><option value="USD">USD</option><option value="CDF">CDF</option></select>    
 
     <div id="mixedFields" class="mixed-box">    
@@ -571,7 +576,7 @@ onValue(ref(db, 'mka_data'), (snap) => {
 }
 
 window.addTransaction = () => {  
-    // --- BARRIÈRE DE SÉCURITÉ (AJOUTÉE) ---
+    // --- BARRIÈRE DE SÉCURITÉ ---
     if (!isDataLoaded) { alert("Synchronisation en cours... Attendez 2 secondes."); return; }
     if (!data.config) { alert("Erreur de chargement des données. Rechargez la page."); return; }
     
@@ -579,6 +584,11 @@ window.addTransaction = () => {
     const tyI = document.getElementById("typeSelect").value;
     const amtSIM = parseFloat(document.getElementById("amount").value) || 0; 
     const cur = document.getElementById("currency").value;
+
+    // --- LOGIQUE DU TAUX D'OPÉRATION ---
+    // On récupère la valeur saisie, sinon on prend le taux par défaut de la data
+    const opTauxSaisi = parseFloat(document.getElementById("opTaux").value);
+    const tauxOperation = !isNaN(opTauxSaisi) ? opTauxSaisi : parseFloat(data.taux);
     
     const mixUSD = parseFloat(document.getElementById("mixUSD").value) || 0;
     const mixCDF = parseFloat(document.getElementById("mixCDF").value) || 0;
@@ -588,19 +598,20 @@ window.addTransaction = () => {
     let mode = document.getElementById("payMode").value;
     const modeNorm = normalize(mode);
 
-// 🔥 TABLE DE CONVERSION PROPRE
-if (modeNorm.includes("credit")) {
-    mode = "dette_client";
-}
-else if (modeNorm.includes("dette moi")) {
-    mode = "dette_moi";
-}
-else if (modeNorm.includes("cash")) {
-    mode = "cash";
-}
-else if (modeNorm.includes("virtuel") || modeNorm.includes("sim")) {
-    mode = "virtuel";
-}
+    // 🔥 TABLE DE CONVERSION PROPRE
+    if (modeNorm.includes("credit")) {
+        mode = "dette_client";
+    }
+    else if (modeNorm.includes("dette moi")) {
+        mode = "dette_moi";
+    }
+    else if (modeNorm.includes("cash")) {
+        mode = "cash";
+    }
+    else if (modeNorm.includes("virtuel") || modeNorm.includes("sim")) {
+        mode = "virtuel";
+    }
+
     const motif = document.getElementById("motif").value;
     const person = document.getElementById("personName").value.trim();
     const stkM = parseFloat(document.getElementById("stkMove").value) || 0; 
@@ -610,7 +621,7 @@ else if (modeNorm.includes("virtuel") || modeNorm.includes("sim")) {
 
     if(!ty || !op) return;
 
-    // Détection automatique du type de dette basée sur l'opérateur OU le mode
+    // Détection automatique du type de dette
     let typeDetteDetecte = "";
     if (mode === "dette_client" || normalize(op.name).includes("client")) {
         typeDetteDetecte = "dette client";
@@ -629,9 +640,11 @@ else if (modeNorm.includes("virtuel") || modeNorm.includes("sim")) {
         mix: { USD: mixUSD, CDF: mixCDF } 
     });
 
+    // On injecte le taux utilisé pour que createTransaction ou les calculs suivants en profitent
+    t.tauxApplique = tauxOperation; 
     t.impacts.virtuel = { opIdx: null, USD: 0, CDF: 0 };
     t.stk = stkM; 
-    t.typeDette = typeDetteDetecte; // On force le type de dette détecté
+    t.typeDette = typeDetteDetecte;
 
     if (mode === "depense") {
         const depOp = data.operators.find(o => normalize(o.name).toLowerCase().includes("depense"));
@@ -658,19 +671,40 @@ else if (modeNorm.includes("virtuel") || modeNorm.includes("sim")) {
             simSource.CDF -= vCDF;
             t.impacts.virtuel = { opIdx: paySimIdx, USD: vUSD, CDF: vCDF };
         }
-        t.impacts.caisse.USD = commUSD;
+        
+        t.impacts.caisse.USD = commUSD; // Seule la commission va en caisse en mode virtuel pur
         t.impacts.caisse.CDF = commCDF;
         t.impacts.operator.USD = (cur === "USD" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
         t.impacts.operator.CDF = (cur === "CDF" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
+
+        // --- NOUVEAU : CALCUL DE LA DETTE EN MODE VIRTUEL ---
+        // Si vous donnez du cash lors d'un retrait virtuel, cela réduit la dette
+        if (cur === "USD") {
+            t.detteUSD = amtSIM - mixUSD - (mixCDF / tauxOperation);
+            t.detteCDF = 0;
+        } else {
+            t.detteCDF = amtSIM - mixCDF - (mixUSD * tauxOperation);
+            t.detteUSD = 0;
+        }
+        // Si le calcul arrive à 0 ou moins, on considère qu'il n'y a pas de dette
+        if (t.detteUSD < 0) t.detteUSD = 0;
+        if (t.detteCDF < 0) t.detteCDF = 0;
 
     } else if (mode === "dette_client" || mode === "dette_moi") {
         t.isDette = true; 
         t.impacts.operator.USD = (cur === "USD" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
         t.impacts.operator.CDF = (cur === "CDF" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
+        
+        if (cur === "USD") {
+            t.detteUSD = amtSIM - mixUSD - (mixCDF / tauxOperation);
+            t.detteCDF = 0;
+        } else {
+            t.detteCDF = amtSIM - mixCDF - (mixUSD * tauxOperation);
+            t.detteUSD = 0;
+        }
+
         t.impacts.caisse.USD = mixUSD + commUSD;
         t.impacts.caisse.CDF = mixCDF + commCDF;
-        t.detteUSD = (cur === "USD" ? amtSIM : 0) - mixUSD;
-        t.detteCDF = (cur === "CDF" ? amtSIM : 0) - mixCDF;
 
     } else {
         const dirCaisse = (parseInt(ty.impC) || 0);
@@ -678,16 +712,21 @@ else if (modeNorm.includes("virtuel") || modeNorm.includes("sim")) {
         t.impacts.operator.CDF = (cur === "CDF" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
         t.impacts.caisse.USD = (mixUSD * dirCaisse) + commUSD;
         t.impacts.caisse.CDF = (mixCDF * dirCaisse) + commCDF;
-        // Si on utilise l'opérateur principal Dette, on calcule l'impact dette même en mode normal
+        
         if (typeDetteDetecte) {
-            t.detteUSD = (cur === "USD" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
-            t.detteCDF = (cur === "CDF" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
+            if (cur === "USD") {
+                t.detteUSD = (amtSIM * (parseInt(ty.impO) || 0)) - mixUSD - (mixCDF / tauxOperation);
+                t.detteCDF = 0;
+            } else {
+                t.detteCDF = (amtSIM * (parseInt(ty.impO) || 0)) - mixCDF - (mixUSD * tauxOperation);
+                t.detteUSD = 0;
+            }
         }
     }
 
+
     applyImpacts(t);
 
-    // LOGIQUE DE CAPTURE AMÉLIORÉE
     if (person && typeDetteDetecte) {
         const key = `${normalize(typeDetteDetecte)}_${normalize(person)}`;
         const finalDebt = data.debts[key] || { USD: 0, CDF: 0 };
@@ -696,6 +735,7 @@ else if (modeNorm.includes("virtuel") || modeNorm.includes("sim")) {
 
     const newEntry = {
         ...t,
+        tauxApplique: tauxOperation, // On enregistre le taux utilisé dans l'historique
         person: person,
         date: new Date().toLocaleString(),
         desc: `${mode === "depense" ? 'DÉPENSE' : ty.name} - ${op.name} (${person ? 'NOM: '+person+' | ' : ''}${motif})`,
@@ -707,137 +747,126 @@ else if (modeNorm.includes("virtuel") || modeNorm.includes("sim")) {
     };
 
     data.transactions.unshift(newEntry);
-    save(); // Appel de la nouvelle fonction save() sécurisée
+    save(); 
     alert("Opération enregistrée !");
     render();
     
-    ["amount","mixUSD","mixCDF","commUSD","commCDF","motif","personName", "stkMove"].forEach(id => {
+    // Nettoyage des champs (Ajout de opTaux dans la liste)
+    ["amount","opTaux","mixUSD","mixCDF","commUSD","commCDF","motif","personName", "stkMove"].forEach(id => {
         const el = document.getElementById(id);
         if(el) el.value = "";
     });
 };
 
  window.settleAccountV2 = () => {
-
     const opIdx = document.getElementById("settleOpIdx").value;
     const person = document.getElementById("debtPersonName").value.trim();
     const destIdx = document.getElementById("settleDest").value;
+    const taux = parseFloat(data.taux) || 1; 
 
     const opDette = data.operators[opIdx];
-    const taux = parseFloat(data.taux) || 1;
-
-    const pOnUsd_USD = parseFloat(document.getElementById("payOnUsd_USD").value) || 0;
-    const pOnUsd_CDF = parseFloat(document.getElementById("payOnUsd_CDF").value) || 0;
-    const pOnCdf_USD = parseFloat(document.getElementById("payOnCdf_USD").value) || 0;
-    const pOnCdf_CDF = parseFloat(document.getElementById("payOnCdf_CDF").value) || 0;
-
     if (!opDette || !person) {
         alert("Sélectionnez un opérateur et entrez le nom de la personne.");
         return;
     }
 
-    // --- TYPE DETTE ---
-    const isMoi = normalize(opDette.name).includes("moi");
-    const typeDette = isMoi ? "dette moi" : "dette client";
-    const modePourFiltre = isMoi ? "dette_moi" : "dette_client";
+    // Récupération des montants saisis dans le formulaire
+    const pOnUsd_USD = parseFloat(document.getElementById("payOnUsd_USD").value) || 0;
+    const pOnUsd_CDF = parseFloat(document.getElementById("payOnUsd_CDF").value) || 0;
+    const pOnCdf_USD = parseFloat(document.getElementById("payOnCdf_USD").value) || 0;
+    const pOnCdf_CDF = parseFloat(document.getElementById("payOnCdf_CDF").value) || 0;
 
-    const key = `${normalize(typeDette)}_${normalize(person)}`;
-    const oldDebt = JSON.parse(JSON.stringify(data.debts[key] || { USD: 0, CDF: 0 }));
+    // Cash total reçu (ce qui entre en caisse ou chez l'opérateur)
+    const totalPaidUSD = pOnUsd_USD + pOnCdf_USD;
+    const totalPaidCDF = pOnUsd_CDF + pOnCdf_CDF;
 
-    // --- CALCULS ---
-    const reductionUSD = pOnUsd_USD + (pOnUsd_CDF / taux);
-    const reductionCDF = pOnCdf_CDF + (pOnCdf_USD * taux);
-
-    const totalCashUSD = pOnUsd_USD + pOnCdf_USD;
-    const totalCashCDF = pOnUsd_CDF + pOnCdf_CDF;
-
-    if (totalCashUSD === 0 && totalCashCDF === 0) {
+    if (totalPaidUSD === 0 && totalPaidCDF === 0) {
         alert("Veuillez saisir au moins un montant.");
         return;
     }
 
-    // 🔥 IMPORTANT : opérateur = destination (PAS dette)
-    const operatorName = destIdx === "caisse"
-        ? "CAISSE"
-        : (data.operators[destIdx]?.name || "INCONNU");
+    const isMoi = normalize(opDette.name).includes("moi");
+    const typeDette = isMoi ? "dette moi" : "dette client";
+    const key = `${normalize(typeDette)}_${normalize(person)}`;
+    const oldDebt = JSON.parse(JSON.stringify(data.debts[key] || { USD: 0, CDF: 0 }));
 
-    const destName = operatorName;
+    // --- 1. CALCUL DE LA RÉDUCTION POUR LA DETTE USD ---
+    // On convertit les FC payés sur la ligne USD en Dollars
+    const reductionTotaleUSD = pOnUsd_USD + (pOnUsd_CDF / taux);
 
-    // --- TRANSACTION ---
+    // --- 2. CALCUL DE LA RÉDUCTION POUR LA DETTE CDF ---
+    // On convertit les Dollars payés sur la ligne CDF en Francs
+    const reductionTotaleCDF = pOnCdf_CDF + (pOnCdf_USD * taux);
+
+    // --- LOGIQUE DE SURPLUS USD ---
+    let redUSD = reductionTotaleUSD;
+    let surplusUSD = 0;
+    if (reductionTotaleUSD > oldDebt.USD) {
+        surplusUSD = reductionTotaleUSD - oldDebt.USD;
+        redUSD = oldDebt.USD;
+    }
+
+    // --- LOGIQUE DE SURPLUS CDF ---
+    let redCDF = reductionTotaleCDF;
+    let surplusCDF = 0;
+    if (reductionTotaleCDF > oldDebt.CDF) {
+        surplusCDF = reductionTotaleCDF - oldDebt.CDF;
+        redCDF = oldDebt.CDF;
+    }
+
+    const operatorName = destIdx === "caisse" ? "CAISSE" : (data.operators[destIdx]?.name || "INCONNU");
+    const direction = isMoi ? -1 : 1;
+
     const t = createTransaction({
         typeNom: "REGLEMENT",
         operator: operatorName,
-        mode: modePourFiltre,
-        amt: totalCashUSD,
+        mode: isMoi ? "dette_moi" : "dette_client",
+        amt: totalPaidUSD, 
         cur: "USD",
         person,
-        mix: { USD: totalCashUSD, CDF: totalCashCDF }
+        mix: { USD: totalPaidUSD, CDF: totalPaidCDF }
     });
 
     t.isReglement = true;
-    t.typeDette = typeDette;
-
-    const direction = isMoi ? -1 : 1;
-
-    // --- IMPACT DETTE ---
-    t.impacts.dette = {
-        USD: -reductionUSD,
-        CDF: -reductionCDF
+    t.surplusUSD = surplusUSD;
+    t.surplusCDF = surplusCDF;
+    t.isMoi = isMoi;
+    t.payDetail = {
+        onUsd: { usd: pOnUsd_USD, cdf: pOnUsd_CDF },
+        onCdf: { usd: pOnCdf_USD, cdf: pOnCdf_CDF }
     };
+    t.debtBefore = oldDebt; 
 
-    // --- IMPACT DESTINATION (CENTRALISÉ) ---
+    // Impact Dette : On retire la valeur calculée (convertie)
+    t.impacts.dette = { USD: -redUSD, CDF: -redCDF };
+
+    // Impact Caisse/Opérateur : On enregistre le cash réel reçu
     if (destIdx === "caisse") {
-        t.impacts.caisse = {
-            USD: totalCashUSD * direction,
-            CDF: totalCashCDF * direction
-        };
+        t.impacts.caisse = { USD: totalPaidUSD * direction, CDF: totalPaidCDF * direction };
     } else {
-        t.impacts.operator = {
-            USD: totalCashUSD * direction,
-            CDF: totalCashCDF * direction
-        };
+        t.impacts.operator = { USD: totalPaidUSD * direction, CDF: totalPaidCDF * direction };
     }
 
-    // ✅ PAS de modification directe des opérateurs ici !
-
-    // --- APPLY ---
     applyImpacts(t);
 
-    // 🔥 MODIFICATION ICI : Capture du nouveau solde pour l'historique
     const newDebt = data.debts[key] || { USD: 0, CDF: 0 };
     t.snapshotDette = { USD: newDebt.USD, CDF: newDebt.CDF };
 
-    // --- HISTORIQUE ---
     data.transactions.unshift({
         ...t,
         date: new Date().toLocaleString(),
-        desc: `RÈGLEMENT: ${person.toUpperCase()} (${typeDette}) vers ${destName}`,
-        debtBefore: oldDebt,
-        debtAfter: newDebt, // Gardé pour compatibilité
-        payDetail: {
-            onUsd: { usd: pOnUsd_USD, cdf: pOnUsd_CDF },
-            onCdf: { usd: pOnCdf_USD, cdf: pOnCdf_CDF }
-        },
-        usdCash: totalCashUSD,
-        cdfCash: totalCashCDF
+        desc: `RÈGLEMENT: ${person.toUpperCase()} (${typeDette}) vers ${operatorName}`,
+        usdCash: totalPaidUSD,
+        cdfCash: totalPaidCDF
     });
 
     save();
-
-    alert(`Règlement de ${person} vers ${destName} enregistré !`);
-
     render();
-
-    // --- RESET ---
-    [
-        "payOnUsd_USD",
-        "payOnUsd_CDF",
-        "payOnCdf_USD",
-        "payOnCdf_CDF",
-        "debtPersonName"
-    ].forEach(id => {
+    alert("Enregistré avec succès !");
+    
+    ["payOnUsd_USD", "payOnUsd_CDF", "payOnCdf_USD", "payOnCdf_CDF", "debtPersonName"].forEach(id => {
         const el = document.getElementById(id);
-        if (el) el.value = "";
+        if(el) el.value = "";
     });
 };
 
@@ -944,43 +973,77 @@ window.showFullHistory = (filter) => {
             </div>`;
         }
 
-        // --- 2. DESIGN SPÉCIAL POUR LES RÈGLEMENTS DE DETTES ---
-        if (t.isReglement && t.debtBefore) {
-            const b = t.debtBefore;
-            const a = t.debtAfter;
-            const p = t.payDetail;
-            const estSolde = (Math.abs(a.USD) < 0.1 && Math.abs(a.CDF) < 100);
+// --- DESIGN RÈGLEMENT AVEC DÉTAIL COMPLET (VOTRE PRÉFÉRÉ) ---
+if (t.isReglement) {
+    const b = t.debtBefore || { USD: 0, CDF: 0 };
+    const a = t.snapshotDette || { USD: 0, CDF: 0 };
+    const p = t.payDetail || { onUsd: { usd: 0, cdf: 0 }, onCdf: { usd: 0, cdf: 0 } };
+    
+    // Correction de la détection du solde (pour gérer les micro-restes)
+    const estSolde = (a.USD <= 0.1 && a.CDF <= 100);
+    
+    const sUSD = parseFloat(t.surplusUSD || 0);
+    const sCDF = parseFloat(t.surplusCDF || 0);
+    const labelSurplus = t.isMoi ? "PERTE" : "INTÉRÊT";
 
-            return `
-            <div style="background:#fff7ed; border-radius:16px; padding:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); border-left:5px solid #eab308;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                    <span style="font-size:11px; color:#64748b;">${t.date}</span>
-                    <span style="font-weight:bold; color:#854d0e; font-size:12px;">💰 RÈGLEMENT DETTE</span>
-                    ${isAdmin ? `<button onclick="cancelTransaction(${realIdx})" style="background:#f59e0b;color:#fff;border:none;padding:4px 8px;border-radius:6px;font-size:10px;cursor:pointer;">↩ Annuler</button>` : ""}
+    return `
+    <div style="background:#fff7ed; border-radius:16px; padding:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); border-left:5px solid #eab308; margin-bottom:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <span style="font-size:11px; color:#64748b;">${t.date}</span>
+            <span style="font-weight:bold; color:#854d0e; font-size:12px;">💰 RÈGLEMENT ${t.person.toUpperCase()}</span>
+            ${isAdmin ? `<button onclick="cancelTransaction(${realIdx})" style="background:#f59e0b;color:#fff;border:none;padding:4px 8px;border-radius:6px;font-size:10px;cursor:pointer;">↩ Annuler</button>` : ""}
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1.6fr 1fr; gap:8px; align-items:center; background:white; padding:10px; border-radius:10px;">
+            
+            <div style="text-align:center;">
+                <div style="font-size:9px; color:#9a3412; font-weight:bold; text-transform:uppercase;">Était Dû</div>
+                <div style="font-weight:bold; font-size:13px; color:#0f172a;">${fmt(b.USD)}$</div>
+                <div style="font-size:11px; color:#475569;">${fmt(b.CDF)} FC</div>
+            </div>
+
+            <div style="font-size:10px; border-left:1px solid #fed7aa; border-right:1px solid #fed7aa; padding:0 8px;">
+                <div style="font-weight:bold; color:#166534; font-size:9px; margin-bottom:4px; text-align:center; text-decoration:underline;">DÉTAIL DU VERSEMENT</div>
+                
+                <div style="display:flex; justify-content:space-between; margin-bottom:2px;">
+                    <span style="color:#64748b;">Sur Dette $:</span> 
+                    <b style="color:#166534;">${fmt(p.onUsd.usd)}$ + ${fmt(p.onUsd.cdf)}FC</b>
                 </div>
-                <div style="display:grid; grid-template-columns: 1fr 1.5fr 1fr; gap:8px; align-items:center; background:white; padding:10px; border-radius:10px;">
-                    <div style="text-align:center;">
-                        <div style="font-size:9px; color:#9a3412; font-weight:bold;">ÉTAIT DÛ</div>
-                        <div style="font-weight:bold; font-size:13px; color:#0f172a;">${fmt(b.USD)}$</div>
-                        <div style="font-size:11px; color:#475569;">${fmt(b.CDF)} FC</div>
-                    </div>
-                    <div style="font-size:10px; border-left:1px solid #fed7aa; border-right:1px solid #fed7aa; padding:0 8px;">
-                        <div style="font-weight:bold; color:#166534; margin-bottom:3px; text-transform:uppercase;">Payé par ${t.person} :</div>
-                        <div style="display:flex; justify-content:space-between;"><span>Sur $:</span> <b>${fmt(p.onUsd.usd)}$ + ${fmt(p.onUsd.cdf)}FC</b></div>
-                        <div style="display:flex; justify-content:space-between;"><span>Sur FC:</span> <b>${fmt(p.onCdf.usd)}$ + ${fmt(p.onCdf.cdf)}FC</b></div>
-                    </div>
-                    <div style="text-align:center;">
-                        ${estSolde ? 
-                            `<div style="background:#16a34a; color:white; padding:6px; border-radius:8px; font-weight:bold; font-size:12px; border:2px solid #bcf0da;">SOLDE</div>` : 
-                            `<div style="font-size:9px; color:#64748b; font-weight:bold;">RESTE À PAYER</div>
-                             <div style="font-weight:bold; font-size:13px; color:#dc2626;">${fmt(a.USD)}$</div>
-                             <div style="font-size:11px; color:#dc2626;">${fmt(a.CDF)} FC</div>`
+                
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                    <span style="color:#64748b;">Sur Dette FC:</span> 
+                    <b style="color:#166534;">${fmt(p.onCdf.usd)}$ + ${fmt(p.onCdf.cdf)}FC</b>
+                </div>
+
+                <div style="text-align:center; font-size:9px; color:#9a3412; border-top:1px dashed #fed7aa; padding-top:4px;">
+                    Destination: <b>${t.operator}</b>
+                </div>
+            </div>
+
+            <div style="text-align:center;">
+                ${estSolde ? 
+                    `<div style="background:#16a34a; color:white; padding:6px; border-radius:10px; font-weight:bold; font-size:12px; border:2px solid #bcf0da;">
+                        SOLDÉ
+                        ${(sUSD > 0 || sCDF > 0) ? `
+                            <div style="font-size:8px; background:rgba(0,0,0,0.15); margin-top:4px; padding:2px; border-radius:4px; line-height:1;">
+                                <span style="text-decoration:underline;">${labelSurplus}:</span><br>
+                                ${sUSD > 0 ? `+${fmt(sUSD)}$` : ''}
+                                ${sCDF > 0 ? (sUSD > 0 ? ' | ' : '') + `+${fmt(sCDF)}FC` : ''}
+                            </div>` : ''
                         }
-                    </div>
-                </div>
-                <div style="font-size:10px; margin-top:5px; color:#9a3412; text-align:center; font-style:italic;">${desc}</div>
-            </div>`;
-        }
+                    </div>` : 
+                    `<div style="font-size:9px; color:#64748b; font-weight:bold;">RESTE À PAYER</div>
+                     <div style="font-weight:bold; font-size:13px; color:#dc2626;">${fmt(a.USD)}$</div>
+                     <div style="font-size:11px; color:#dc2626;">${fmt(a.CDF)} FC</div>`
+                }
+            </div>
+        </div>
+
+        <div style="font-size:10px; margin-top:6px; color:#9a3412; text-align:center; font-style:italic; opacity:0.8;">
+            ${t.desc || ""}
+        </div>
+    </div>`;
+}
 
         // --- 3. DESIGN SPÉCIAL POUR LES DÉPENSES ---
         if (t.mode === 'depense' || t.isDepense || normalize(desc).includes("depense")) {
@@ -1218,12 +1281,16 @@ return `
         </div>  
         
         <div style="line-height:1.3;">  
+        <div style="font-weight:bold; color:#0f172a;">
+        SIM: ${fmt(t.amtSIM || t.amt)} ${t.curSIM || t.cur}
+        </div>
+    
+        <div style="font-size:9px; color:#64748b; font-style:italic;">
+        Taux: ${t.tauxApplique || data.taux} FC
+        </div>
 
-            <div style="font-weight:bold; color:#0f172a;">
-                SIM: ${fmt(t.amtSIM || t.amt)} ${t.curSIM || t.cur}
-            </div>
-                
-            ${finalCashDisplay}
+    ${finalCashDisplay}
+
 
             ${(cUSD > 0 || cCDF > 0) ? 
                 `<div style="color:#0ea5e9; font-size:10px; font-weight:bold; background:#f0f9ff; border-radius:4px; padding:1px 3px;">
