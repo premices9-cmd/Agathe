@@ -1,3 +1,5 @@
+Veuillez analyser ligne par ligne svp il y a un fonction soit addtransaction ou settleaccount que on a omis la fonctionnalité de détection de dettes par opérateur principale pour que le montant principale  soit considéré comme une dette et soit son montant Reste à Payé ou s'ajoute à son ancien montant Reste à Payé si il avait une autre dette donc en cas de de l'opérateur qui contient dette que le calcul du montant dû détail cash et du montant principale ne se fait pas 
+
 <!DOCTYPE html>  <html lang="fr">    <head>    
    <meta charset="UTF-8">    
    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">    
@@ -690,11 +692,32 @@ window.addTransaction = () => {
         if (t.detteUSD < 0) t.detteUSD = 0;
         if (t.detteCDF < 0) t.detteCDF = 0;
 
-    } else if (mode === "dette_client" || mode === "dette_moi") {
-        t.isDette = true; 
-        t.impacts.operator.USD = (cur === "USD" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
-        t.impacts.operator.CDF = (cur === "CDF" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
-        
+ // --- DANS addTransaction, remplacez la gestion des dettes par ceci ---
+
+} else if (mode === "dette_client" || mode === "dette_moi" || typeDetteDetecte !== "") {
+    t.isDette = true; 
+    
+    // Impact sur la SIM (toujours le montant total pour la balance SIM)
+    t.impacts.operator.USD = (cur === "USD" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
+    t.impacts.operator.CDF = (cur === "CDF" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
+    
+    // LOGIQUE DE DÉTECTION : Dette pure vs Reste à payer
+    const opNom = normalize(op.name);
+    const isCompteDettePur = opNom.includes("dette client") || opNom.includes("dette moi");
+
+    if (isCompteDettePur) {
+        // CAS 1 : L'opérateur est un compte de dette (Ex: "DETTE CLIENTS")
+        // Le montant principal est la dette entière.
+        if (cur === "USD") {
+            t.detteUSD = amtSIM;
+            t.detteCDF = 0;
+        } else {
+            t.detteCDF = amtSIM;
+            t.detteUSD = 0;
+        }
+    } else {
+        // CAS 2 : Opérateur normal (Ex: Airtel) mais mode "Dette"
+        // On calcule le reste à payer (Montant SIM - Ce qui a été payé cash)
         if (cur === "USD") {
             t.detteUSD = amtSIM - mixUSD - (mixCDF / tauxOperation);
             t.detteCDF = 0;
@@ -702,27 +725,13 @@ window.addTransaction = () => {
             t.detteCDF = amtSIM - mixCDF - (mixUSD * tauxOperation);
             t.detteUSD = 0;
         }
-
-        t.impacts.caisse.USD = mixUSD + commUSD;
-        t.impacts.caisse.CDF = mixCDF + commCDF;
-
-    } else {
-        const dirCaisse = (parseInt(ty.impC) || 0);
-        t.impacts.operator.USD = (cur === "USD" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
-        t.impacts.operator.CDF = (cur === "CDF" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
-        t.impacts.caisse.USD = (mixUSD * dirCaisse) + commUSD;
-        t.impacts.caisse.CDF = (mixCDF * dirCaisse) + commCDF;
-        
-        if (typeDetteDetecte) {
-            if (cur === "USD") {
-                t.detteUSD = (amtSIM * (parseInt(ty.impO) || 0)) - mixUSD - (mixCDF / tauxOperation);
-                t.detteCDF = 0;
-            } else {
-                t.detteCDF = (amtSIM * (parseInt(ty.impO) || 0)) - mixCDF - (mixUSD * tauxOperation);
-                t.detteUSD = 0;
-            }
-        }
     }
+
+    // Le cash saisi sort (ou entre) quand même de la caisse
+    t.impacts.caisse.USD = mixUSD + commUSD;
+    t.impacts.caisse.CDF = mixCDF + commCDF;
+}
+
 
 
     applyImpacts(t);
@@ -1777,5 +1786,7 @@ window.addEventListener('appinstalled', () => {
 
   
 </script>  </body>    
-</html>   
+</html>
 
+
+Car lorsque l'operateur principale contient dette c'est à dire que je donne le prêt à quelqu'un alors le montant principale sera ex: 100$ et détail cash explique le montant principale comment je lui est donné  : 70$ et 67500$ et mode cash qu'après validation le système comprenne que j'ai emprunté 100$ détail cash 70$ et 67500$ en grosso modo que le système ne comprenne pas qu'il va soustrer le détail cash au montant principale

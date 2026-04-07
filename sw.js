@@ -1,6 +1,6 @@
 // --- CONFIGURATION DU CACHE ---
 // Change ce numéro (v5.3.3 -> v5.3.4) à chaque fois que tu modifies ton index.html
-const CACHE_NAME = 'mka-shop-v5.3.9'; 
+const CACHE_NAME = 'mka-shop-v5.4.0'; 
 
 const assets = [
   './',
