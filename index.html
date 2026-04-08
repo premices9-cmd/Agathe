@@ -623,13 +623,10 @@ onValue(ref(db, 'mka_data'), (snap) => {
     t.typeDette = typeDetteDetecte;
     const dirCaisse = (parseInt(ty.impC) || 1); 
 
-    // --- LOGIQUE DÉPENSE (Opérateur ou Mode) ---
     if (mode === "depense" || isCompteDepense) {
         t.isDepense = true;
         t.impacts.operator.USD = (cur === "USD" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
         t.impacts.operator.CDF = (cur === "CDF" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
-        
-        // Sortie de caisse justifiée par le cash saisi
         t.impacts.caisse.USD = (mixUSD + commUSD) * -1; 
         t.impacts.caisse.CDF = (mixCDF + commCDF) * -1;
         t.isDette = false;
@@ -647,7 +644,6 @@ onValue(ref(db, 'mka_data'), (snap) => {
         t.impacts.operator.USD = (cur === "USD" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
         t.impacts.operator.CDF = (cur === "CDF" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
 
-        // En mode virtuel, on calcule le reste si le cash ne suffit pas
         if (cur === "USD") {
             t.detteUSD = Math.max(0, amtSIM - mixUSD - (mixCDF / tauxOperation));
             t.detteCDF = 0;
@@ -658,17 +654,16 @@ onValue(ref(db, 'mka_data'), (snap) => {
         t.isDette = (t.detteUSD > 0.01 || t.detteCDF > 10);
 
     } else {
-        // --- MODE CASH OU DETTE ---
         t.impacts.operator.USD = (cur === "USD" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
         t.impacts.operator.CDF = (cur === "CDF" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
         
-        // 1. SI COMPTE DETTE (Ex: Dette Fournisseur)
+        // --- LOGIQUE SPÉCIFIQUE DETTE ---
         if (isCompteDette) {
             t.isDette = true;
+            // Règle demandée : Le montant principal reste ENTIER en dette
             t.detteUSD = (cur === "USD" ? amtSIM : 0);
             t.detteCDF = (cur === "CDF" ? amtSIM : 0);
         } 
-        // 2. SI MODE CRÉDIT (Calcul du reste à payer)
         else if (mode !== "cash") {
             t.isDette = true;
             if (cur === "USD") {
@@ -679,14 +674,13 @@ onValue(ref(db, 'mka_data'), (snap) => {
                 t.detteUSD = 0;
             }
         } 
-        // 3. SI MODE CASH (Pas de calcul de reste, dette = 0)
         else {
             t.isDette = false;
             t.detteUSD = 0;
             t.detteCDF = 0;
         }
 
-        // Dans tous les cas, le cash saisi impacte la caisse (justification)
+        // Justification de caisse (tracabilité du cash saisi)
         t.impacts.caisse.USD = (mixUSD * dirCaisse) + commUSD;
         t.impacts.caisse.CDF = (mixCDF * dirCaisse) + commCDF;
     }
@@ -700,6 +694,9 @@ onValue(ref(db, 'mka_data'), (snap) => {
         desc: `${t.isDepense ? 'DÉPENSE' : ty.name} - ${op.name} (${person ? 'NOM: '+person+' | ' : ''}${motif})`,
         amtSIM: amtSIM, curSIM: cur, usdCash: mixUSD, cdfCash: mixCDF, commission: { usd: commUSD, cdf: commCDF }
     };
+    
+    if (t.isDette) newEntry.isNouvelleDette = true;
+
     data.transactions.unshift(newEntry);
     save(); render(); alert("Opération enregistrée !");
     
@@ -707,6 +704,7 @@ onValue(ref(db, 'mka_data'), (snap) => {
         if(document.getElementById(id)) document.getElementById(id).value = "";
     });
 };
+
 
 
  window.settleAccountV2 = () => {
