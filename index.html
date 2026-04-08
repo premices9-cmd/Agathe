@@ -692,46 +692,48 @@ window.addTransaction = () => {
         if (t.detteCDF < 0) t.detteCDF = 0;
 
  // --- DANS addTransaction, remplacez la gestion des dettes par ceci ---
+} else if (mode==="cash" || mode === "dette_client" || mode === "dette_moi" || typeDetteDetecte !== "") {
+    const opNom = normalize(op.name || ""); 
+    const isDepense = opNom.includes("depense"); 
 
-} else if (mode === "dette_client" || mode === "dette_moi" || typeDetteDetecte !== "") {
-    t.isDette = true; 
-    
-    // Impact sur la SIM (toujours le montant total pour la balance SIM)
-    t.impacts.operator.USD = (cur === "USD" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
-    t.impacts.operator.CDF = (cur === "CDF" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
-    
-    // LOGIQUE DE DÉTECTION : Dette pure vs Reste à payer
-    const opNom = normalize(op.name);
-    const isCompteDettePur = opNom.includes("dette client") || opNom.includes("dette moi");
+    if (isDepense) {
+        // --- CAS SPÉCIAL : DÉPENSE (Justification de sortie de caisse) ---
+        t.isDette = false; // Ce n'est pas une dette, c'est une dépense finie
+        
+        // L'opérateur (ex: COMPTE DÉPENSES) prend tout le montant
+        t.impacts.operator.USD = (cur === "USD" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
+        t.impacts.operator.CDF = (cur === "CDF" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
 
-    if (isCompteDettePur) {
-        // CAS 1 : L'opérateur est un compte de dette (Ex: "DETTE CLIENTS")
-        // Le montant principal est la dette entière.
-        if (cur === "USD") {
-            t.detteUSD = amtSIM;
-            t.detteCDF = 0;
-        } else {
-            t.detteCDF = amtSIM;
-            t.detteUSD = 0;
-        }
+        // La caisse sort exactement ce que vous avez saisi en cash (510$ + 22500fc)
+        // Ici on utilise impC (souvent -1 pour une dépense)
+        const dirCaisse = (parseInt(ty.impC) || -1);
+        t.impacts.caisse.USD = (mixUSD * dirCaisse) + (commUSD * dirCaisse);
+        t.impacts.caisse.CDF = (mixCDF * dirCaisse) + (commCDF * dirCaisse);
+
     } else {
-        // CAS 2 : Opérateur normal (Ex: Airtel) mais mode "Dette"
-        // On calcule le reste à payer (Montant SIM - Ce qui a été payé cash)
-        if (cur === "USD") {
-            t.detteUSD = amtSIM - mixUSD - (mixCDF / tauxOperation);
-            t.detteCDF = 0;
+        // --- CAS : DETTES (Reste à payer) ---
+        t.isDette = true;
+        const isCompteDettePur = opNom.includes("dette");
+
+        t.impacts.operator.USD = (cur === "USD" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
+        t.impacts.operator.CDF = (cur === "CDF" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
+        
+        if (isCompteDettePur) {
+            t.detteUSD = (cur === "USD" ? amtSIM : 0);
+            t.detteCDF = (cur === "CDF" ? amtSIM : 0);
         } else {
-            t.detteCDF = amtSIM - mixCDF - (mixUSD * tauxOperation);
-            t.detteUSD = 0;
+            if (cur === "USD") {
+                t.detteUSD = amtSIM - mixUSD - (mixCDF / tauxOperation);
+                t.detteCDF = 0;
+            } else {
+                t.detteCDF = amtSIM - mixCDF - (mixUSD * tauxOperation);
+                t.detteUSD = 0;
+            }
         }
+        t.impacts.caisse.USD = mixUSD + commUSD;
+        t.impacts.caisse.CDF = mixCDF + commCDF;
     }
-
-    // Le cash saisi sort (ou entre) quand même de la caisse
-    t.impacts.caisse.USD = mixUSD + commUSD;
-    t.impacts.caisse.CDF = mixCDF + commCDF;
 }
-
-
 
     applyImpacts(t);
 
