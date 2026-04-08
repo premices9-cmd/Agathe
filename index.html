@@ -576,18 +576,14 @@ onValue(ref(db, 'mka_data'), (snap) => {
     }
 }
 
-window.addTransaction = () => {  
-    // --- BARRIÈRE DE SÉCURITÉ ---
-    if (!isDataLoaded) { alert("Synchronisation en cours... Attendez 2 secondes."); return; }
-    if (!data.config) { alert("Erreur de chargement des données. Rechargez la page."); return; }
+ window.addTransaction = () => {  
+    if (!isDataLoaded || !data.config) { alert("Erreur de chargement."); return; }
     
     const opI = document.getElementById("operatorSelect").value;
     const tyI = document.getElementById("typeSelect").value;
     const amtSIM = parseFloat(document.getElementById("amount").value) || 0; 
     const cur = document.getElementById("currency").value;
 
-    // --- LOGIQUE DU TAUX D'OPÉRATION ---
-    // On récupère la valeur saisie, sinon on prend le taux par défaut de la data
     const opTauxSaisi = parseFloat(document.getElementById("opTaux").value);
     const tauxOperation = !isNaN(opTauxSaisi) ? opTauxSaisi : parseFloat(data.taux);
     
@@ -599,174 +595,119 @@ window.addTransaction = () => {
     let mode = document.getElementById("payMode").value;
     const modeNorm = normalize(mode);
 
-    // 🔥 TABLE DE CONVERSION PROPRE
-    if (modeNorm.includes("credit")) {
-        mode = "dette_client";
-    }
-    else if (modeNorm.includes("dette moi")) {
-        mode = "dette_moi";
-    }
-    else if (modeNorm.includes("cash")) {
-        mode = "cash";
-    }
-    else if (modeNorm.includes("virtuel") || modeNorm.includes("sim")) {
-        mode = "virtuel";
-    }
+    if (modeNorm.includes("credit")) { mode = "dette_client"; }
+    else if (modeNorm.includes("dette moi")) { mode = "dette_moi"; }
+    else if (modeNorm.includes("cash")) { mode = "cash"; }
+    else if (modeNorm.includes("virtuel") || modeNorm.includes("sim")) { mode = "virtuel"; }
 
-    const motif = document.getElementById("motif").value;
-    const person = document.getElementById("personName").value.trim();
-    const stkM = parseFloat(document.getElementById("stkMove").value) || 0; 
-    
     const ty = data.types[tyI];
     const op = data.operators[opI];
-
     if(!ty || !op) return;
 
-    // Détection automatique du type de dette
+    const opNom = normalize(op.name).toLowerCase();
+    const isCompteDette = opNom.includes("dette");
+    const isCompteDepense = opNom.includes("depense");
+
     let typeDetteDetecte = "";
-    if (mode === "dette_client" || normalize(op.name).includes("client")) {
+    if (mode === "dette_client" || opNom.includes("client")) {
         typeDetteDetecte = "dette client";
-    } else if (mode === "dette_moi" || normalize(op.name).includes("moi")) {
+    } else if (mode === "dette_moi" || opNom.includes("moi")) {
         typeDetteDetecte = "dette moi";
     }
 
     const t = createTransaction({
-        typeNom: ty.name,
-        operator: op.name, 
-        mode,
-        amt: amtSIM, 
-        cur,
-        person,
-        stk: stkM, 
-        mix: { USD: mixUSD, CDF: mixCDF } 
+        typeNom: ty.name, operator: op.name, mode, amt: amtSIM, cur, mix: { USD: mixUSD, CDF: mixCDF } 
     });
 
-    // On injecte le taux utilisé pour que createTransaction ou les calculs suivants en profitent
     t.tauxApplique = tauxOperation; 
-    t.impacts.virtuel = { opIdx: null, USD: 0, CDF: 0 };
-    t.stk = stkM; 
     t.typeDette = typeDetteDetecte;
+    const dirCaisse = (parseInt(ty.impC) || 1); 
 
-    if (mode === "depense") {
-        const depOp = data.operators.find(o => normalize(o.name).toLowerCase().includes("depense"));
-        if (!depOp) { alert("Erreur : Aucun compte 'depense' trouvé."); return; }
+    // --- LOGIQUE DÉPENSE (Opérateur ou Mode) ---
+    if (mode === "depense" || isCompteDepense) {
         t.isDepense = true;
-        t.depenseTarget = depOp.name;
-        const impactDirection = (parseInt(ty.impO) || 0);
-        t.impacts.operator.USD = (cur === "USD" ? amtSIM : 0) * impactDirection;
-        t.impacts.operator.CDF = (cur === "CDF" ? amtSIM : 0) * impactDirection;
-        t.realUSD = Math.abs(t.impacts.operator.USD);
-        t.realCDF = Math.abs(t.impacts.operator.CDF);
-        if (cur === "USD") { depOp.USD = (depOp.USD || 0) + t.realUSD; } 
-        else { depOp.CDF = (depOp.CDF || 0) + t.realCDF; }
-        t.impacts.caisse.USD = mixUSD + commUSD; 
-        t.impacts.caisse.CDF = mixCDF + commCDF;
+        t.impacts.operator.USD = (cur === "USD" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
+        t.impacts.operator.CDF = (cur === "CDF" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
         
+        // Sortie de caisse justifiée par le cash saisi
+        t.impacts.caisse.USD = (mixUSD + commUSD) * -1; 
+        t.impacts.caisse.CDF = (mixCDF + commCDF) * -1;
+        t.isDette = false;
+
     } else if (mode === "virtuel") {
         const paySimIdx = document.getElementById("paySimSelect").value;
         const simSource = data.operators[paySimIdx];
         if (simSource) {
-            const vUSD = (cur === "USD" ? amtSIM : 0);
-            const vCDF = (cur === "CDF" ? amtSIM : 0);
-            simSource.USD -= vUSD;
-            simSource.CDF -= vCDF;
-            t.impacts.virtuel = { opIdx: paySimIdx, USD: vUSD, CDF: vCDF };
+            simSource.USD -= (cur === "USD" ? amtSIM : 0);
+            simSource.CDF -= (cur === "CDF" ? amtSIM : 0);
+            t.impacts.virtuel = { opIdx: paySimIdx, USD: (cur === "USD" ? amtSIM : 0), CDF: (cur === "CDF" ? amtSIM : 0) };
         }
-        
-        t.impacts.caisse.USD = commUSD; // Seule la commission va en caisse en mode virtuel pur
-        t.impacts.caisse.CDF = commCDF;
+        t.impacts.caisse.USD = (mixUSD * dirCaisse) + commUSD; 
+        t.impacts.caisse.CDF = (mixCDF * dirCaisse) + commCDF;
         t.impacts.operator.USD = (cur === "USD" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
         t.impacts.operator.CDF = (cur === "CDF" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
 
-        // --- NOUVEAU : CALCUL DE LA DETTE EN MODE VIRTUEL ---
-        // Si vous donnez du cash lors d'un retrait virtuel, cela réduit la dette
+        // En mode virtuel, on calcule le reste si le cash ne suffit pas
         if (cur === "USD") {
-            t.detteUSD = amtSIM - mixUSD - (mixCDF / tauxOperation);
+            t.detteUSD = Math.max(0, amtSIM - mixUSD - (mixCDF / tauxOperation));
             t.detteCDF = 0;
         } else {
-            t.detteCDF = amtSIM - mixCDF - (mixUSD * tauxOperation);
+            t.detteCDF = Math.max(0, amtSIM - mixCDF - (mixUSD * tauxOperation));
             t.detteUSD = 0;
         }
-        // Si le calcul arrive à 0 ou moins, on considère qu'il n'y a pas de dette
-        if (t.detteUSD < 0) t.detteUSD = 0;
-        if (t.detteCDF < 0) t.detteCDF = 0;
-
- // --- DANS addTransaction, remplacez la gestion des dettes par ceci ---
-} else if (mode==="cash" || mode === "dette_client" || mode === "dette_moi" || typeDetteDetecte !== "") {
-    const opNom = normalize(op.name || ""); 
-    const isDepense = opNom.includes("depense"); 
-
-    if (isDepense) {
-        // --- CAS SPÉCIAL : DÉPENSE (Justification de sortie de caisse) ---
-        t.isDette = false; // Ce n'est pas une dette, c'est une dépense finie
-        
-        // L'opérateur (ex: COMPTE DÉPENSES) prend tout le montant
-        t.impacts.operator.USD = (cur === "USD" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
-        t.impacts.operator.CDF = (cur === "CDF" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
-
-        // La caisse sort exactement ce que vous avez saisi en cash (510$ + 22500fc)
-        // Ici on utilise impC (souvent -1 pour une dépense)
-        const dirCaisse = (parseInt(ty.impC) || -1);
-        t.impacts.caisse.USD = (mixUSD * dirCaisse) + (commUSD * dirCaisse);
-        t.impacts.caisse.CDF = (mixCDF * dirCaisse) + (commCDF * dirCaisse);
+        t.isDette = (t.detteUSD > 0.01 || t.detteCDF > 10);
 
     } else {
-        // --- CAS : DETTES (Reste à payer) ---
-        t.isDette = true;
-        const isCompteDettePur = opNom.includes("dette");
-
+        // --- MODE CASH OU DETTE ---
         t.impacts.operator.USD = (cur === "USD" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
         t.impacts.operator.CDF = (cur === "CDF" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
         
-        if (isCompteDettePur) {
+        // 1. SI COMPTE DETTE (Ex: Dette Fournisseur)
+        if (isCompteDette) {
+            t.isDette = true;
             t.detteUSD = (cur === "USD" ? amtSIM : 0);
             t.detteCDF = (cur === "CDF" ? amtSIM : 0);
-        } else {
+        } 
+        // 2. SI MODE CRÉDIT (Calcul du reste à payer)
+        else if (mode !== "cash") {
+            t.isDette = true;
             if (cur === "USD") {
-                t.detteUSD = amtSIM - mixUSD - (mixCDF / tauxOperation);
+                t.detteUSD = Math.max(0, amtSIM - mixUSD - (mixCDF / tauxOperation));
                 t.detteCDF = 0;
             } else {
-                t.detteCDF = amtSIM - mixCDF - (mixUSD * tauxOperation);
+                t.detteCDF = Math.max(0, amtSIM - mixCDF - (mixUSD * tauxOperation));
                 t.detteUSD = 0;
             }
+        } 
+        // 3. SI MODE CASH (Pas de calcul de reste, dette = 0)
+        else {
+            t.isDette = false;
+            t.detteUSD = 0;
+            t.detteCDF = 0;
         }
-        t.impacts.caisse.USD = mixUSD + commUSD;
-        t.impacts.caisse.CDF = mixCDF + commCDF;
+
+        // Dans tous les cas, le cash saisi impacte la caisse (justification)
+        t.impacts.caisse.USD = (mixUSD * dirCaisse) + commUSD;
+        t.impacts.caisse.CDF = (mixCDF * dirCaisse) + commCDF;
     }
-}
 
     applyImpacts(t);
 
-    if (person && typeDetteDetecte) {
-        const key = `${normalize(typeDetteDetecte)}_${normalize(person)}`;
-        const finalDebt = data.debts[key] || { USD: 0, CDF: 0 };
-        t.snapshotDette = { USD: finalDebt.USD, CDF: finalDebt.CDF };
-    }
-
+    const person = document.getElementById("personName").value.trim();
+    const motif = document.getElementById("motif").value;
     const newEntry = {
-        ...t,
-        tauxApplique: tauxOperation, // On enregistre le taux utilisé dans l'historique
-        person: person,
-        date: new Date().toLocaleString(),
-        desc: `${mode === "depense" ? 'DÉPENSE' : ty.name} - ${op.name} (${person ? 'NOM: '+person+' | ' : ''}${motif})`,
-        amtSIM: amtSIM, 
-        curSIM: cur,
-        usdCash: mixUSD,
-        cdfCash: mixCDF,
-        commission: { usd: commUSD, cdf: commCDF }
+        ...t, person, date: new Date().toLocaleString(),
+        desc: `${t.isDepense ? 'DÉPENSE' : ty.name} - ${op.name} (${person ? 'NOM: '+person+' | ' : ''}${motif})`,
+        amtSIM: amtSIM, curSIM: cur, usdCash: mixUSD, cdfCash: mixCDF, commission: { usd: commUSD, cdf: commCDF }
     };
-
     data.transactions.unshift(newEntry);
-    save(); 
-    alert("Opération enregistrée !");
-    render();
+    save(); render(); alert("Opération enregistrée !");
     
-    // Nettoyage des champs (Ajout de opTaux dans la liste)
     ["amount","opTaux","mixUSD","mixCDF","commUSD","commCDF","motif","personName", "stkMove"].forEach(id => {
-        const el = document.getElementById(id);
-        if(el) el.value = "";
+        if(document.getElementById(id)) document.getElementById(id).value = "";
     });
 };
+
 
  window.settleAccountV2 = () => {
     const opIdx = document.getElementById("settleOpIdx").value;
