@@ -94,7 +94,15 @@
         <div class="grid-2">    
             <input type="number" id="srcAmt" placeholder="Montant" oninput="calcDest()">    
             <select id="srcCurr" onchange="calcDest()"><option value="USD">USD</option><option value="CDF">CDF</option></select>    
-        </div>    
+        </div>   
+        <div style="margin: 5px 0;">
+    <label class="label-sm" style="color:#0ea5e9;">Taux de l'opération :</label>
+    <div style="display:flex; gap:2px;">
+        <input type="number" id="transferRate" placeholder="Taux spécifique" oninput="calcDest()">
+        <button type="button" onclick="document.getElementById('transferRate').value = data.taux; calcDest();" style="width:70px; background:#64748b; font-size:10px;">DÉFAUT</button>
+    </div>
+</div>
+
         <label class="label-sm">Vers :</label>    
         <select id="destWallet"></select>    
         <div class="grid-2">    
@@ -1419,10 +1427,24 @@ window.cancelTransaction = (index) => {
     };  
   
     window.calcDest = () => {    
-        const amt = parseFloat(document.getElementById("srcAmt").value) || 0, t = parseFloat(data.taux) || 1;    
-        const sc = document.getElementById("srcCurr").value, dc = document.getElementById("destCurr").value;    
-        document.getElementById("destAmt").value = ((sc==="USD" && dc==="CDF") ? amt * t : (sc==="CDF" && dc==="USD") ? amt / t : amt).toFixed(2);    
-    };    
+    const amt = parseFloat(document.getElementById("srcAmt").value) || 0;
+    // On récupère le taux spécifique, sinon on prend le taux global
+    const t = parseFloat(document.getElementById("transferRate").value) || parseFloat(data.taux) || 1;    
+    const sc = document.getElementById("srcCurr").value;
+    const dc = document.getElementById("destCurr").value;    
+    
+    let result = 0;
+    if (sc === "USD" && dc === "CDF") {
+        result = amt * t;
+    } else if (sc === "CDF" && dc === "USD") {
+        result = amt / t;
+    } else {
+        result = amt; // Même devise
+    }
+    
+    document.getElementById("destAmt").value = result.toFixed(2);    
+};
+
   
   window.executeGlobalChange = () => {    
     const sIdx = document.getElementById("srcWallet").value;
@@ -1432,13 +1454,13 @@ window.cancelTransaction = (index) => {
     const sc = document.getElementById("srcCurr").value;
     const dc = document.getElementById("destCurr").value;
     const motif = document.getElementById("transferMotif").value || "Change/Transfert";
+    
+    // --- NOUVEAU : On récupère le taux utilisé pour l'historique ---
+    const tUsed = parseFloat(document.getElementById("transferRate").value) || parseFloat(data.taux);
 
-    // --- NOUVELLE CONDITION DE SÉCURITÉ ---
-    // On bloque si : 
-    // 1. Le montant est 0
-    // 2. OU SI (le compte est le même ET la devise est la même)
+    // --- SÉCURITÉ ---
     if (!sAmt || (sIdx === dIdx && sc === dc)) {
-        alert("Action impossible : vous essayez de transférer la même devise sur le même compte.");
+        alert("Action impossible : vérifiez le montant ou les devises.");
         return;
     }
 
@@ -1462,12 +1484,14 @@ window.cancelTransaction = (index) => {
     const t = { 
         id: Date.now(),
         date: new Date().toLocaleString(), 
-        desc: sIdx === dIdx ? `CHANGE: ${sourceName} (${sc} ➔ ${dc})` : `TRANSFERT: ${sourceName} ➔ ${destName}`, 
+        // --- MODIFIÉ : On ajoute le taux dans la description ---
+        desc: sIdx === dIdx ? `CHANGE: ${sourceName} (${sc} ➔ ${dc}) @ Taux: ${tUsed}` : `TRANSFERT: ${sourceName} ➔ ${destName} @ Taux: ${tUsed} (${motif})`, 
         amt: sAmt, 
         cur: sc, 
         mode: 'transfert',
+        tauxApplique: tUsed, // Pour mémoire
         transferDetails: {
-            sIdx, dIdx, sAmt, dAmt, sc, dc, sourceName, destName
+            sIdx, dIdx, sAmt, dAmt, sc, dc, sourceName, destName, appliedRate: tUsed
         },
         impacts: {
             isTransfer: true,
@@ -1480,12 +1504,15 @@ window.cancelTransaction = (index) => {
     save(); 
     render();
     
-    // Nettoyage
+    // --- NETTOYAGE COMPLET ---
     document.getElementById("srcAmt").value = "";
     document.getElementById("destAmt").value = "";
+    document.getElementById("transferRate").value = ""; // ON VIDE LE TAUX AUSSI
+    document.getElementById("transferMotif").value = "";
     
     alert(sIdx === dIdx ? "Change effectué avec succès ✅" : "Transfert effectué ✅");
 };
+
   
     window.updateAdminBasics = () => {    
         const tX = document.getElementById("newTaux").value, uX = document.getElementById("editCashUSD").value, cX = document.getElementById("editCashCDF").value;    
