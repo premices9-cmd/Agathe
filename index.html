@@ -436,30 +436,16 @@ onValue(ref(db, 'mka_data'), (snap) => {
     };    
   
  function createTransaction({  
-    typeNom,  
-    operator,  
-    mode,  
-    amt,  
-    cur,  
-    person,  
-    stk,
-    mix
+    typeNom, operator, mode, amt, cur, person, stk, mix
 }){  
 
-    // 🔥 1. SÉCURISATION DU MODE (ANTI "CRÉDIT PUR")
     let safeMode = normalize(mode || "");
 
-    if (safeMode.includes("credit")) {
-        mode = "dette_client";
-    } else if (safeMode.includes("dette moi")) {
-        mode = "dette_moi";
-    } else if (safeMode.includes("cash")) {
-        mode = "cash";
-    } else if (safeMode.includes("virtuel") || safeMode.includes("sim")) {
-        mode = "virtuel";
-    }
+    if (safeMode.includes("credit")) mode = "dette_client";
+    else if (safeMode.includes("dette moi")) mode = "dette_moi";
+    else if (safeMode.includes("cash")) mode = "cash";
+    else if (safeMode.includes("virtuel") || safeMode.includes("sim")) mode = "virtuel";
 
-    // 🔥 2. STRUCTURE DES IMPACTS
     const impacts = {  
         caisse: { USD:0, CDF:0 },  
         operator: { USD:0, CDF:0 },  
@@ -467,55 +453,38 @@ onValue(ref(db, 'mka_data'), (snap) => {
         stock: stk || 0  
     };  
 
-    // 🔥 3. DÉTECTION TYPE DETTE SÉCURISÉE
     let typeDette = "";
-    const modeNorm = normalize(mode);
     const opNorm = normalize(operator);
+    const modeNorm = normalize(mode);
 
-    if (modeNorm === "dette_client") {
-        typeDette = "dette client";
-    } 
-    else if (modeNorm === "dette_moi") {
-        typeDette = "dette moi";
-    } 
+    if (modeNorm === "dette_client") typeDette = "dette client";
+    else if (modeNorm === "dette_moi") typeDette = "dette moi";
     else {
         if (opNorm.includes("dette client")) typeDette = "dette client";
         else if (opNorm.includes("dette moi")) typeDette = "dette moi";
     }
 
-    // 🔥 4. GESTION MULTI-DEVISE
     const finalUSD = (mix && mix.USD) ? mix.USD : (cur === "USD" ? amt : 0);
     const finalCDF = (mix && mix.CDF) ? mix.CDF : (cur === "CDF" ? amt : 0);
 
-    // 🔥 5. DÉTECTION RÈGLEMENT
     const isReglement = normalize(typeNom).includes("reglement");
-    const mult = isReglement ? -1 : 1;
 
-    // 🔥 6. IMPACT DETTE
-    if(typeDette && person){
-        impacts.dette.USD = finalUSD * mult;
-        impacts.dette.CDF = finalCDF * mult;
-    }
-
-    // 🔥 7. RETURN FINAL SÉCURISÉ
     return {  
         id: Date.now(),  
-        typeNom,  
-        operator,  
-        mode, // ✅ maintenant sécurisé
+        typeNom, operator, mode,
         amt: (cur === "USD" ? finalUSD : finalCDF), 
-        cur,  
-        person,  
-        typeDette,
+        cur, person, typeDette,
+        isReglement,
         impacts,
         realUSD: finalUSD,
         realCDF: finalCDF
     };  
 }
 
-    function applyImpacts(t, reverse = false) {
-    const factor = reverse ? -1 : 1;
+ function applyImpacts(t, reverse = false) {
+
     if (!t) return;
+    const factor = reverse ? -1 : 1;
 
     // =========================
     // 1. CAISSE
@@ -529,29 +498,32 @@ onValue(ref(db, 'mka_data'), (snap) => {
     // 2. OPÉRATEUR
     // =========================
     let op = data.operators.find(o => o.name === t.operator);
-    if (op && t.impacts?.operator) {
+    const isDettePrincipal = normalize(t.operator).includes("dette");
+
+    if (op && t.impacts?.operator && !isDettePrincipal) {
         op.USD += (t.impacts.operator.USD || 0) * factor;
         op.CDF += (t.impacts.operator.CDF || 0) * factor;
 
-        if (t.stk !== undefined && t.stk !== 0) {
+        if (t.stk) {
             op.stock = (parseFloat(op.stock) || 0) + (parseFloat(t.stk) * factor);
             op.stock = Math.round(op.stock * 100) / 100;
         }
     }
+// =========================
+// 🔵 INTER-SIM (ANNULATION PARFAITE FIX)
+// =========================
+if (t.impacts?.virtuel) {
 
-    // =========================
-    // 3. DÉPENSE
-    // =========================
-    if (t.isDepense && t.depenseTarget) {
-        let depOp = data.operators.find(o => o.name === t.depenseTarget);
-        if (depOp) {
-            depOp.USD += (t.realUSD || 0) * factor;
-            depOp.CDF += (t.realCDF || 0) * factor;
-        }
+    const v = t.impacts.virtuel;
+    const sourceSim = data.operators[v.opIdx];
+
+    if (sourceSim) {
+        sourceSim.USD += (v.USD || 0) * factor;
+        sourceSim.CDF += (v.CDF || 0) * factor;
     }
-
+}
     // =========================
-    // 4. DETTES (🔥 VERSION SAFE)
+    // 3. DETTES (🔥 FIX ANNULATION PARFAITE)
     // =========================
     if (t.person && t.typeDette) {
 
@@ -567,32 +539,70 @@ onValue(ref(db, 'mka_data'), (snap) => {
         let impUSD = 0;
         let impCDF = 0;
 
-        // 🔥 RÈGLEMENT (paiement)
+        // =========================
+        // 💰 RÈGLEMENT
+        // =========================
         if (t.isReglement) {
-            impUSD = -(t.impacts?.dette?.USD || 0);
-            impCDF = -(t.impacts?.dette?.CDF || 0);
+
+            // 🔁 ANNULATION
+            if (reverse && (t.paidUSD !== undefined || t.paidCDF !== undefined)) {
+
+                impUSD = - (t.paidUSD || 0);
+                impCDF = - (t.paidCDF || 0);
+            }
+            else {
+
+                const taux = parseFloat(data.taux) || 1;
+
+// 💰 RÉCUPÉRATION MIX RÉEL
+const paidUSD = (t.realUSD || 0) + ((t.realCDF || 0) / taux);
+const paidCDF = (t.realCDF || 0) + ((t.realUSD || 0) * taux);
+
+// 🔥 PAIEMENT INTELLIGENT PAR TYPE DE DETTE
+let payUSD = 0;
+let payCDF = 0;
+
+if (t.deviseDette === "USD") {
+    payUSD = Math.min(paidUSD, oldUSD);
+}
+else if (t.deviseDette === "CDF") {
+    payCDF = Math.min(paidCDF, oldCDF);
+}
+else {
+    // fallback (ancien comportement)
+    payUSD = Math.min(paidUSD, oldUSD);
+    payCDF = Math.min(paidCDF, oldCDF);
+}
+
+                // 🔥 ON STOCKE POUR ANNULATION
+                t.paidUSD = payUSD;
+                t.paidCDF = payCDF;
+
+                impUSD = -payUSD;
+                impCDF = -payCDF;
+            }
         }
-        // 🔥 NOUVELLE DETTE
+
+        // =========================
+        // 📈 CRÉATION DETTE
+        // =========================
         else {
             impUSD = (t.detteUSD || 0);
             impCDF = (t.detteCDF || 0);
         }
 
-        // 🔥 Application avec factor UNE SEULE FOIS
         impUSD *= factor;
         impCDF *= factor;
 
-        // 🔥 Ignore si zéro (évite bugs UI)
         if (impUSD !== 0 || impCDF !== 0) {
 
             data.debts[key].USD += impUSD;
             data.debts[key].CDF += impCDF;
 
-            // 🔥 ARRONDI
-            data.debts[key].USD = Math.round(data.debts[key].USD * 100) / 100;
-            data.debts[key].CDF = Math.round(data.debts[key].CDF);
+            data.debts[key].USD = Math.max(0, Math.round(data.debts[key].USD * 100) / 100);
+            data.debts[key].CDF = Math.max(0, Math.round(data.debts[key].CDF));
 
-            // 🔥 SNAPSHOT PROPRE
+            // snapshot
             t.ancienneDette = { USD: oldUSD, CDF: oldCDF };
             t.nouvelleDette = {
                 USD: data.debts[key].USD,
@@ -600,7 +610,7 @@ onValue(ref(db, 'mka_data'), (snap) => {
             };
 
             // =========================
-            // 5. COMPTE GLOBAL DETTE
+            // GLOBAL DETTE
             // =========================
             let opG = data.operators.find(o =>
                 normalize(o.name).includes(normalize(t.typeDette))
@@ -614,19 +624,15 @@ onValue(ref(db, 'mka_data'), (snap) => {
     }
 }
 
-window.addTransaction = () => {  
-    // --- SÉCURITÉ ---
-    if (!isDataLoaded) { alert("Synchronisation en cours..."); return; }
-    if (!data.config) { alert("Erreur config."); return; }
+ window.addTransaction = () => {
 
-    // --- INPUTS ---
+    if (!isDataLoaded) { alert("Synchronisation..."); return; }
+    if (!data.config) { alert("Erreur config"); return; }
+
     const opI = document.getElementById("operatorSelect").value;
     const tyI = document.getElementById("typeSelect").value;
     const amtSIM = parseFloat(document.getElementById("amount").value) || 0;
     const cur = document.getElementById("currency").value;
-
-    const opTauxSaisi = parseFloat(document.getElementById("opTaux").value);
-    const tauxOperation = !isNaN(opTauxSaisi) ? opTauxSaisi : parseFloat(data.taux);
 
     const mixUSD = parseFloat(document.getElementById("mixUSD").value) || 0;
     const mixCDF = parseFloat(document.getElementById("mixCDF").value) || 0;
@@ -634,6 +640,8 @@ window.addTransaction = () => {
     const commCDF = parseFloat(document.getElementById("commCDF").value) || 0;
 
     let mode = document.getElementById("payMode").value;
+    const modeNorm = normalize(mode || "");
+
     const motif = document.getElementById("motif").value;
     const person = document.getElementById("personName").value.trim();
     const stkM = parseFloat(document.getElementById("stkMove").value) || 0;
@@ -642,25 +650,16 @@ window.addTransaction = () => {
     const op = data.operators[opI];
     if (!ty || !op) return;
 
-    // --- NORMALISATION MODE ---
-    const modeNorm = normalize(mode);
-    if (modeNorm.includes("credit")) mode = "dette_client";
-    else if (modeNorm.includes("dette moi")) mode = "dette_moi";
-    else if (modeNorm.includes("cash")) mode = "cash";
-    else if (modeNorm.includes("virtuel") || modeNorm.includes("sim")) mode = "virtuel";
+    const opNorm = normalize(op.name);
+    const isDettePrincipal = opNorm.includes("dette");
+    const isDepensePrincipal = opNorm.includes("depense");
 
-    const opNom = normalize(op.name || "");
+    const isInterSim = (
+        modeNorm.includes("inter") ||
+        modeNorm.includes("sim") ||
+        modeNorm.includes("virtuel")
+    );
 
-    const isCompteDettePrincipal = opNom.includes("dette");
-    const isCompteDepensePrincipal = opNom.includes("depense");
-
-    // --- TYPE DETTE ---
-    let typeDette = "";
-    if (mode === "dette_client") typeDette = "dette client";
-    else if (mode === "dette_moi") typeDette = "dette moi";
-    else if (isCompteDettePrincipal) typeDette = "dette client";
-
-    // --- CREATE TRANSACTION ---
     const t = createTransaction({
         typeNom: ty.name,
         operator: op.name,
@@ -672,99 +671,134 @@ window.addTransaction = () => {
         mix: { USD: mixUSD, CDF: mixCDF }
     });
 
-    t.tauxApplique = tauxOperation;
     t.stk = stkM;
-    t.typeDette = typeDette;
 
-    // --- CONVERSION ---
-    const totalCashUSD = mixUSD + (mixCDF / tauxOperation);
-    const totalCashCDF = mixCDF + (mixUSD * tauxOperation);
+    // 🔒 sécurisation
+    t.impacts = t.impacts || {};
+    t.impacts.operator = t.impacts.operator || { USD:0, CDF:0 };
+    t.impacts.caisse = t.impacts.caisse || { USD:0, CDF:0 };
 
-    // --- IMPACT OPERATOR ---
-    t.impacts.operator.USD = (cur === "USD" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
-    t.impacts.operator.CDF = (cur === "CDF" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
-
-    // --- MODE VIRTUEL ---
-    if (mode === "virtuel") {
-        const paySimIdx = document.getElementById("paySimSelect").value;
-        const simSource = data.operators[paySimIdx];
-
-        if (simSource) {
-            if (cur === "USD") simSource.USD -= amtSIM;
-            else simSource.CDF -= amtSIM;
-        }
+    // =========================
+    // 🔥 IMPACT OPERATOR NORMAL
+    // =========================
+    if (!isDettePrincipal && !isInterSim) {
+        t.impacts.operator.USD = (cur === "USD" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
+        t.impacts.operator.CDF = (cur === "CDF" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
     }
 
-    // --- DETTE / DEPENSE ---
-    if (isCompteDepensePrincipal) {
+    // =========================
+    // 🟥 DETTE PRINCIPAL
+    // =========================
+    if (isDettePrincipal) {
+
+        t.detteUSD = (cur === "USD") ? amtSIM : 0;
+        t.detteCDF = (cur === "CDF") ? amtSIM : 0;
+
+        const dirCaisse = parseInt(ty.impC) || 0;
+
+        t.impacts.caisse.USD = (mixUSD + commUSD) * dirCaisse;
+        t.impacts.caisse.CDF = (mixCDF + commCDF) * dirCaisse;
+    }
+
+    // =========================
+    // 💸 DEPENSE
+    // =========================
+    else if (isDepensePrincipal) {
+
         t.isDepense = true;
 
         t.realUSD = (cur === "USD") ? amtSIM : 0;
         t.realCDF = (cur === "CDF") ? amtSIM : 0;
 
-        t.detteUSD = 0;
-        t.detteCDF = 0;
-
-    } else if (isCompteDettePrincipal) {
-        t.isDette = true;
-
-        t.detteUSD = (cur === "USD") ? amtSIM : 0;
-        t.detteCDF = (cur === "CDF") ? amtSIM : 0;
-
-    } else {
-        t.isDette = true;
-
-        if (cur === "USD") {
-            t.detteUSD = Math.max(0, amtSIM - totalCashUSD);
-            t.detteCDF = 0;
-        } else {
-            t.detteCDF = Math.max(0, amtSIM - totalCashCDF);
-            t.detteUSD = 0;
-        }
+        t.impacts.caisse.USD = -(mixUSD + commUSD);
+        t.impacts.caisse.CDF = -(mixCDF + commCDF);
     }
 
-// --- CAISSE (Correction) ---
-const impCValue = parseInt(ty.impC);
-let dirCaisse;
+// =========================
+// 🔵 INTER-SIM (FIX FINAL)
+// =========================
+else if (isInterSim) {
 
-if (isCompteDettePrincipal) {
-    dirCaisse = -1;
-    // Pour les comptes dettes, l'impact caisse doit utiliser le montant total 
-    // si le mix cash n'a pas été rempli, sinon l'impact sera de 0.
-    const montantUSD = (cur === "USD") ? amtSIM : (amtSIM / tauxOperation);
-    const montantCDF = (cur === "CDF") ? amtSIM : (amtSIM * tauxOperation);
-    
-    t.impacts.caisse.USD = (mixUSD || montantUSD) * dirCaisse;
-    t.impacts.caisse.CDF = (mixCDF || montantCDF) * dirCaisse;
+    const taux = parseFloat(data.taux) || 1;
+    const paySimIdx = parseInt(document.getElementById("paySimSelect").value);
 
-} else if (isCompteDepensePrincipal) {
-    dirCaisse = -1;
-    t.impacts.caisse.USD = (mixUSD + commUSD) * dirCaisse;
-    t.impacts.caisse.CDF = (mixCDF + commCDF) * dirCaisse;
-} else {
-    dirCaisse = isNaN(impCValue) ? 0 : impCValue;
+    let diffUSD = 0;
+    let diffCDF = 0;
+
+    if (cur === "USD") {
+        const totalCash = mixUSD + (mixCDF / taux);
+        diffUSD = Math.max(0, amtSIM - totalCash);
+    } else {
+        const totalCash = mixCDF + (mixUSD * taux);
+        diffCDF = Math.max(0, amtSIM - totalCash);
+    }
+
+    // 🔥 ON STOCKE POUR ANNULATION (CRUCIAL)
+    t.virtualUSD = diffUSD;
+    t.virtualCDF = diffCDF;
+    t.virtualOpIdx = paySimIdx;
+
+    // ❌ PAS DE DETTE
+    t.detteUSD = 0;
+    t.detteCDF = 0;
+
+    // IMPACT APPLY
+    t.impacts.virtuel = {
+        opIdx: paySimIdx,
+        USD: -diffUSD,
+        CDF: -diffCDF
+    };
+
+    // CAISSE
+    const dirCaisse = parseInt(ty.impC) || 0;
     t.impacts.caisse.USD = (mixUSD + commUSD) * dirCaisse;
     t.impacts.caisse.CDF = (mixCDF + commCDF) * dirCaisse;
 }
-console.log(`Vérification Caisse: Dir=${dirCaisse}, USD=${t.impacts.caisse.USD}, CDF=${t.impacts.caisse.CDF}`);
 
-    // --- APPLY IMPACT ---
-    applyImpacts(t);
+    // =========================
+    // ⚙️ NORMAL
+    // =========================
+    else {
 
-    // --- SNAPSHOT DETTE ---
-    if (person && typeDette) {
-        const key = `${normalize(typeDette)}_${normalize(person)}`;
-        const finalDebt = data.debts[key] || { USD: 0, CDF: 0 };
-        t.snapshotDette = { USD: finalDebt.USD, CDF: finalDebt.CDF };
+        const taux = parseFloat(data.taux) || 1;
+
+        const totalCashUSD = mixUSD + (mixCDF / taux);
+        const totalCashCDF = mixCDF + (mixUSD * taux);
+
+        if (cur === "USD") {
+            t.detteUSD = Math.max(0, amtSIM - totalCashUSD);
+        } else {
+            t.detteCDF = Math.max(0, amtSIM - totalCashCDF);
+        }
+
+        const dirCaisse = parseInt(ty.impC) || 0;
+
+        t.impacts.caisse.USD = (mixUSD + commUSD) * dirCaisse;
+        t.impacts.caisse.CDF = (mixCDF + commCDF) * dirCaisse;
     }
 
-    // --- SAVE ---
+    // APPLY
+    applyImpacts(t);
+
+    // SNAPSHOT
+    if (person && t.typeDette) {
+        const key = `${normalize(t.typeDette)}_${normalize(person)}`;
+        const d = data.debts[key] || { USD: 0, CDF: 0 };
+        t.snapshotDette = { USD: d.USD, CDF: d.CDF };
+    }
+
+    // 🧾 HISTORIQUE AVEC SIM SOURCE
+    let simSourceName = "";
+    if (t.impacts?.virtuel) {
+        const sourceOp = data.operators[t.impacts.virtuel.opIdx];
+        simSourceName = sourceOp ? ` [via ${sourceOp.name}]` : "";
+    }
+
     const newEntry = {
         ...t,
-        tauxApplique: tauxOperation,
         person,
         date: new Date().toLocaleString(),
-        desc: `${ty.name} - ${op.name} (${person ? 'NOM: ' + person + ' | ' : ''}${motif})`,
+        desc: `${ty.name} - ${op.name}${simSourceName} (${person ? 'NOM: '+person+' | ' : ''}${motif})`,
         amtSIM,
         curSIM: cur,
         usdCash: mixUSD,
@@ -778,11 +812,10 @@ console.log(`Vérification Caisse: Dir=${dirCaisse}, USD=${t.impacts.caisse.USD}
     alert("Opération enregistrée !");
     render();
 
-    // --- RESET ---
-    ["amount","opTaux","mixUSD","mixCDF","commUSD","commCDF","motif","personName","stkMove"]
+    ["amount","mixUSD","mixCDF","commUSD","commCDF","motif","personName","stkMove"]
     .forEach(id => {
         const el = document.getElementById(id);
-        if (el) el.value = "";
+        if(el) el.value = "";
     });
 };
 
@@ -1350,18 +1383,6 @@ window.cancelTransaction = (index) => {
   
     const t = data.transactions[index];  
     if(!t) return;
-
-    // 1. GESTION DU MODE VIRTUEL (INTER-SIM) - CRUCIAL
-    // Si l'opération a utilisé une autre SIM pour payer, on rend l'argent à cette SIM
-    if(t.impacts && t.impacts.virtuel && t.impacts.virtuel.opIdx !== null) {
-        const v = t.impacts.virtuel;
-        const opSourceSecondaire = data.operators[v.opIdx];
-        if(opSourceSecondaire) {
-            opSourceSecondaire.USD += v.USD; // On remet les USD
-            opSourceSecondaire.CDF += v.CDF; // On remet les FC
-        }
-    }
-
     // 2. CAS SPÉCIFIQUE DU TRANSFERT / CHANGE
     if(t.mode === 'transfert' && t.impacts && t.impacts.isTransfer) {
         const { source, dest } = t.impacts;
