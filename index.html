@@ -547,49 +547,11 @@ if (t.impacts?.virtuel) {
         let impUSD = 0;
         let impCDF = 0;
 
-        // =========================
-        // 💰 RÈGLEMENT
-        // =========================
-        if (t.isReglement) {
+    if (t.isReglement) {
 
-            // 🔁 ANNULATION
-            if (reverse && (t.paidUSD !== undefined || t.paidCDF !== undefined)) {
-
-                impUSD = - (t.paidUSD || 0);
-                impCDF = - (t.paidCDF || 0);
-            }
-            else {
-
-                const taux = parseFloat(data.taux) || 1;
-
-// 💰 RÉCUPÉRATION MIX RÉEL
-const paidUSD = (t.realUSD || 0) + ((t.realCDF || 0) / taux);
-const paidCDF = (t.realCDF || 0) + ((t.realUSD || 0) * taux);
-
-// 🔥 PAIEMENT INTELLIGENT PAR TYPE DE DETTE
-let payUSD = 0;
-let payCDF = 0;
-
-if (t.deviseDette === "USD") {
-    payUSD = Math.min(paidUSD, oldUSD);
+    impUSD = (t.impacts?.dette?.USD || 0);
+    impCDF = (t.impacts?.dette?.CDF || 0);
 }
-else if (t.deviseDette === "CDF") {
-    payCDF = Math.min(paidCDF, oldCDF);
-}
-else {
-    // fallback (ancien comportement)
-    payUSD = Math.min(paidUSD, oldUSD);
-    payCDF = Math.min(paidCDF, oldCDF);
-}
-
-                // 🔥 ON STOCKE POUR ANNULATION
-                t.paidUSD = payUSD;
-                t.paidCDF = payCDF;
-
-                impUSD = -payUSD;
-                impCDF = -payCDF;
-            }
-        }
 
         // =========================
         // 📈 CRÉATION DETTE
@@ -636,7 +598,6 @@ else {
 
     if (!isDataLoaded) { alert("Synchronisation..."); return; }
     if (!data.config) { alert("Erreur config"); return; }
-
     const opI = document.getElementById("operatorSelect").value;
     const tyI = document.getElementById("typeSelect").value;
     const amtSIM = parseFloat(document.getElementById("amount").value) || 0;
@@ -678,7 +639,6 @@ else {
         stk: stkM,
         mix: { USD: mixUSD, CDF: mixCDF }
     });
-
     t.stk = stkM;
 
     // 🔒 sécurisation
@@ -693,7 +653,6 @@ else {
         t.impacts.operator.USD = (cur === "USD" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
         t.impacts.operator.CDF = (cur === "CDF" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
     }
-
     // =========================
     // 🟥 DETTE PRINCIPAL
     // =========================
