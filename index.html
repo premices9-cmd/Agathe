@@ -1711,7 +1711,7 @@ runAutoCleanup();
 }
     let pendingCleanup = [];
 
-    const runAutoCleanup = () => {
+const runAutoCleanup = () => {
     if (!data.transactions || data.transactions.length === 0) return;
 
     const now = Date.now();
@@ -1726,16 +1726,33 @@ runAutoCleanup();
 
         let tTime = t.timestamp;
 
-        // 🔥 CORRECTION POUR ANCIENNES DONNÉES
+        // 🔥 CORRECTION AUTOMATIQUE DES ANCIENNES DONNÉES
         if (!tTime) {
-            const parsed = new Date(t.date).getTime();
-            if (!isNaN(parsed)) {
-                tTime = parsed;
-                t.timestamp = parsed; // 🔥 on corrige définitivement
-            } else {
-                return true; // on garde si illisible
+
+            if (t.date) {
+
+                // 🔁 tentative normale
+                let parsed = new Date(t.date).getTime();
+
+                // 🔥 fallback spécial pour formats bizarres (ex: 26/04/2026 12:30)
+                if (isNaN(parsed)) {
+                    const parts = t.date.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+                    if (parts) {
+                        const [_, d, m, y] = parts;
+                        parsed = new Date(`${y}-${m}-${d}`).getTime();
+                    }
+                }
+
+                // ✅ si récupéré → on sauvegarde définitivement
+                if (!isNaN(parsed)) {
+                    tTime = parsed;
+                    t.timestamp = parsed;
+                }
             }
         }
+
+        // ❌ toujours illisible → on garde
+        if (!tTime || isNaN(tTime)) return true;
 
         const age = now - tTime;
 
@@ -1755,8 +1772,11 @@ runAutoCleanup();
         // 🔴 DEPENSE (10 jours)
         // =====================
         if (isDepense) {
-            if (age >= H240) hasOldData = true;
-            return age < H240;
+            if (age >= H240) {
+                hasOldData = true;
+                return false;
+            }
+            return true;
         }
 
         // =====================
@@ -1768,27 +1788,35 @@ runAutoCleanup();
                 Math.abs(t.snapshotDette.USD) < 0.1 &&
                 Math.abs(t.snapshotDette.CDF) < 100;
 
-            if (isSolded) {
-                if (age >= H72) hasOldData = true;
-                return age < H72;
+            if (isSolded && age >= H72) {
+                hasOldData = true;
+                return false;
             }
+            return true;
         }
 
         // =====================
         // 🔵 NORMAL (5 jours)
         // =====================
-        if (age >= H120) hasOldData = true;
-        return age < H120;
+        if (age >= H120) {
+            hasOldData = true;
+            return false;
+        }
+
+        return true;
     });
 
-    // 🔥 NOTIFICATION FIABLE
     if (hasOldData) {
         pendingCleanup = filtered;
         document.getElementById("cleanupNotify").classList.remove("hidden");
+        console.log("🔥 Nettoyage détecté !");
     } else {
         document.getElementById("cleanupNotify").classList.add("hidden");
     }
-};
+
+    // 🔥 SAUVEGARDE automatique si correction faite
+    save();
+}; 
     
     window.confirmCleanup = () => {
     if (confirm("As-tu bien téléchargé ton PDF ? Les vieilles transactions seront définitivement supprimées.")) {
