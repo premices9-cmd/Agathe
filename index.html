@@ -158,7 +158,7 @@
         <button type="button" onclick="document.getElementById('opTaux').value = data.taux" style="width:45px; background:#64748b; font-size:10px;">DEFAUT</button>
         </div>
     </div>
-        <input type="number" id="stkMove" placeholder="Stock (+/-)" value="0" style="margin-top:5px;">
+       <input type="number" id="stkMove" step="any" placeholder="Stock (+/-)">
     
     <select id="currency" style="margin-bottom: 10px;"><option value="USD">USD</option><option value="CDF">CDF</option></select>    
 
@@ -598,6 +598,7 @@ if (t.impacts?.virtuel) {
 
     if (!isDataLoaded) { alert("Synchronisation..."); return; }
     if (!data.config) { alert("Erreur config"); return; }
+
     const opI = document.getElementById("operatorSelect").value;
     const tyI = document.getElementById("typeSelect").value;
     const amtSIM = parseFloat(document.getElementById("amount").value) || 0;
@@ -613,7 +614,10 @@ if (t.impacts?.virtuel) {
 
     const motif = document.getElementById("motif").value;
     const person = document.getElementById("personName").value.trim();
-    const stkM = parseFloat(document.getElementById("stkMove").value) || 0;
+    const stkM = parseFloat(
+    (document.getElementById("stkMove").value || "0")
+    .replace(",", ".")
+) || 0;
 
     const ty = data.types[tyI];
     const op = data.operators[opI];
@@ -639,6 +643,7 @@ if (t.impacts?.virtuel) {
         stk: stkM,
         mix: { USD: mixUSD, CDF: mixCDF }
     });
+
     t.stk = stkM;
 
     // 🔒 sécurisation
@@ -653,6 +658,7 @@ if (t.impacts?.virtuel) {
         t.impacts.operator.USD = (cur === "USD" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
         t.impacts.operator.CDF = (cur === "CDF" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
     }
+
     // =========================
     // 🟥 DETTE PRINCIPAL
     // =========================
@@ -663,8 +669,9 @@ if (t.impacts?.virtuel) {
 
         const dirCaisse = parseInt(ty.impC) || 0;
 
-        t.impacts.caisse.USD = (mixUSD + commUSD) * dirCaisse;
-        t.impacts.caisse.CDF = (mixCDF + commCDF) * dirCaisse;
+        // 💰 CASH normal
+        t.impacts.caisse.USD = (mixUSD * dirCaisse) + commUSD;
+        t.impacts.caisse.CDF = (mixCDF * dirCaisse) + commCDF;
     }
 
     // =========================
@@ -677,50 +684,49 @@ if (t.impacts?.virtuel) {
         t.realUSD = (cur === "USD") ? amtSIM : 0;
         t.realCDF = (cur === "CDF") ? amtSIM : 0;
 
-        t.impacts.caisse.USD = -(mixUSD + commUSD);
-        t.impacts.caisse.CDF = -(mixCDF + commCDF);
+        // ❗ cash sort MAIS commission entre
+        t.impacts.caisse.USD = (-mixUSD) + commUSD;
+        t.impacts.caisse.CDF = (-mixCDF) + commCDF;
     }
 
-// =========================
-// 🔵 INTER-SIM (FIX FINAL)
-// =========================
-else if (isInterSim) {
+    // =========================
+    // 🔵 INTER-SIM
+    // =========================
+    else if (isInterSim) {
 
-    const taux = parseFloat(data.taux) || 1;
-    const paySimIdx = parseInt(document.getElementById("paySimSelect").value);
+        const taux = parseFloat(data.taux) || 1;
+        const paySimIdx = parseInt(document.getElementById("paySimSelect").value);
 
-    let diffUSD = 0;
-    let diffCDF = 0;
+        let diffUSD = 0;
+        let diffCDF = 0;
 
-    if (cur === "USD") {
-        const totalCash = mixUSD + (mixCDF / taux);
-        diffUSD = Math.max(0, amtSIM - totalCash);
-    } else {
-        const totalCash = mixCDF + (mixUSD * taux);
-        diffCDF = Math.max(0, amtSIM - totalCash);
+        if (cur === "USD") {
+            const totalCash = mixUSD + (mixCDF / taux);
+            diffUSD = Math.max(0, amtSIM - totalCash);
+        } else {
+            const totalCash = mixCDF + (mixUSD * taux);
+            diffCDF = Math.max(0, amtSIM - totalCash);
+        }
+
+        t.virtualUSD = diffUSD;
+        t.virtualCDF = diffCDF;
+        t.virtualOpIdx = paySimIdx;
+
+        t.detteUSD = 0;
+        t.detteCDF = 0;
+
+        t.impacts.virtuel = {
+            opIdx: paySimIdx,
+            USD: -diffUSD,
+            CDF: -diffCDF
+        };
+
+        const dirCaisse = parseInt(ty.impC) || 0;
+
+        // 💰 CASH + COMMISSION AJOUTÉE
+        t.impacts.caisse.USD = (mixUSD * dirCaisse) + commUSD;
+        t.impacts.caisse.CDF = (mixCDF * dirCaisse) + commCDF;
     }
-
-    // 🔥 ON STOCKE POUR ANNULATION (CRUCIAL)
-    t.virtualUSD = diffUSD;
-    t.virtualCDF = diffCDF;
-    t.virtualOpIdx = paySimIdx;
-
-    // ❌ PAS DE DETTE
-    t.detteUSD = 0;
-    t.detteCDF = 0;
-
-    // IMPACT APPLY
-    t.impacts.virtuel = {
-        opIdx: paySimIdx,
-        USD: -diffUSD,
-        CDF: -diffCDF
-    };
-
-    // CAISSE
-    const dirCaisse = parseInt(ty.impC) || 0;
-    t.impacts.caisse.USD = (mixUSD + commUSD) * dirCaisse;
-    t.impacts.caisse.CDF = (mixCDF + commCDF) * dirCaisse;
-}
 
     // =========================
     // ⚙️ NORMAL
@@ -740,31 +746,33 @@ else if (isInterSim) {
 
         const dirCaisse = parseInt(ty.impC) || 0;
 
-        t.impacts.caisse.USD = (mixUSD + commUSD) * dirCaisse;
-        t.impacts.caisse.CDF = (mixCDF + commCDF) * dirCaisse;
+        // 💰 CASH normal + commission toujours positive
+        t.impacts.caisse.USD = (mixUSD * dirCaisse) + commUSD;
+        t.impacts.caisse.CDF = (mixCDF * dirCaisse) + commCDF;
     }
 
     // APPLY
     applyImpacts(t);
 
-    // SNAPSHOT
+    // SNAPSHOT DETTE
     if (person && t.typeDette) {
         const key = `${normalize(t.typeDette)}_${normalize(person)}`;
         const d = data.debts[key] || { USD: 0, CDF: 0 };
         t.snapshotDette = { USD: d.USD, CDF: d.CDF };
     }
 
-    // 🧾 HISTORIQUE AVEC SIM SOURCE
+    // HISTORIQUE
     let simSourceName = "";
     if (t.impacts?.virtuel) {
         const sourceOp = data.operators[t.impacts.virtuel.opIdx];
         simSourceName = sourceOp ? ` [via ${sourceOp.name}]` : "";
     }
 
-    const newEntry = {
+        const newEntry = {
         ...t,
         person,
-        date: new Date().toLocaleString(),
+        date: new Date().toISOString(), // 🔥 format universel
+        timestamp: Date.now(),
         desc: `${ty.name} - ${op.name}${simSourceName} (${person ? 'NOM: '+person+' | ' : ''}${motif})`,
         amtSIM,
         curSIM: cur,
@@ -772,6 +780,7 @@ else if (isInterSim) {
         cdfCash: mixCDF,
         commission: { usd: commUSD, cdf: commCDF }
     };
+
 
     data.transactions.unshift(newEntry);
     save();
@@ -1696,47 +1705,93 @@ window.cancelTransaction = (index) => {
             ${t.name}
             <button class="btn-del" onclick="deleteType(${i})">X</button>
         </div>`
-    ).join("");    
+).join("");
+
+runAutoCleanup();
 }
+    let pendingCleanup = [];
 
-    let pendingCleanup = []; // Stockage temporaire des données à garder
-
-const runAutoCleanup = () => {
+    const runAutoCleanup = () => {
     if (!data.transactions || data.transactions.length === 0) return;
 
     const now = Date.now();
-    const H240 = 240 * 60 * 60 * 1000; 
-    const H120 = 120 * 60 * 60 * 1000; 
-    const H72 = 72 * 60 * 60 * 1000;   
 
-    // On prépare ce qui DEVRAIT rester après nettoyage
+    const H240 = 240 * 60 * 60 * 1000; // 10 jours
+    const H120 = 120 * 60 * 60 * 1000; // 5 jours
+    const H72  = 72  * 60 * 60 * 1000; // 3 jours
+
+    let hasOldData = false;
+
     const filtered = data.transactions.filter(t => {
-        const tDate = new Date(t.date).getTime();
-        if (isNaN(tDate)) return true; 
-        const age = now - tDate;
-        const opName = t.operator ? t.operator.toLowerCase() : "";
-        const isDepenseAny = t.mode === 'depense' || t.isDepense === true || opName.includes("depense");
 
-        if (isDepenseAny) return age < H240;
-        if (t.isReglement || (t.mode && t.mode.includes("dette"))) {
-            const isSolded = t.snapshotDette && Math.abs(t.snapshotDette.USD) < 0.1 && Math.abs(t.snapshotDette.CDF) < 100;
-            if (isSolded) return age < H72;
+        let tTime = t.timestamp;
+
+        // 🔥 CORRECTION POUR ANCIENNES DONNÉES
+        if (!tTime) {
+            const parsed = new Date(t.date).getTime();
+            if (!isNaN(parsed)) {
+                tTime = parsed;
+                t.timestamp = parsed; // 🔥 on corrige définitivement
+            } else {
+                return true; // on garde si illisible
+            }
         }
+
+        const age = now - tTime;
+
+        const mode = (t.mode || "").toLowerCase();
+        const opName = (t.operator || "").toLowerCase();
+
+        const isDepense =
+            t.isDepense === true ||
+            mode.includes("depense") ||
+            opName.includes("depense");
+
+        const isDette =
+            t.isReglement ||
+            mode.includes("dette");
+
+        // =====================
+        // 🔴 DEPENSE (10 jours)
+        // =====================
+        if (isDepense) {
+            if (age >= H240) hasOldData = true;
+            return age < H240;
+        }
+
+        // =====================
+        // 🟡 DETTE SOLDÉE (3 jours)
+        // =====================
+        if (isDette) {
+            const isSolded =
+                t.snapshotDette &&
+                Math.abs(t.snapshotDette.USD) < 0.1 &&
+                Math.abs(t.snapshotDette.CDF) < 100;
+
+            if (isSolded) {
+                if (age >= H72) hasOldData = true;
+                return age < H72;
+            }
+        }
+
+        // =====================
+        // 🔵 NORMAL (5 jours)
+        // =====================
+        if (age >= H120) hasOldData = true;
         return age < H120;
     });
 
-    // Si le nombre de transactions après filtre est différent, on montre la notif
-    if (filtered.length !== data.transactions.length) {
-        pendingCleanup = filtered; // On stocke le résultat du filtre
+    // 🔥 NOTIFICATION FIABLE
+    if (hasOldData) {
+        pendingCleanup = filtered;
         document.getElementById("cleanupNotify").classList.remove("hidden");
     } else {
         document.getElementById("cleanupNotify").classList.add("hidden");
     }
 };
-
-// Nouvelle fonction pour valider après ton export PDF
-window.confirmCleanup = () => {
-    if(confirm("As-tu bien téléchargé ton PDF ? Les vieilles transactions seront définitivement supprimées.")) {
+    
+    window.confirmCleanup = () => {
+    if (confirm("As-tu bien téléchargé ton PDF ? Les vieilles transactions seront définitivement supprimées.")) {
         data.transactions = pendingCleanup;
         save();
         document.getElementById("cleanupNotify").classList.add("hidden");
@@ -1744,9 +1799,14 @@ window.confirmCleanup = () => {
         render();
     }
 };
+    // =========================
+// AUTO CLEANUP LOOP
+// =========================
+setInterval(runAutoCleanup, 30000);
 
-
-
+    window.onload = () => {
+    runAutoCleanup();
+};
     window.deleteOperator = function(index){
     if(!confirm("Supprimer cet opérateur ?")) return;
 
