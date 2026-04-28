@@ -305,48 +305,109 @@
         projectId: "mka-mobile-money"    
     };    
   
-    const app = initializeApp(firebaseConfig);    
-    const db = getDatabase(app);    
-    
-    // --- ÉTAT INITIAL ---
-    let data = { caisse:{USD:0, CDF:0}, operators:[], types:[], transactions:[], taux:2800, config: { pinAdmin: "1234", pinUser: "0000" }, debts: {} };    
-    let isDataLoaded = false; 
+    // --- CONFIG FIREBASE ---
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
 
-    // RÉCEPTION DES DONNÉES SÉCURISÉE AVEC NETTOYAGE AUTO
-onValue(ref(db, 'mka_data'), (snap) => {     
-    const incomingData = snap.val();
-    if(incomingData) {     
-        data = incomingData;     
-        if(!data.transactions) data.transactions = [];     
-        if(!data.types) data.types = [];  
-        if(!data.operators) data.operators = [];  
-        if(!data.config) data.config = { pinAdmin: "1234", pinUser: "0000" };  
-        if(!data.debts) data.debts = {};  
-        
-        isDataLoaded = true; 
-        console.log("Données synchronisées");
-        
-        // 1. On dessine l'interface d'abord
-        render(); 
-        
-        // 2. On lance le nettoyage des vieilles opérations (Dépenses, Dettes soldées, etc.)
-        runAutoCleanup();    
-    }     
+// --- ÉTAT INITIAL ---
+let data = {
+    caisse:{USD:0, CDF:0},
+    operators:[],
+    types:[],
+    transactions:[],
+    taux:2800,
+    config: { pinAdmin: "1234", pinUser: "0000" },
+    debts: {}
+};
+
+let isDataLoaded = false;
+
+// 🔒 STOCKAGE LOCAL + FILE D’ATTENTE
+let pendingQueue = JSON.parse(localStorage.getItem("pendingQueue") || "[]");
+let isSyncing = false;
+
+// =========================
+// 💾 LOCAL STORAGE
+// =========================
+const saveLocal = () => {
+    localStorage.setItem("mka_data_local", JSON.stringify(data));
+};
+
+const loadLocal = () => {
+    const local = localStorage.getItem("mka_data_local");
+    if (local) {
+        data = JSON.parse(local);
+        console.log("Données chargées depuis local");
+    }
+};
+
+const addToQueue = (entry) => {
+    pendingQueue.push(entry);
+    localStorage.setItem("pendingQueue", JSON.stringify(pendingQueue));
+};
+
+// 🔥 IMPORTANT : charger local APRÈS déclaration data
+loadLocal();
+
+try {
+    render();
+} catch(e) {
+    console.warn("Render initial ignoré");
+}
+
+onValue(ref(db, 'mka_data'), (snap) => {
+    const incoming = snap.val() || {};
+
+    // 🔄 garder les autres données
+    data.operators = incoming.operators || data.operators;
+    data.types = incoming.types || data.types;
+    data.config = incoming.config || data.config;
+    data.debts = incoming.debts || data.debts;
+    data.caisse = incoming.caisse || data.caisse;
+    data.taux = incoming.taux || data.taux;
+
+    // 🔥 transactions séparées
+    const obj = incoming.transactions || {};
+    data.transactions = Object.values(obj).sort((a,b)=>b.timestamp-a.timestamp);
+
+    saveLocal();
+    isDataLoaded = true;
+
+    console.log("Données Firebase synchronisées");
+
+    render();
 });
-   
-    // --- UNIQUE FONCTION DE SAUVEGARDE SÉCURISÉE ---
-    const save = () => {
-        if (isDataLoaded && data.config) {
-            update(ref(db, 'mka_data'), data)
-                .then(() => console.log("Sauvegarde réussie (Update)"))
-                .catch((err) => {
-                    console.error("Erreur Firebase:", err);
-                    alert("Erreur de connexion : " + err.message);
-                });
-        } else {
-            console.warn("Sauvegarde ignorée : données non chargées");
+
+// =========================
+// 🔁 SYNC QUEUE
+// =========================
+const syncQueue = async () => {
+    if (isSyncing || pendingQueue.length === 0) return;
+
+    isSyncing = true;
+
+    while (pendingQueue.length > 0) {
+        const entry = pendingQueue[0];
+
+        try {
+            await update(ref(db, 'mka_data/transactions'), {
+                [entry.timestamp]: entry
+            });
+
+            pendingQueue.shift();
+            localStorage.setItem("pendingQueue", JSON.stringify(pendingQueue));
+
+        } catch (e) {
+            console.warn("Erreur sync, retry plus tard");
+            break;
         }
-    };
+    }
+
+    isSyncing = false;
+};
+
+// 🔁 AUTO SYNC
+setInterval(syncQueue, 5000);
 
     const fmt = (n) => parseFloat(n || 0).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).replace(/,/g, '.');    
     const normalize = (str) => str ? str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : "";
@@ -596,7 +657,6 @@ if (t.impacts?.virtuel) {
 
  window.addTransaction = () => {
 
-    if (!isDataLoaded) { alert("Synchronisation..."); return; }
     if (!data.config) { alert("Erreur config"); return; }
 
     const opI = document.getElementById("operatorSelect").value;
@@ -771,8 +831,18 @@ if (t.impacts?.virtuel) {
         const newEntry = {
         ...t,
         person,
-        date: new Date().toISOString(), // 🔥 format universel
         timestamp: Date.now(),
+
+// 👇 AFFICHAGE LOCAL GOMA
+date: new Date().toLocaleString("fr-FR", {
+    timeZone: "Africa/Kinshasa",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+}),
         desc: `${ty.name} - ${op.name}${simSourceName} (${person ? 'NOM: '+person+' | ' : ''}${motif})`,
         amtSIM,
         curSIM: cur,
@@ -783,11 +853,18 @@ if (t.impacts?.virtuel) {
 
 
     data.transactions.unshift(newEntry);
-    save();
+
+// 💾 sauvegarde locale immédiate
+    saveLocal();
+
+// 📦 ajouter à la file d’attente
+    addToQueue(newEntry);
+
+// 🔁 lancer sync
+    syncQueue();
 
     alert("Opération enregistrée !");
     render();
-
     ["amount","mixUSD","mixCDF","commUSD","commCDF","motif","personName","stkMove"]
     .forEach(id => {
         const el = document.getElementById(id);
@@ -1010,13 +1087,13 @@ window.showFullHistory = (filter) => {
             </div>`;
         }
 
-// --- DESIGN RÈGLEMENT AVEC DÉTAIL COMPLET (VOTRE PRÉFÉRÉ) ---
+// --- DESIGN RÈGLEMENT AVEC ACTIONS (ANNULER + SUPPRIMER) ---
 if (t.isReglement) {
     const b = t.debtBefore || { USD: 0, CDF: 0 };
     const a = t.snapshotDette || { USD: 0, CDF: 0 };
     const p = t.payDetail || { onUsd: { usd: 0, cdf: 0 }, onCdf: { usd: 0, cdf: 0 } };
     
-    // Correction de la détection du solde (pour gérer les micro-restes)
+    // Détection du solde
     const estSolde = (a.USD <= 0.1 && a.CDF <= 100);
     
     const sUSD = parseFloat(t.surplusUSD || 0);
@@ -1028,7 +1105,12 @@ if (t.isReglement) {
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
             <span style="font-size:11px; color:#64748b;">${t.date}</span>
             <span style="font-weight:bold; color:#854d0e; font-size:12px;">💰 RÈGLEMENT ${t.person.toUpperCase()}</span>
-            ${isAdmin ? `<button onclick="cancelTransaction(${realIdx})" style="background:#f59e0b;color:#fff;border:none;padding:4px 8px;border-radius:6px;font-size:10px;cursor:pointer;">↩ Annuler</button>` : ""}
+            
+            ${isAdmin ? `
+            <div style="display:flex; gap:6px;">
+                <button onclick="cancelTransaction(${realIdx})" style="background:#f59e0b; color:#fff; border:none; padding:4px 8px; border-radius:6px; font-size:10px; cursor:pointer; font-weight:bold;">↩ Annuler</button>
+                <button onclick="deleteTransaction(${realIdx})" style="background:#ef4444; color:#fff; border:none; padding:4px 8px; border-radius:6px; font-size:10px; cursor:pointer; font-weight:bold;">🗑️ Suppr</button>
+            </div>` : ""}
         </div>
 
         <div style="display:grid; grid-template-columns: 1fr 1.6fr 1fr; gap:8px; align-items:center; background:white; padding:10px; border-radius:10px;">
@@ -1044,16 +1126,16 @@ if (t.isReglement) {
                 
                 <div style="display:flex; justify-content:space-between; margin-bottom:2px;">
                     <span style="color:#64748b;">Sur Dette $:</span> 
-                    <b style="color:#166534;">${fmt(p.onUsd.usd)}$ + ${fmt(p.onUsd.cdf)}FC</b>
+                    <b style="color:#166534;">${fmt(p.onUsd.usd)}$+${fmt(p.onUsd.cdf)}F</b>
                 </div>
                 
                 <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
                     <span style="color:#64748b;">Sur Dette FC:</span> 
-                    <b style="color:#166534;">${fmt(p.onCdf.usd)}$ + ${fmt(p.onCdf.cdf)}FC</b>
+                    <b style="color:#166534;">${fmt(p.onCdf.usd)}$+${fmt(p.onCdf.cdf)}F</b>
                 </div>
 
                 <div style="text-align:center; font-size:9px; color:#9a3412; border-top:1px dashed #fed7aa; padding-top:4px;">
-                    Destination: <b>${t.operator}</b>
+                    Dest: <b>${t.operator}</b>
                 </div>
             </div>
 
@@ -1069,16 +1151,14 @@ if (t.isReglement) {
                             </div>` : ''
                         }
                     </div>` : 
-                    `<div style="font-size:9px; color:#64748b; font-weight:bold;">RESTE À PAYER</div>
+                    `<div style="font-size:9px; color:#64748b; font-weight:bold;">RESTE</div>
                      <div style="font-weight:bold; font-size:13px; color:#dc2626;">${fmt(a.USD)}$</div>
                      <div style="font-size:11px; color:#dc2626;">${fmt(a.CDF)} FC</div>`
                 }
             </div>
         </div>
 
-        <div style="font-size:10px; margin-top:6px; color:#9a3412; text-align:center; font-style:italic; opacity:0.8;">
-            ${t.desc || ""}
-        </div>
+        ${t.desc ? `<div style="font-size:10px; margin-top:6px; color:#9a3412; text-align:center; font-style:italic; opacity:0.8;">${t.desc}</div>` : ""}
     </div>`;
 }
 
@@ -1519,7 +1599,21 @@ window.cancelTransaction = (index) => {
         if(name) { data.types.push({ name, impO, impC, impS }); save(); alert("Type créé"); }    
     };  
   
-    window.deleteTransaction = (idx) => { if(confirm("Supprimer ?")) { data.transactions.splice(idx, 1); save(); window.showFullHistory('general'); } };  
+    // À placer dans votre fichier JS principal
+window.deleteTransaction = function(idx) {
+    console.log("Tentative de suppression de l'index :", idx);
+    if(confirm("Supprimer cette ligne définitivement ?")) {
+        // Vérification si data.transactions existe
+        if(typeof data !== 'undefined' && data.transactions) {
+            data.transactions.splice(idx, 1);
+            if(typeof save === 'function') save(); // Sauvegarde si la fonction existe
+            if(typeof showFullHistory === 'function') showFullHistory('general');
+        } else {
+            alert("Erreur : Tableau de données introuvable.");
+        }
+    }
+};
+
     window.closeHistory = () => document.getElementById("historyModal").classList.add("hidden");    
     window.updateDefaultStockMove = () => { const ty = data.types[document.getElementById("typeSelect").value]; if(ty) document.getElementById("stkMove").value = ty.impS || 0; };  
     window.exportHistory = async () => {
