@@ -335,9 +335,22 @@ const saveLocal = () => {
 
 const loadLocal = () => {
     const local = localStorage.getItem("mka_data_local");
+
     if (local) {
-        data = JSON.parse(local);
-        console.log("Données chargées depuis local");
+        const parsed = JSON.parse(local);
+
+        // 🔒 sécurisation structure
+        data = {
+            caisse: parsed.caisse || {USD:0, CDF:0},
+            operators: parsed.operators || [],
+            types: parsed.types || [],
+            transactions: parsed.transactions || [],
+            taux: parsed.taux || 2800,
+            config: parsed.config || { pinAdmin:"1234", pinUser:"0000" },
+            debts: parsed.debts || {}
+        };
+
+        console.log("Données locales restaurées");
     }
 };
 
@@ -346,19 +359,21 @@ const addToQueue = (entry) => {
     localStorage.setItem("pendingQueue", JSON.stringify(pendingQueue));
 };
 
-// 🔥 IMPORTANT : charger local APRÈS déclaration data
 loadLocal();
 
+// 🔥 autorise le mode offline
+isDataLoaded = true;
+
+// 🔒 sécurise le render
 try {
     render();
 } catch(e) {
-    console.warn("Render initial ignoré");
+    console.warn("Render initial ignoré", e);
 }
 
 onValue(ref(db, 'mka_data'), (snap) => {
     const incoming = snap.val() || {};
 
-    // 🔄 garder les autres données
     data.operators = incoming.operators || data.operators;
     data.types = incoming.types || data.types;
     data.config = incoming.config || data.config;
@@ -366,14 +381,11 @@ onValue(ref(db, 'mka_data'), (snap) => {
     data.caisse = incoming.caisse || data.caisse;
     data.taux = incoming.taux || data.taux;
 
-    // 🔥 transactions séparées
     const obj = incoming.transactions || {};
     data.transactions = Object.values(obj).sort((a,b)=>b.timestamp-a.timestamp);
 
+    // 🔥 IMPORTANT
     saveLocal();
-    isDataLoaded = true;
-
-    console.log("Données Firebase synchronisées");
 
     render();
 });
@@ -390,9 +402,13 @@ const syncQueue = async () => {
         const entry = pendingQueue[0];
 
         try {
-            await update(ref(db, 'mka_data/transactions'), {
-                [entry.timestamp]: entry
-            });
+            if (entry.type === "delete") {
+                await remove(ref(db, 'mka_data/transactions/' + entry.timestamp));
+            } else {
+                await update(ref(db, 'mka_data/transactions'), {
+                    [entry.timestamp]: entry
+                });
+            }
 
             pendingQueue.shift();
             localStorage.setItem("pendingQueue", JSON.stringify(pendingQueue));
@@ -1600,17 +1616,42 @@ window.cancelTransaction = (index) => {
     };  
   
     // À placer dans votre fichier JS principal
-window.deleteTransaction = function(idx) {
-    console.log("Tentative de suppression de l'index :", idx);
-    if(confirm("Supprimer cette ligne définitivement ?")) {
-        // Vérification si data.transactions existe
-        if(typeof data !== 'undefined' && data.transactions) {
-            data.transactions.splice(idx, 1);
-            if(typeof save === 'function') save(); // Sauvegarde si la fonction existe
-            if(typeof showFullHistory === 'function') showFullHistory('general');
-        } else {
-            alert("Erreur : Tableau de données introuvable.");
-        }
+window.deleteTransaction = async function(idx) {
+    if (!confirm("Supprimer définitivement ?")) return;
+
+    const t = data.transactions[idx];
+
+    if (!t || !t.timestamp) {
+        alert("Erreur : ID introuvable");
+        return;
+    }
+
+    try {
+        // 🔥 suppression Firebase Realtime Database
+        await remove(ref(db, 'mka_data/transactions/' + t.timestamp));
+
+        // 🔥 suppression locale
+        data.transactions.splice(idx, 1);
+        saveLocal();
+        render();
+
+        alert("Transaction supprimée !");
+        
+    } catch (error) {
+        console.error("Erreur suppression:", error);
+
+        // 🔒 mode hors ligne → ajouter à la queue
+        addToQueue({
+            type: "delete",
+            timestamp: t.timestamp
+        });
+
+        // suppression locale quand même
+        data.transactions.splice(idx, 1);
+        saveLocal();
+        render();
+
+        alert("Supprimé localement. Sera synchronisé plus tard.");
     }
 };
 
