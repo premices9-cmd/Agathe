@@ -288,126 +288,123 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";    
     import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-database.js";    
 
-    // --- 1. ENREGISTREMENT DU SERVICE WORKER (AJOUTÉ) ---
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js')
-                .then(reg => console.log('MKA Shop : Service Worker prêt !'))
-                .catch(err => console.log('Erreur SW :', err));
-        });
-    }
+// --- 1. ENREGISTREMENT DU SERVICE WORKER ---
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+            .then(reg => console.log('MKA Shop : Interface prête !'))
+            .catch(err => console.log('Erreur SW :', err));
+    });
+}
 
-    // --- 2. CONFIGURATION FIREBASE ---
-    const firebaseConfig = {    
-        apiKey: "AIzaSyDSK9sIPu8fvGebZQG9EdHBhlf7nl8Dmzs",    
-        authDomain: "mka-mobile-money.firebaseapp.com",    
-        databaseURL: "https://mka-mobile-money-default-rtdb.firebaseio.com",    
-        projectId: "mka-mobile-money"    
-    };    
-  
-    // --- CONFIG FIREBASE ---
+// --- 2. CONFIGURATION FIREBASE ---
+const firebaseConfig = {    
+    apiKey: "AIzaSyDSK9sIPu8fvGebZQG9EdHBhlf7nl8Dmzs",    
+    authDomain: "mka-mobile-money.firebaseapp.com",    
+    databaseURL: "https://mka-mobile-money-default-rtdb.firebaseio.com",    
+    projectId: "mka-mobile-money"    
+};    
+
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-// --- ÉTAT INITIAL ---
+// --- 3. ÉTAT INITIAL (Source de vérité unique) ---
 let data = {
-    caisse:{USD:0, CDF:0},
-    operators:[],
-    types:[],
-    transactions:[],
-    taux:2800,
+    caisse: { USD: 0, CDF: 0 },
+    operators: [],
+    types: [],
+    transactions: [],
+    taux: 2800,
     config: { pinAdmin: "1234", pinUser: "0000" },
     debts: {}
 };
 
 let isDataLoaded = false;
 
-// 🔒 STOCKAGE LOCAL + FILE D’ATTENTE
-let pendingQueue = JSON.parse(localStorage.getItem("pendingQueue") || "[]");
-let isSyncing = false;
-
-// =========================
-// 💾 LOCAL STORAGE
-// =========================
-const saveLocal = () => {
-    localStorage.setItem("mka_data_local", JSON.stringify(data));
-};
-
-const loadLocal = () => {
-    const local = localStorage.getItem("mka_data_local");
-    if (local) {
-        data = JSON.parse(local);
-        console.log("Données chargées depuis local");
-    }
-};
-
-const addToQueue = (entry) => {
-    pendingQueue.push(entry);
-    localStorage.setItem("pendingQueue", JSON.stringify(pendingQueue));
-};
-
-// 🔥 IMPORTANT : charger local APRÈS déclaration data
-loadLocal();
-
-try {
-    render();
-} catch(e) {
-    console.warn("Render initial ignoré");
-}
-
+// ==========================================
+// 📥 LECTURE EN TEMPS RÉEL (SYNC ACTIVE)
+// ==========================================
 onValue(ref(db, 'mka_data'), (snap) => {
-    const incoming = snap.val() || {};
+    const incoming = snap.val();
+    
+    if (!incoming) {
+        console.warn("MKA Shop : Base de données vide.");
+        return;
+    }
 
-    // 🔄 garder les autres données
-    data.operators = incoming.operators || data.operators;
-    data.types = incoming.types || data.types;
+    // Mise à jour de l'objet global
+    data.operators = incoming.operators || [];
+    data.types = incoming.types || [];
     data.config = incoming.config || data.config;
-    data.debts = incoming.debts || data.debts;
-    data.caisse = incoming.caisse || data.caisse;
-    data.taux = incoming.taux || data.taux;
+    data.debts = incoming.debts || {};
+    data.caisse = incoming.caisse || { USD: 0, CDF: 0 };
+    data.taux = incoming.taux || 2800;
 
-    // 🔥 transactions séparées
+    // Conversion des transactions (Objet Firebase -> Tableau trié)
     const obj = incoming.transactions || {};
-    data.transactions = Object.values(obj).sort((a,b)=>b.timestamp-a.timestamp);
+    data.transactions = Object.values(obj).sort((a, b) => b.timestamp - a.timestamp);
 
-    saveLocal();
     isDataLoaded = true;
+    console.log("MKA Shop : Données Firebase synchronisées.");
 
-    console.log("Données Firebase synchronisées");
-
-    render();
+    // Rappel de la fonction d'affichage
+    try {
+        render(); 
+    } catch(e) {
+        console.error("Erreur de rendu :", e);
+    }
 });
 
-// =========================
-// 🔁 SYNC QUEUE
-// =========================
-const syncQueue = async () => {
-    if (isSyncing || pendingQueue.length === 0) return;
-
-    isSyncing = true;
-
-    while (pendingQueue.length > 0) {
-        const entry = pendingQueue[0];
-
-        try {
-            await update(ref(db, 'mka_data/transactions'), {
-                [entry.timestamp]: entry
-            });
-
-            pendingQueue.shift();
-            localStorage.setItem("pendingQueue", JSON.stringify(pendingQueue));
-
-        } catch (e) {
-            console.warn("Erreur sync, retry plus tard");
-            break;
-        }
+// ==========================================
+// 📤 ÉCRITURE DIRECTE (SANS ATTENTE)
+// ==========================================
+const ajouterTransaction = async (nouvelleTransaction) => {
+    // On utilise le timestamp comme ID unique
+    const id = nouvelleTransaction.timestamp; 
+    
+    try {
+        // Enregistrement direct
+        await set(ref(db, `mka_data/transactions/${id}`), nouvelleTransaction);
+        console.log("MKA Shop : Transaction enregistrée !");
+    } catch (error) {
+        console.error("Erreur d'enregistrement :", error);
+        alert("Erreur de connexion : l'opération n'a pas pu être envoyée à Firebase.");
     }
-
-    isSyncing = false;
 };
 
-// 🔁 AUTO SYNC
-setInterval(syncQueue, 5000);
+// À l'intérieur du script type="module"
+window.save = async function() {
+    // 1. Préparation des transactions sous forme d'objet pour Firebase
+    const transObj = {};
+    data.transactions.forEach(t => {
+        if (t.timestamp) {
+            transObj[t.timestamp] = t;
+        }
+    });
+
+    try {
+        // 2. Mise à jour de TOUTE la structure d'un coup
+        // On utilise 'set' pour être sûr que la base de données 
+        // reflète exactement l'état de votre variable 'data'
+        await set(ref(db, 'mka_data'), {
+            caisse: data.caisse,
+            operators: data.operators,
+            taux: data.taux,
+            config: data.config,
+            debts: data.debts,
+            transactions: transObj, // Écrase l'ancienne liste par la nouvelle (nettoyée/modifiée)
+            types: data.types
+        });
+        
+        console.log("Synchronisation Firebase réussie ✅");
+    } catch (error) {
+        console.error("Erreur de sauvegarde Firebase ❌ :", error);
+        alert("Erreur de connexion. Les modifications ne sont pas enregistrées sur internet.");
+    }
+};
+
+// Optionnel : Créer un alias local si vous préférez écrire save() au lieu de window.save()
+const save = window.save;
 
     const fmt = (n) => parseFloat(n || 0).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).replace(/,/g, '.');    
     const normalize = (str) => str ? str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : "";
@@ -851,26 +848,34 @@ date: new Date().toLocaleString("fr-FR", {
         commission: { usd: commUSD, cdf: commCDF }
     };
 
+    // 1. On l'ajoute visuellement tout de suite pour la rapidité
+    data.transactions.unshift(newEntry); 
+    render(); 
 
-    data.transactions.unshift(newEntry);
-
-// 💾 sauvegarde locale immédiate
-    saveLocal();
-
-// 📦 ajouter à la file d’attente
-    addToQueue(newEntry);
-
-// 🔁 lancer sync
-    syncQueue();
+    // 2. On l'envoie directement à Firebase
+    ajouterTransaction(newEntry).then(() => {
+        // Optionnel : on peut faire un petit log ou un feedback visuel ici
+        console.log("Synchro Firebase OK");
+    }).catch(err => {
+        // En cas d'erreur, on prévient l'utilisateur
+        alert("Attention : L'opération est affichée mais n'a pas pu être sauvegardée sur internet.");
+    });
 
     alert("Opération enregistrée !");
-    render();
-    ["amount","mixUSD","mixCDF","commUSD","commCDF","motif","personName","stkMove"]
-    .forEach(id => {
+    
+    // 3. Reset des champs
+    const fields = ["amount","mixUSD","mixCDF","commUSD","commCDF","motif","personName","stkMove"];
+    fields.forEach(id => {
         const el = document.getElementById(id);
-        if(el) el.value = "";
+        if (el) el.value = "";
+    });
+
+    ["operatorSelect","typeSelect","currency","payMode"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.selectedIndex = 0;
     });
 };
+
 
  window.settleAccountV2 = () => {
     const opIdx = document.getElementById("settleOpIdx").value;
@@ -1600,18 +1605,29 @@ window.cancelTransaction = (index) => {
     };  
   
     // À placer dans votre fichier JS principal
-window.deleteTransaction = function(idx) {
-    console.log("Tentative de suppression de l'index :", idx);
-    if(confirm("Supprimer cette ligne définitivement ?")) {
-        // Vérification si data.transactions existe
-        if(typeof data !== 'undefined' && data.transactions) {
-            data.transactions.splice(idx, 1);
-            if(typeof save === 'function') save(); // Sauvegarde si la fonction existe
-            if(typeof showFullHistory === 'function') showFullHistory('general');
-        } else {
-            alert("Erreur : Tableau de données introuvable.");
-        }
+ window.deleteTransaction = async function(idx) {
+    if (!confirm("Supprimer définitivement ?")) return;
+    const t = data.transactions[idx];
+    if (!t) return;
+
+    // 1. Supprimer du tableau local
+    data.transactions.splice(idx, 1);
+
+    // 2. Lancer la synchronisation globale
+    await window.save(); 
+    
+    // 3. Mettre à jour l'interface principale (soldes, etc.)
+    render();
+
+    // 4. RÉ-AFFICHER la liste de l'historique pour masquer l'élément supprimé
+    // On passe généralement le type (ex: "general", "Airtel", etc.) 
+    // ou on utilise une variable qui stocke le dernier type affiché.
+    if (typeof showFullHistory === "function") {
+        // Si vous avez une variable 'currentHistoryType' qui stocke le filtre actuel
+        showFullHistory(window.currentHistoryType || 'general');
     }
+    
+    alert("Supprimé de la base de données");
 };
 
     window.closeHistory = () => document.getElementById("historyModal").classList.add("hidden");    
@@ -1995,3 +2011,8 @@ window.addEventListener('appinstalled', () => {
   
 </script>  </body>    
 </html>
+
+
+Donne moi le logique métier du bouton annuler et supprimer qui ses trouve dans l'historique. Je doute sur ses executions ne sont pas correctes car j'annule une opération mais si je me reconnecte l'opération je le revois même chose pour supprimer et on constate même aussi les montants sont revenues comme si je n'avais pas fait l'annulation ou je n'avais pas supprimer.
+
+Autres peut être parce que je manque save car canceltransaction appel save mais il n'y a rien mais je dois affirmé que toutes les logique pour annuler et supprimer sont correctes, le problème c'est dans la base de données
