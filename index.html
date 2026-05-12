@@ -1002,7 +1002,10 @@ window.showFullHistory = (filter) => {
     let filtered = data.transactions;    
   
     // --- FILTRES ---
-    if(filter === 'ventes') {  
+    if(filter === 'general') {
+    filtered = data.transactions; 
+} 
+    else if(filter === 'ventes') {  
         filtered = data.transactions.filter(t =>   
             normalize(t.typeNom || "").includes("vente") ||   
             normalize(t.desc || "").includes("vente")  
