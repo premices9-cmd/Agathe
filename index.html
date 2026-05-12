@@ -971,16 +971,20 @@ date: new Date().toLocaleString("fr-FR", {
     const newDebt = data.debts[key] || { USD: 0, CDF: 0 };
     t.snapshotDette = { USD: newDebt.USD, CDF: newDebt.CDF };
 
-    data.transactions.unshift({
-        ...t,
-        date: new Date().toLocaleString(),
-        desc: `RÈGLEMENT: ${person.toUpperCase()} (${typeDette}) vers ${operatorName}`,
-        usdCash: totalPaidUSD,
-        cdfCash: totalPaidCDF
-    });
+    const finalEntry = {
+    ...t,
+    timestamp: Date.now(),
+    date: new Date().toLocaleString(),
+    desc: `RÈGLEMENT: ${person.toUpperCase()} (${typeDette}) vers ${operatorName}`,
+    usdCash: totalPaidUSD,
+    cdfCash: totalPaidCDF,
+    typeNom: "REGLEMENT" // Important pour le filtre
+};
 
-    save();
+    data.transactions.unshift(finalEntry);
+    window.save();
     render();
+
     alert("Enregistré avec succès !");
     
     ["payOnUsd_USD", "payOnUsd_CDF", "payOnCdf_USD", "payOnCdf_CDF", "debtPersonName"].forEach(id => {
@@ -1501,7 +1505,6 @@ window.cancelTransaction = (index) => {
     document.getElementById("destAmt").value = result.toFixed(2);    
 };
 
-  
   window.executeGlobalChange = () => {    
     const sIdx = document.getElementById("srcWallet").value;
     const dIdx = document.getElementById("destWallet").value;    
@@ -1538,26 +1541,22 @@ window.cancelTransaction = (index) => {
     }
 
     const t = { 
-        id: Date.now(),
-        date: new Date().toLocaleString(), 
-        // --- MODIFIÉ : On ajoute le taux dans la description ---
-        desc: sIdx === dIdx ? `CHANGE: ${sourceName} (${sc} ➔ ${dc}) @ Taux: ${tUsed}` : `TRANSFERT: ${sourceName} ➔ ${destName} @ Taux: ${tUsed} (${motif})`, 
-        amt: sAmt, 
-        cur: sc, 
-        mode: 'transfert',
-        tauxApplique: tUsed, // Pour mémoire
-        transferDetails: {
-            sIdx, dIdx, sAmt, dAmt, sc, dc, sourceName, destName, appliedRate: tUsed
-        },
-        impacts: {
-            isTransfer: true,
-            source: { idx: sIdx, amt: sAmt, cur: sc },
-            dest: { idx: dIdx, amt: dAmt, cur: dc }
-        }
-    };
+    id: Date.now(),
+    timestamp: Date.now(), // Crucial pour le tri
+    date: new Date().toLocaleString(), 
+    typeNom: "TRANSFERT", // Ajouté pour le filtrage
+    operator: sourceName, 
+    desc: sIdx === dIdx ? `CHANGE: ${sourceName} (${sc} ➔ ${dc})` : `TRANSFERT: ${sourceName} ➔ ${destName} (${motif})`, 
+    amt: sAmt, 
+    cur: sc, 
+    mode: 'transfert',
+    tauxApplique: tUsed,
+    transferDetails: { sIdx, dIdx, sAmt, dAmt, sc, dc, sourceName, destName, appliedRate: tUsed },
+    impacts: { isTransfer: true, source: { idx: sIdx, amt: sAmt, cur: sc }, dest: { idx: dIdx, amt: dAmt, cur: dc } }
+};
 
     data.transactions.unshift(t);    
-    save(); 
+    window.save(); 
     render();
     
     // --- NETTOYAGE COMPLET ---
@@ -2016,3 +2015,4 @@ window.addEventListener('appinstalled', () => {
 </html>
 
 
+EST ce que le code est complet pour que les mouvements d'échanges & transfert ; Règlement de dettes et opérations clients soient tous afficher dans l'historique ?
