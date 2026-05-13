@@ -1,54 +1,57 @@
-// --- CONFIGURATION DU CACHE ---
-// Change ce numéro (v5.3.3 -> v5.3.4) à chaque fois que tu modifies ton index.html
-const CACHE_NAME = 'mka-shop-v5.4.6'; 
-
-const assets = [
+const CACHE_NAME = 'mka-shop-v5.3.0';
+const ASSETS = [
   './',
   './index.html',
-  './icon.png',      
-  './manifest.json'  
+  './manifest.json',
+  './icon.png'
+  // Ajoutez ici vos fichiers CSS ou JS locaux si vous en avez
 ];
 
-// 1. INSTALLATION : Mise en cache des fichiers pour le mode hors-ligne
-self.addEventListener('install', (e) => {
-  e.waitUntil(
+// 1. Installation : Mise en cache des fichiers statiques
+self.addEventListener('install', (event) => {
+  event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('MKA Shop : Mise en cache des ressources (Nouvelle Version)...');
-      return cache.addAll(assets);
+      return cache.addAll(ASSETS);
     })
   );
-  // Force l'activation immédiate sans attendre la fermeture de l'onglet
   self.skipWaiting();
 });
 
-// 2. ACTIVATION : Suppression automatique des anciens caches (Nettoyage)
-self.addEventListener('activate', (e) => {
-  e.waitUntil(
+// 2. Activation : Nettoyage des anciens caches
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
-        keys.map((key) => {
-          if (key !== CACHE_NAME) {
-            console.log('MKA Shop : Suppression de l\'ancienne version du cache :', key);
-            return caches.delete(key);
-          }
-        })
+        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
       );
     })
   );
-  // Prend le contrôle de la page immédiatement
   self.clients.claim();
 });
 
-// 3. STRATÉGIE DE CHARGEMENT : Cache d'abord, puis Réseau
-self.addEventListener('fetch', (e) => {
-  e.respondWith(
-    caches.match(e.request).then((res) => {
-      // Si le fichier est en cache, on le donne, sinon on va sur internet
-      return res || fetch(e.request).catch(() => {
-        console.log("MKA Shop : Mode hors-ligne actif pour cette ressource");
-      });
+// 3. Stratégie de Fetch : Réseau d'abord, Cache sinon
+// Cela permet de toujours tenter d'avoir les données Firebase fraîches
+self.addEventListener('fetch', (event) => {
+  event.respondWith(
+    fetch(event.request).catch(() => {
+      return caches.match(event.request);
     })
   );
 });
 
+// 4. Synchronisation en arrière-plan (Background Sync)
+// S'active quand la connexion revient après une coupure
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'sync-transactions') {
+    event.waitUntil(
+      // Ici, le navigateur tente de relancer les requêtes Firebase en attente
+      console.log("🔄 Synchronisation des données en cours...")
+    );
+  }
+});
 
+// 5. Gestion des notifications (Optionnel pour vos alertes)
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(clients.openWindow('./'));
+});

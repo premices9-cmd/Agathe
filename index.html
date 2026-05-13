@@ -652,8 +652,7 @@ if (t.impacts?.virtuel) {
     }
 }
 
- window.addTransaction = () => {
-
+  window.addTransaction = async () => { // Ajout de async pour la sécurité
     if (!data.config) { alert("Erreur config"); return; }
 
     const opI = document.getElementById("operatorSelect").value;
@@ -668,13 +667,9 @@ if (t.impacts?.virtuel) {
 
     let mode = document.getElementById("payMode").value;
     const modeNorm = normalize(mode || "");
-
     const motif = document.getElementById("motif").value;
     const person = document.getElementById("personName").value.trim();
-    const stkM = parseFloat(
-    (document.getElementById("stkMove").value || "0")
-    .replace(",", ".")
-) || 0;
+    const stkM = parseFloat((document.getElementById("stkMove").value || "0").replace(",", ".")) || 0;
 
     const ty = data.types[tyI];
     const op = data.operators[opI];
@@ -683,12 +678,7 @@ if (t.impacts?.virtuel) {
     const opNorm = normalize(op.name);
     const isDettePrincipal = opNorm.includes("dette");
     const isDepensePrincipal = opNorm.includes("depense");
-
-    const isInterSim = (
-        modeNorm.includes("inter") ||
-        modeNorm.includes("sim") ||
-        modeNorm.includes("virtuel")
-    );
+    const isInterSim = (modeNorm.includes("inter") || modeNorm.includes("sim") || modeNorm.includes("virtuel"));
 
     const t = createTransaction({
         typeNom: ty.name,
@@ -702,61 +692,36 @@ if (t.impacts?.virtuel) {
     });
 
     t.stk = stkM;
-
-    // 🔒 sécurisation
     t.impacts = t.impacts || {};
     t.impacts.operator = t.impacts.operator || { USD:0, CDF:0 };
     t.impacts.caisse = t.impacts.caisse || { USD:0, CDF:0 };
 
-    // =========================
-    // 🔥 IMPACT OPERATOR NORMAL
-    // =========================
+    // ==========================================
+    // VOS CALCULS (CONSERVÉS À 100%)
+    // ==========================================
     if (!isDettePrincipal && !isInterSim) {
         t.impacts.operator.USD = (cur === "USD" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
         t.impacts.operator.CDF = (cur === "CDF" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
     }
 
-    // =========================
-    // 🟥 DETTE PRINCIPAL
-    // =========================
     if (isDettePrincipal) {
-
         t.detteUSD = (cur === "USD") ? amtSIM : 0;
         t.detteCDF = (cur === "CDF") ? amtSIM : 0;
-
         const dirCaisse = parseInt(ty.impC) || 0;
-
-        // 💰 CASH normal
         t.impacts.caisse.USD = (mixUSD * dirCaisse) + commUSD;
         t.impacts.caisse.CDF = (mixCDF * dirCaisse) + commCDF;
     }
-
-    // =========================
-    // 💸 DEPENSE
-    // =========================
     else if (isDepensePrincipal) {
-
         t.isDepense = true;
-
         t.realUSD = (cur === "USD") ? amtSIM : 0;
         t.realCDF = (cur === "CDF") ? amtSIM : 0;
-
-        // ❗ cash sort MAIS commission entre
         t.impacts.caisse.USD = (-mixUSD) + commUSD;
         t.impacts.caisse.CDF = (-mixCDF) + commCDF;
     }
-
-    // =========================
-    // 🔵 INTER-SIM
-    // =========================
     else if (isInterSim) {
-
         const taux = parseFloat(data.taux) || 1;
         const paySimIdx = parseInt(document.getElementById("paySimSelect").value);
-
-        let diffUSD = 0;
-        let diffCDF = 0;
-
+        let diffUSD = 0, diffCDF = 0;
         if (cur === "USD") {
             const totalCash = mixUSD + (mixCDF / taux);
             diffUSD = Math.max(0, amtSIM - totalCash);
@@ -764,120 +729,93 @@ if (t.impacts?.virtuel) {
             const totalCash = mixCDF + (mixUSD * taux);
             diffCDF = Math.max(0, amtSIM - totalCash);
         }
-
-        t.virtualUSD = diffUSD;
-        t.virtualCDF = diffCDF;
-        t.virtualOpIdx = paySimIdx;
-
-        t.detteUSD = 0;
-        t.detteCDF = 0;
-
-        t.impacts.virtuel = {
-            opIdx: paySimIdx,
-            USD: -diffUSD,
-            CDF: -diffCDF
-        };
-
+        t.virtualUSD = diffUSD; t.virtualCDF = diffCDF; t.virtualOpIdx = paySimIdx;
+        t.impacts.virtuel = { opIdx: paySimIdx, USD: -diffUSD, CDF: -diffCDF };
         const dirCaisse = parseInt(ty.impC) || 0;
-
-        // 💰 CASH + COMMISSION AJOUTÉE
         t.impacts.caisse.USD = (mixUSD * dirCaisse) + commUSD;
         t.impacts.caisse.CDF = (mixCDF * dirCaisse) + commCDF;
     }
-
-    // =========================
-    // ⚙️ NORMAL
-    // =========================
     else {
-
         const taux = parseFloat(data.taux) || 1;
-
         const totalCashUSD = mixUSD + (mixCDF / taux);
         const totalCashCDF = mixCDF + (mixUSD * taux);
-
-        if (cur === "USD") {
-            t.detteUSD = Math.max(0, amtSIM - totalCashUSD);
-        } else {
-            t.detteCDF = Math.max(0, amtSIM - totalCashCDF);
-        }
-
+        if (cur === "USD") { t.detteUSD = Math.max(0, amtSIM - totalCashUSD); } 
+        else { t.detteCDF = Math.max(0, amtSIM - totalCashCDF); }
         const dirCaisse = parseInt(ty.impC) || 0;
-
-        // 💰 CASH normal + commission toujours positive
         t.impacts.caisse.USD = (mixUSD * dirCaisse) + commUSD;
         t.impacts.caisse.CDF = (mixCDF * dirCaisse) + commCDF;
     }
 
-    // APPLY
-    applyImpacts(t);
+    // --- SÉCURITÉ : SAUVEGARDE L'ÉTAT AVANT MODIFICATION ---
+    const backupData = JSON.parse(JSON.stringify(data));
 
-    // SNAPSHOT DETTE
-    if (person && t.typeDette) {
-        const key = `${normalize(t.typeDette)}_${normalize(person)}`;
-        const d = data.debts[key] || { USD: 0, CDF: 0 };
-        t.snapshotDette = { USD: d.USD, CDF: d.CDF };
-    }
+    try {
+        // Appliquer localement les changements pour le calcul des dettes
+        applyImpacts(t);
 
-    // HISTORIQUE
-    let simSourceName = "";
-    if (t.impacts?.virtuel) {
-        const sourceOp = data.operators[t.impacts.virtuel.opIdx];
-        simSourceName = sourceOp ? ` [via ${sourceOp.name}]` : "";
-    }
+        if (person && t.typeDette) {
+            const key = `${normalize(t.typeDette)}_${normalize(person)}`;
+            const d = data.debts[key] || { USD: 0, CDF: 0 };
+            t.snapshotDette = { USD: d.USD, CDF: d.CDF };
+        }
+
+        let simSourceName = "";
+        if (t.impacts?.virtuel) {
+            const sourceOp = data.operators[t.impacts.virtuel.opIdx];
+            simSourceName = sourceOp ? ` [via ${sourceOp.name}]` : "";
+        }
 
         const newEntry = {
-        ...t,
-        person,
-        timestamp: Date.now(),
+            ...t,
+            person,
+            timestamp: Date.now(),
+            date: new Date().toLocaleString("fr-FR", {
+                timeZone: "Africa/Kinshasa",
+                year: "numeric", month: "2-digit", day: "2-digit",
+                hour: "2-digit", minute: "2-digit", second: "2-digit"
+            }),
+            desc: `${ty.name} - ${op.name}${simSourceName} (${person ? 'NOM: '+person+' | ' : ''}${motif})`,
+            amtSIM,
+            curSIM: cur,
+            usdCash: mixUSD,
+            cdfCash: mixCDF,
+            commission: { usd: commUSD, cdf: commCDF }
+        };
 
-// 👇 AFFICHAGE LOCAL GOMA
-date: new Date().toLocaleString("fr-FR", {
-    timeZone: "Africa/Kinshasa",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit"
-}),
-        desc: `${ty.name} - ${op.name}${simSourceName} (${person ? 'NOM: '+person+' | ' : ''}${motif})`,
-        amtSIM,
-        curSIM: cur,
-        usdCash: mixUSD,
-        cdfCash: mixCDF,
-        commission: { usd: commUSD, cdf: commCDF }
-    };
+        // Préparer l'objet complet pour Firebase
+        data.transactions.unshift(newEntry);
+        const transObj = {};
+        data.transactions.forEach(tr => { if (tr.timestamp) transObj[tr.timestamp] = tr; });
 
-    // 1. On l'ajoute visuellement tout de suite pour la rapidité
-    data.transactions.unshift(newEntry); 
-    render(); 
+        // --- ENVOI FIREBASE (ATTENTE DU OK) ---
+        await set(ref(db, 'mka_data'), {
+            ...data,
+            transactions: transObj
+        });
 
-    // 2. On l'envoie directement à Firebase
-    ajouterTransaction(newEntry).then(() => {
-        // Optionnel : on peut faire un petit log ou un feedback visuel ici
-        console.log("Synchro Firebase OK");
-    }).catch(err => {
-        // En cas d'erreur, on prévient l'utilisateur
-        alert("Attention : L'opération est affichée mais n'a pas pu être sauvegardée sur internet.");
-    });
+        // --- SI RÉUSSI ---
+        render();
+        console.log("Synchro Firebase réussie ✅");
+        alert("✅ Opération enregistrée et synchronisée !");
 
-    alert("Opération enregistrée !");
-    
-    // 3. Reset des champs
-    const fields = ["amount","mixUSD","mixCDF","commUSD","commCDF","motif","personName","stkMove"];
-    fields.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.value = "";
-    });
+        // Reset des champs
+        ["amount","mixUSD","mixCDF","commUSD","commCDF","motif","personName","stkMove"].forEach(id => {
+            const el = document.getElementById(id); if (el) el.value = "";
+        });
+        ["operatorSelect","typeSelect","currency","payMode"].forEach(id => {
+            const el = document.getElementById(id); if (el) el.selectedIndex = 0;
+        });
 
-    ["operatorSelect","typeSelect","currency","payMode"].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.selectedIndex = 0;
-    });
+    } catch (error) {
+        // --- SI ÉCHEC ---
+        data = backupData; // On annule tout le calcul local
+        console.error("Erreur Firebase ❌:", error);
+        alert("⚠️ ERREUR RÉSEAU : Impossible de sauvegarder. L'opération a été ANNULÉE pour protéger vos soldes.");
+        render();
+    }
 };
 
-
- window.settleAccountV2 = () => {
+ window.settleAccountV2 = async () => {
     const opIdx = document.getElementById("settleOpIdx").value;
     const person = document.getElementById("debtPersonName").value.trim();
     const destIdx = document.getElementById("settleDest").value;
@@ -889,13 +827,11 @@ date: new Date().toLocaleString("fr-FR", {
         return;
     }
 
-    // Récupération des montants saisis dans le formulaire
     const pOnUsd_USD = parseFloat(document.getElementById("payOnUsd_USD").value) || 0;
     const pOnUsd_CDF = parseFloat(document.getElementById("payOnUsd_CDF").value) || 0;
     const pOnCdf_USD = parseFloat(document.getElementById("payOnCdf_USD").value) || 0;
     const pOnCdf_CDF = parseFloat(document.getElementById("payOnCdf_CDF").value) || 0;
 
-    // Cash total reçu (ce qui entre en caisse ou chez l'opérateur)
     const totalPaidUSD = pOnUsd_USD + pOnCdf_USD;
     const totalPaidCDF = pOnUsd_CDF + pOnCdf_CDF;
 
@@ -904,94 +840,108 @@ date: new Date().toLocaleString("fr-FR", {
         return;
     }
 
-    const isMoi = normalize(opDette.name).includes("moi");
-    const typeDette = isMoi ? "dette moi" : "dette client";
-    const key = `${normalize(typeDette)}_${normalize(person)}`;
-    const oldDebt = JSON.parse(JSON.stringify(data.debts[key] || { USD: 0, CDF: 0 }));
+    // --- SÉCURITÉ : BACKUP AVANT CALCUL ---
+    const backupData = JSON.parse(JSON.stringify(data));
 
-    // --- 1. CALCUL DE LA RÉDUCTION POUR LA DETTE USD ---
-    // On convertit les FC payés sur la ligne USD en Dollars
-    const reductionTotaleUSD = pOnUsd_USD + (pOnUsd_CDF / taux);
+    try {
+        const isMoi = normalize(opDette.name).includes("moi");
+        const typeDette = isMoi ? "dette moi" : "dette client";
+        const key = `${normalize(typeDette)}_${normalize(person)}`;
+        const oldDebt = JSON.parse(JSON.stringify(data.debts[key] || { USD: 0, CDF: 0 }));
 
-    // --- 2. CALCUL DE LA RÉDUCTION POUR LA DETTE CDF ---
-    // On convertit les Dollars payés sur la ligne CDF en Francs
-    const reductionTotaleCDF = pOnCdf_CDF + (pOnCdf_USD * taux);
+        const reductionTotaleUSD = pOnUsd_USD + (pOnUsd_CDF / taux);
+        const reductionTotaleCDF = pOnCdf_CDF + (pOnCdf_USD * taux);
 
-    // --- LOGIQUE DE SURPLUS USD ---
-    let redUSD = reductionTotaleUSD;
-    let surplusUSD = 0;
-    if (reductionTotaleUSD > oldDebt.USD) {
-        surplusUSD = reductionTotaleUSD - oldDebt.USD;
-        redUSD = oldDebt.USD;
+        // --- RÉINTÉGRATION LOGIQUE SURPLUS (OMIS PRÉCÉDEMMENT) ---
+        let redUSD = reductionTotaleUSD;
+        let surplusUSD = 0;
+        if (reductionTotaleUSD > oldDebt.USD) {
+            surplusUSD = reductionTotaleUSD - oldDebt.USD;
+            redUSD = oldDebt.USD;
+        }
+
+        let redCDF = reductionTotaleCDF;
+        let surplusCDF = 0;
+        if (reductionTotaleCDF > oldDebt.CDF) {
+            surplusCDF = reductionTotaleCDF - oldDebt.CDF;
+            redCDF = oldDebt.CDF;
+        }
+
+        const operatorName = destIdx === "caisse" ? "CAISSE" : (data.operators[destIdx]?.name || "INCONNU");
+        const direction = isMoi ? -1 : 1;
+
+        const t = createTransaction({
+            typeNom: "REGLEMENT",
+            operator: operatorName,
+            mode: isMoi ? "dette_moi" : "dette_client",
+            amt: totalPaidUSD, 
+            cur: "USD",
+            person,
+            mix: { USD: totalPaidUSD, CDF: totalPaidCDF }
+        });
+
+        t.isReglement = true;
+        t.surplusUSD = surplusUSD; // RÉINTÉGRÉ
+        t.surplusCDF = surplusCDF; // RÉINTÉGRÉ
+        t.isMoi = isMoi;
+        t.payDetail = { // RÉINTÉGRÉ
+            onUsd: { usd: pOnUsd_USD, cdf: pOnUsd_CDF },
+            onCdf: { usd: pOnCdf_USD, cdf: pOnCdf_CDF }
+        };
+        t.debtBefore = oldDebt; 
+
+        t.impacts.dette = { USD: -redUSD, CDF: -redCDF };
+
+        if (destIdx === "caisse") {
+            t.impacts.caisse = { USD: totalPaidUSD * direction, CDF: totalPaidCDF * direction };
+        } else {
+            t.impacts.operator = { USD: totalPaidUSD * direction, CDF: totalPaidCDF * direction };
+        }
+
+        // Application locale pour obtenir le snapshot final
+        applyImpacts(t);
+
+        const newDebt = data.debts[key] || { USD: 0, CDF: 0 };
+        t.snapshotDette = { USD: newDebt.USD, CDF: newDebt.CDF }; // RÉINTÉGRÉ
+
+        const finalEntry = {
+            ...t,
+            timestamp: Date.now(),
+            date: new Date().toLocaleString("fr-FR", { timeZone: "Africa/Kinshasa" }),
+            desc: `RÈGLEMENT: ${person.toUpperCase()} (${typeDette}) vers ${operatorName}`,
+            usdCash: totalPaidUSD,
+            cdfCash: totalPaidCDF,
+            typeNom: "REGLEMENT"
+        };
+
+        data.transactions.unshift(finalEntry);
+
+        // --- ENVOI FIREBASE GLOBAL ---
+        const transObj = {};
+        data.transactions.forEach(tr => { if (tr.timestamp) transObj[tr.timestamp] = tr; });
+        
+        await set(ref(db, 'mka_data'), { 
+            ...data, 
+            transactions: transObj 
+        });
+
+        render();
+        alert("✅ Règlement mémorisé et synchronisé !");
+
+        // Reset
+        ["payOnUsd_USD", "payOnUsd_CDF", "payOnCdf_USD", "payOnCdf_CDF", "debtPersonName"].forEach(id => {
+            const el = document.getElementById(id);
+            if(el) el.value = "";
+        });
+
+    } catch (error) {
+        data = backupData; 
+        console.error("Erreur Sync:", error);
+        alert("❌ ERREUR RÉSEAU : Impossible de valider le règlement sur Firebase.");
+        render();
     }
-
-    // --- LOGIQUE DE SURPLUS CDF ---
-    let redCDF = reductionTotaleCDF;
-    let surplusCDF = 0;
-    if (reductionTotaleCDF > oldDebt.CDF) {
-        surplusCDF = reductionTotaleCDF - oldDebt.CDF;
-        redCDF = oldDebt.CDF;
-    }
-
-    const operatorName = destIdx === "caisse" ? "CAISSE" : (data.operators[destIdx]?.name || "INCONNU");
-    const direction = isMoi ? -1 : 1;
-
-    const t = createTransaction({
-        typeNom: "REGLEMENT",
-        operator: operatorName,
-        mode: isMoi ? "dette_moi" : "dette_client",
-        amt: totalPaidUSD, 
-        cur: "USD",
-        person,
-        mix: { USD: totalPaidUSD, CDF: totalPaidCDF }
-    });
-
-    t.isReglement = true;
-    t.surplusUSD = surplusUSD;
-    t.surplusCDF = surplusCDF;
-    t.isMoi = isMoi;
-    t.payDetail = {
-        onUsd: { usd: pOnUsd_USD, cdf: pOnUsd_CDF },
-        onCdf: { usd: pOnCdf_USD, cdf: pOnCdf_CDF }
-    };
-    t.debtBefore = oldDebt; 
-
-    // Impact Dette : On retire la valeur calculée (convertie)
-    t.impacts.dette = { USD: -redUSD, CDF: -redCDF };
-
-    // Impact Caisse/Opérateur : On enregistre le cash réel reçu
-    if (destIdx === "caisse") {
-        t.impacts.caisse = { USD: totalPaidUSD * direction, CDF: totalPaidCDF * direction };
-    } else {
-        t.impacts.operator = { USD: totalPaidUSD * direction, CDF: totalPaidCDF * direction };
-    }
-
-    applyImpacts(t);
-
-    const newDebt = data.debts[key] || { USD: 0, CDF: 0 };
-    t.snapshotDette = { USD: newDebt.USD, CDF: newDebt.CDF };
-
-    const finalEntry = {
-    ...t,
-    timestamp: Date.now(),
-    date: new Date().toLocaleString(),
-    desc: `RÈGLEMENT: ${person.toUpperCase()} (${typeDette}) vers ${operatorName}`,
-    usdCash: totalPaidUSD,
-    cdfCash: totalPaidCDF,
-    typeNom: "REGLEMENT" // Important pour le filtre
 };
 
-    data.transactions.unshift(finalEntry);
-    window.save();
-    render();
-
-    alert("Enregistré avec succès !");
-    
-    ["payOnUsd_USD", "payOnUsd_CDF", "payOnCdf_USD", "payOnCdf_CDF", "debtPersonName"].forEach(id => {
-        const el = document.getElementById(id);
-        if(el) el.value = "";
-    });
-};
 
     // RESTAURATION DE LA LOGIQUE D'HISTORIQUE PAR MOTS-CLÉS 
 window.showFullHistory = (filter) => {     
@@ -1505,7 +1455,7 @@ window.cancelTransaction = (index) => {
     document.getElementById("destAmt").value = result.toFixed(2);    
 };
 
-  window.executeGlobalChange = () => {    
+  window.executeGlobalChange = async () => { // Ajout de async
     const sIdx = document.getElementById("srcWallet").value;
     const dIdx = document.getElementById("destWallet").value;    
     const sAmt = parseFloat(document.getElementById("srcAmt").value) || 0;
@@ -1513,59 +1463,63 @@ window.cancelTransaction = (index) => {
     const sc = document.getElementById("srcCurr").value;
     const dc = document.getElementById("destCurr").value;
     const motif = document.getElementById("transferMotif").value || "Change/Transfert";
-    
-    // --- NOUVEAU : On récupère le taux utilisé pour l'historique ---
     const tUsed = parseFloat(document.getElementById("transferRate").value) || parseFloat(data.taux);
 
-    // --- SÉCURITÉ ---
     if (!sAmt || (sIdx === dIdx && sc === dc)) {
         alert("Action impossible : vérifiez le montant ou les devises.");
         return;
     }
 
-    const sourceName = sIdx === "caisse" ? "Caisse" : data.operators[sIdx].name;
-    const destName = dIdx === "caisse" ? "Caisse" : data.operators[dIdx].name;
+    // --- SAUVEGARDE POUR SÉCURITÉ ---
+    const backupData = JSON.parse(JSON.stringify(data));
 
-    // Retrait de la source
-    if(sIdx === "caisse") {
-        data.caisse[sc] -= sAmt; 
-    } else {
-        data.operators[sIdx][sc] -= sAmt;
+    try {
+        const sourceName = sIdx === "caisse" ? "Caisse" : data.operators[sIdx].name;
+        const destName = dIdx === "caisse" ? "Caisse" : data.operators[dIdx].name;
+
+        // Mise à jour locale
+        if(sIdx === "caisse") data.caisse[sc] -= sAmt; 
+        else data.operators[sIdx][sc] -= sAmt;
+
+        if(dIdx === "caisse") data.caisse[dc] += dAmt; 
+        else data.operators[dIdx][dc] += dAmt;
+
+        const t = { 
+            id: Date.now(),
+            timestamp: Date.now(),
+            date: new Date().toLocaleString("fr-FR", { timeZone: "Africa/Kinshasa" }), 
+            typeNom: "TRANSFERT",
+            operator: sourceName, 
+            desc: sIdx === dIdx ? `CHANGE: ${sourceName} (${sc} ➔ ${dc})` : `TRANSFERT: ${sourceName} ➔ ${destName} (${motif})`, 
+            amt: sAmt, 
+            cur: sc, 
+            mode: 'transfert',
+            tauxApplique: tUsed,
+            transferDetails: { sIdx, dIdx, sAmt, dAmt, sc, dc, sourceName, destName, appliedRate: tUsed },
+            impacts: { isTransfer: true, source: { idx: sIdx, amt: sAmt, cur: sc }, dest: { idx: dIdx, amt: dAmt, cur: dc } }
+        };
+
+        data.transactions.unshift(t);
+
+        // --- ENVOI FIREBASE FORCÉ ---
+        const transObj = {};
+        data.transactions.forEach(tr => { if (tr.timestamp) transObj[tr.timestamp] = tr; });
+        
+        await set(ref(db, 'mka_data'), { ...data, transactions: transObj });
+
+        render();
+        alert("✅ Transfert/Change synchronisé !");
+
+        document.getElementById("srcAmt").value = "";
+        document.getElementById("destAmt").value = "";
+        document.getElementById("transferRate").value = "";
+        document.getElementById("transferMotif").value = "";
+
+    } catch (error) {
+        data = backupData; // Annulation locale
+        alert("❌ ÉCHEC FIREBASE : Le transfert a été annulé car la connexion est instable.");
+        render();
     }
-
-    // Ajout à la destination
-    if(dIdx === "caisse") {
-        data.caisse[dc] += dAmt; 
-    } else {
-        data.operators[dIdx][dc] += dAmt;
-    }
-
-    const t = { 
-    id: Date.now(),
-    timestamp: Date.now(), // Crucial pour le tri
-    date: new Date().toLocaleString(), 
-    typeNom: "TRANSFERT", // Ajouté pour le filtrage
-    operator: sourceName, 
-    desc: sIdx === dIdx ? `CHANGE: ${sourceName} (${sc} ➔ ${dc})` : `TRANSFERT: ${sourceName} ➔ ${destName} (${motif})`, 
-    amt: sAmt, 
-    cur: sc, 
-    mode: 'transfert',
-    tauxApplique: tUsed,
-    transferDetails: { sIdx, dIdx, sAmt, dAmt, sc, dc, sourceName, destName, appliedRate: tUsed },
-    impacts: { isTransfer: true, source: { idx: sIdx, amt: sAmt, cur: sc }, dest: { idx: dIdx, amt: dAmt, cur: dc } }
-};
-
-    data.transactions.unshift(t);    
-    window.save(); 
-    render();
-    
-    // --- NETTOYAGE COMPLET ---
-    document.getElementById("srcAmt").value = "";
-    document.getElementById("destAmt").value = "";
-    document.getElementById("transferRate").value = ""; // ON VIDE LE TAUX AUSSI
-    document.getElementById("transferMotif").value = "";
-    
-    alert(sIdx === dIdx ? "Change effectué avec succès ✅" : "Transfert effectué ✅");
 };
 
   
