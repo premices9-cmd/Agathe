@@ -1644,22 +1644,68 @@ window.cancelTransaction = (index) => {
     }
 };
     
-    // Fonction pour envoyer un rappel de dette impayée
-window.sendWhatsAppReminder = (person, usd, cdf) => {
-    const message = `Bonjour *${person}*, c'est MKA SHOP. Nous vous envoyons ce petit rappel concernant votre dette en cours qui s'élève à *${usd}$* et *${cdf} FC*. Merci de passer au bureau pour régulariser. Bonne journée !`;
+    window.sendWhatsAppTrustMessage = (person, montantAjouteUsd, montantAjouteCdf, totalUsd, totalCdf) => {
+    const filter = document.querySelector(".nav-hist button.active")?.id;
+    const estDetteMoi = (filter === "btn-h-dette_moi");
+
+    let message = "";
+
+    if (estDetteMoi) {
+        // Message pour celui qui vous prête (Prêteur/Fournisseur/Ami)
+        message = `*MKA SHOP - MESSAGE DE GRATITUDE*\n\n` +
+                  `Je tiens à vous remercier sincèrement pour la confiance renouvelée en m'accordant ce complément de *${montantAjouteUsd}$ / ${montantAjouteCdf} FC*.\n` +
+                  `Ceci porte mon engagement total envers vous à *${totalUsd}$* et *${totalCdf} FC*. Votre soutien est précieux pour mes activités. Merci encore.`;
+    } else {
+        // Message pour le Client à qui vous accordez plus de crédit
+        message = `*MKA SHOP - GESTE DE CONFIANCE*\n\n` +
+                  `Cher(e) client(e) *${person}*, nous avons bien enregistré l'ajout de *${montantAjouteUsd}$ / ${montantAjouteCdf} FC* à votre compte.\n` +
+                  `Normalement, nous n'augmentons pas le crédit non soldé, mais nous le faisons pour vous par *CONFIANCE* en votre parole.\n` +
+                  `Votre nouveau solde total est de : *${totalUsd}$* et *${totalCdf} FC*. Merci pour votre honnêteté habituelle.`;
+    }
+
     const encodedMsg = encodeURIComponent(message);
     window.open(`https://wa.me/?text=${encodedMsg}`, '_blank');
 };
 
-// Fonction pour envoyer un reçu de règlement
-window.sendWhatsAppReceipt = (person, usdPaye, cdfPaye, resteUsd, resteCdf) => {
-    const estSolde = (resteUsd <= 0.1 && resteCdf <= 100);
-    let message = `*MKA SHOP - REÇU DE PAIEMENT*\n\nMerci *${person}* pour votre règlement de *${usdPaye}$* et *${cdfPaye} FC*.\n`;
-    
-    if (estSolde) {
-        message += `✅ Votre compte est maintenant *COMPLÈTEMENT SOLDÉ*. Merci de votre fidélité !`;
+    window.sendWhatsAppReminder = (person, usd, cdf) => {
+    const filter = document.querySelector(".nav-hist button.active")?.id;
+    const estDetteMoi = (filter === "btn-h-dette_moi");
+
+    let message = "";
+
+    if (estDetteMoi) {
+        // Message général pour celui à qui vous devez (Respectueux et rassurant)
+        message = `Bonjour, c'est *MKA SHOP*. Je vous contacte pour vous rassurer concernant mon solde de *${usd}$ / ${cdf} FC*. Soyez certain que je mets tout en œuvre pour vous honorer. Merci encore pour votre confiance à mon égard.`;
     } else {
-        message += `📈 Reste à payer : *${resteUsd}$* et *${resteCdf} FC*.`;
+        // Message pour le client (Relance polie)
+        message = `Bonjour cher(e) client(e) *${person}*, c'est *MKA SHOP*. Nous vous envoyons ce petit rappel concernant votre solde de *${usd}$* et *${cdf} FC*. Nous comptons sur votre passage habituel pour la régularisation. Merci de votre confiance.`;
+    }
+
+    const encodedMsg = encodeURIComponent(message);
+    window.open(`https://wa.me/?text=${encodedMsg}`, '_blank');
+};
+
+    window.sendWhatsAppReceipt = (person, usdPaye, cdfPaye, resteUsd, resteCdf) => {
+    const estSolde = (resteUsd <= 0.1 && resteCdf <= 100);
+    const filter = document.querySelector(".nav-hist button.active")?.id;
+    const estDetteMoi = (filter === "btn-h-dette_moi");
+    
+    let message = `*MKA SHOP - SUIVI DE PAIEMENT*\n\n`;
+
+    if (estDetteMoi) {
+        message += `Je viens de verser *${usdPaye}$* et *${cdfPaye} FC* sur ma dette.\n`;
+        if (estSolde) {
+            message += `✅ La dette est maintenant *TOTALEMENT SOLDÉE*. Merci pour votre confiance !`;
+        } else {
+            message += `📉 Solde restant à vous payer : *${resteUsd}$* et *${resteCdf} FC*.`;
+        }
+    } else {
+        message += `Cher(e) client(e) *${person}*, nous confirmons la réception de votre versement de *${usdPaye}$* et *${cdfPaye} FC*.\n`;
+        if (estSolde) {
+            message += `✅ Votre compte est maintenant *SOLDÉ*. Merci pour votre fidélité !`;
+        } else {
+            message += `📉 Votre solde restant est de : *${resteUsd}$* et *${resteCdf} FC*.`;
+        }
     }
     
     const encodedMsg = encodeURIComponent(message);
