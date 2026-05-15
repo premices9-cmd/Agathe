@@ -158,7 +158,8 @@
         <button type="button" onclick="document.getElementById('opTaux').value = data.taux" style="width:45px; background:#64748b; font-size:10px;">DEFAUT</button>
         </div>
     </div>
-       <input type="number" id="stkMove" step="any" placeholder="Stock (+/-)">
+       <input type="number" id="stkMove" step="any" inputmode="decimal" placeholder="Stock (+/-)">
+
     
     <select id="currency" style="margin-bottom: 10px;"><option value="USD">USD</option><option value="CDF">CDF</option></select>    
 
@@ -252,7 +253,8 @@
                </div>    
     
                <div class="grid-2" style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:10px;">    
-                  <input type="number" id="initStock" placeholder="Stock SIM initial" step="any" style="padding:8px; border:1px solid #ccc; border-radius:4px;">    
+                  <input type="number" id="initStock" placeholder="Stock SIM initial" step="any" inputmode="decimal" style="padding:8px; border:1px solid #ccc; border-radius:4px;">
+    
                   <input type="number" id="initPrice" placeholder="Prix Achat SIM $" step="any" style="padding:8px; border:1px solid #ccc; border-radius:4px;">    
                </div>    
     
@@ -560,7 +562,7 @@ const save = window.save;
         data.caisse.CDF += (t.impacts.caisse.CDF || 0) * factor;
     }
 
-    // =========================
+        // =========================
     // 2. OPÉRATEUR
     // =========================
     let op = data.operators.find(o => o.name === t.operator);
@@ -571,10 +573,14 @@ const save = window.save;
         op.CDF += (t.impacts.operator.CDF || 0) * factor;
 
         if (t.stk) {
+            // Utilise parseFloat pour accepter les virgules/points et additionner correctement
             op.stock = (parseFloat(op.stock) || 0) + (parseFloat(t.stk) * factor);
+            
+            // On arrondit à 2 décimales pour éviter les erreurs de calcul (ex: 1.1 + 0.2 = 1.3000000004)
             op.stock = Math.round(op.stock * 100) / 100;
         }
     }
+
 // =========================
 // 🔵 INTER-SIM (ANNULATION PARFAITE FIX)
 // =========================
@@ -669,7 +675,7 @@ if (t.impacts?.virtuel) {
     const modeNorm = normalize(mode || "");
     const motif = document.getElementById("motif").value;
     const person = document.getElementById("personName").value.trim();
-    const stkM = parseFloat((document.getElementById("stkMove").value || "0").replace(",", ".")) || 0;
+    const stkM = parseFloat(String(document.getElementById("stkMove").value || "0").replace(",", ".")) || 0;
 
     const ty = data.types[tyI];
     const op = data.operators[opI];
@@ -1062,6 +1068,17 @@ if (t.isReglement) {
     const sCDF = parseFloat(t.surplusCDF || 0);
     const labelSurplus = t.isMoi ? "PERTE" : "INTÉRÊT";
 
+    // --- LOGIQUE BOUTON REÇU WHATSAPP ---
+    const pUSD = t.usdCash || 0;
+    const pCDF = t.cdfCash || 0;
+    const rUSD = a.USD;
+    const rCDF = a.CDF;
+
+    const receiptButton = `<button onclick="sendWhatsAppReceipt('${t.person.replace(/'/g, "\\'")}', ${pUSD}, ${pCDF}, ${rUSD}, ${rCDF})" 
+                            style="background:#25D366; color:white; border:none; padding:4px 8px; border-radius:6px; font-size:9px; margin-top:5px; cursor:pointer; width:100%; font-weight:bold;">
+                            ✉️ Envoyer Reçu
+                           </button>`;
+
     return `
     <div style="background:#fff7ed; border-radius:16px; padding:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); border-left:5px solid #eab308; margin-bottom:12px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
@@ -1113,10 +1130,13 @@ if (t.isReglement) {
                             </div>` : ''
                         }
                     </div>` : 
-                    `<div style="font-size:9px; color:#64748b; font-weight:bold;">RESTE</div>
-                     <div style="font-weight:bold; font-size:13px; color:#dc2626;">${fmt(a.USD)}$</div>
-                     <div style="font-size:11px; color:#dc2626;">${fmt(a.CDF)} FC</div>`
+                    `<div>
+                        <div style="font-size:9px; color:#64748b; font-weight:bold;">RESTE</div>
+                        <div style="font-weight:bold; font-size:13px; color:#dc2626;">${fmt(a.USD)}$</div>
+                        <div style="font-size:11px; color:#dc2626;">${fmt(a.CDF)} FC</div>
+                    </div>`
                 }
+                ${receiptButton}
             </div>
         </div>
 
@@ -1124,40 +1144,41 @@ if (t.isReglement) {
     </div>`;
 }
 
-        // --- 3. DESIGN SPÉCIAL POUR LES DÉPENSES ---
-        if (t.mode === 'depense' || t.isDepense || normalize(desc).includes("depense")) {
-            let stockDisplay = "";
-            const qteStock = parseFloat(t.stk || (t.impacts && t.impacts.stock) || 0);
-            if(qteStock !== 0) {
-                const sColor = qteStock > 0 ? "#16a34a" : "#ef4444";
-                const sSign = qteStock > 0 ? "+" : "";
-                stockDisplay = `<div style="color:${sColor}; font-weight:bold; font-size:10px; margin-top:2px;">Stock: ${sSign}${fmt(qteStock)}</div>`;
-            }
+// --- 3. DESIGN SPÉCIAL POUR LES DÉPENSES ---
+if (t.mode === 'depense' || t.isDepense || normalize(desc).includes("depense")) {
+    let stockDisplay = "";
+    const qteStock = parseFloat(t.stk || (t.impacts && t.impacts.stock) || 0);
+    if(qteStock !== 0) {
+        const sColor = qteStock > 0 ? "#16a34a" : "#ef4444";
+        const sSign = qteStock > 0 ? "+" : "";
+        stockDisplay = `<div style="color:${sColor}; font-weight:bold; font-size:10px; margin-top:2px;">Stock: ${sSign}${fmt(qteStock)}</div>`;
+    }
 
-            return `
-            <div style="background:#fef2f2; border-radius:16px; padding:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); border-left:5px solid #ef4444;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                    <span style="font-size:11px; color:#64748b;">${t.date}</span>
-                    <span style="font-weight:bold; color:#b91c1c; font-size:12px;">🚫 SORTIE / DÉPENSE</span>
-                    ${isAdmin ? `
-                    <div style="display:flex; gap:5px;">
-                        <button onclick="cancelTransaction(${realIdx})" style="background:#f59e0b;color:#fff;border:none;padding:4px 8px;border-radius:6px;font-size:10px;cursor:pointer;">↩ Annuler</button>
-                        <button onclick="deleteTransaction(${realIdx})" style="background:#ef4444;color:#fff;border:none;padding:4px 8px;border-radius:6px;font-size:10px;cursor:pointer;">Suppr</button>
-                    </div>` : ""}
-                </div>
-                <div style="display:flex; justify-content:space-between; align-items:center; background:white; padding:10px; border-radius:10px;">
-                    <div>
-                        <div style="font-weight:bold; font-size:13px; color:#1e293b;">${t.operator || "-"}</div>
-                        <div style="font-size:11px; color:#64748b;">${desc}</div>
-                        ${stockDisplay}
-                    </div>
-                    <div style="text-align:right;">
-                        <div style="font-size:16px; font-weight:bold; color:#ef4444;">-${fmt(t.amtSIM || t.amt)} ${t.curSIM || t.cur}</div>
-                        <div style="font-size:10px; color:#94a3b8;">Cash: ${fmt(t.usdCash || 0)}$ | ${fmt(t.cdfCash || 0)}FC</div>
-                    </div>
-                </div>
-            </div>`;
-        }
+    return `
+    <div style="background:#fef2f2; border-radius:16px; padding:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); border-left:5px solid #ef4444;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <span style="font-size:11px; color:#64748b;">${t.date}</span>
+            <span style="font-weight:bold; color:#b91c1c; font-size:12px;">🚫 SORTIE / DÉPENSE</span>
+            ${isAdmin ? `
+            <div style="display:flex; gap:5px;">
+                <button onclick="cancelTransaction(${realIdx})" style="background:#f59e0b;color:#fff;border:none;padding:4px 8px;border-radius:6px;font-size:10px;cursor:pointer;">↩ Annuler</button>
+                <button onclick="deleteTransaction(${realIdx})" style="background:#ef4444;color:#fff;border:none;padding:4px 8px;border-radius:6px;font-size:10px;cursor:pointer;">Suppr</button>
+            </div>` : ""}
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; background:white; padding:10px; border-radius:10px;">
+            <div>
+                <div style="font-weight:bold; font-size:13px; color:#1e293b;">${t.operator || "-"}</div>
+                <div style="font-size:11px; color:#64748b;">${desc}</div>
+                ${stockDisplay}
+            </div>
+            <div style="text-align:right;">
+                <div style="font-size:16px; font-weight:bold; color:#ef4444;">-${fmt(t.amtSIM || t.amt)} ${t.curSIM || t.cur}</div>
+                <div style="font-size:10px; color:#94a3b8;">Cash: ${fmt(t.usdCash || 0)}$ | ${fmt(t.cdfCash || 0)}FC</div>
+            </div>
+        </div>
+    </div>`;
+}
+
 
         // --- 4. DESIGN CLASSIQUE (VENTES, DEPOTS, RETRAITS, DETTES) ---
         const parts = desc.split("-");  
@@ -1173,15 +1194,15 @@ if (t.isReglement) {
   
         let finalPerson = t.person || "";
 
-// 🔥 SÉCURISATION MAX : toujours récupérer depuis source fiable
-if (!finalPerson && t.desc && t.desc.includes("NOM:")) {
-    finalPerson = t.desc.split("NOM:")[1].split("|")[0].trim();
-}
+        // 🔥 SÉCURISATION MAX : toujours récupérer depuis source fiable
+        if (!finalPerson && t.desc && t.desc.includes("NOM:")) {
+            finalPerson = t.desc.split("NOM:")[1].split("|")[0].trim();
+        }
 
-// 🔥 DERNIER RECOURS
-if (!finalPerson && t.payDetail && t.person) {
-    finalPerson = t.person;
-}
+        // 🔥 DERNIER RECOURS
+        if (!finalPerson && t.payDetail && t.person) {
+            finalPerson = t.person;
+        }
   
         let isOpDette = normalize(t.operator || "").includes("dette");
 
@@ -1193,44 +1214,51 @@ if (!finalPerson && t.payDetail && t.person) {
              isOpDette ||
              normalize(desc || "").includes("creance") ||
              normalize(type || "").includes("dette")
-);
+        );
 
-        // --- Remplace l'ancien bloc de calcul du reste par celui-ci ---
+        // --- CALCUL DU RESTE ET COULEUR ---
+        let resteTxt = "✔ Cash"; 
+        let resteColor = "#16a34a";  
 
-         let resteTxt = "✔ Cash"; 
-         let resteColor = "#16a34a";  
+        if (t.snapshotDette) {
+            const duUSD = t.snapshotDette.USD;
+            const duCDF = t.snapshotDette.CDF;
+            const isCleared = Math.abs(duUSD) < 0.1 && Math.abs(duCDF) < 100;
 
-// 1. On vérifie si la transaction a une "photo" du solde (Snapshot)
-if (t.snapshotDette) {
-    const duUSD = t.snapshotDette.USD;
-    const duCDF = t.snapshotDette.CDF;
-    
-    // On considère que c'est payé si le reste est insignifiant
-    const isCleared = Math.abs(duUSD) < 0.1 && Math.abs(duCDF) < 100;
+            if (isCleared) {
+                resteTxt = "✔ SOLDÉ"; 
+                resteColor = "#16a34a";
+            } else {
+                resteTxt = `Reste: ${fmt(duUSD)}$ | ${fmt(duCDF)}FC`;
+                resteColor = "#dc2626"; 
+            }
+        } 
+        else if (t.person && (t.mode?.includes("dette") || t.typeDette)) {
+            resteTxt = "Ancienne dette";
+            resteColor = "#6b7280";
+        }
+        else if (finalPerson && isModeDette) {  
+            const typeDette = (t.mode === "dette_moi" || (t.typeDette && t.typeDette.includes("moi"))) ? "dette moi" : "dette client";
+            const debtKey = `${normalize(typeDette)}_${normalize(finalPerson)}`;  
+            const currentDebt = data.debts[debtKey] || { USD: 0, CDF: 0 };
+            
+            resteTxt = `Reste: ${fmt(currentDebt.USD)}$ | ${fmt(currentDebt.CDF)}FC`;
+            resteColor = "#dc2626"; 
+        }
 
-    if (isCleared) {
-        resteTxt = "✔ SOLDÉ"; 
-        resteColor = "#16a34a";
-    } else {
-        resteTxt = `Reste: ${fmt(duUSD)}$ | ${fmt(duCDF)}FC`;
-        resteColor = "#dc2626"; 
-    }
-} 
-// 2. Sécurité pour les ANCIENNES transactions (avant la mise à jour)
-else if (t.person && (t.mode?.includes("dette") || t.typeDette)) {
-    resteTxt = "Ancienne dette";
-    resteColor = "#6b7280"; // Gris pour les données historiques non capturées
-}
-
-// Si c'est une ancienne transaction sans snapshot, on garde l'ancien calcul par défaut
-else if (finalPerson && isModeDette) {  
-    const typeDette = (t.mode === "dette_moi" || (t.typeDette && t.typeDette.includes("moi"))) ? "dette moi" : "dette client";
-    const debtKey = `${normalize(typeDette)}_${normalize(finalPerson)}`;  
-    const currentDebt = data.debts[debtKey] || { USD: 0, CDF: 0 };
-    
-    resteTxt = `Reste: ${fmt(currentDebt.USD)}$ | ${fmt(currentDebt.CDF)}FC`;
-    resteColor = "#dc2626"; 
-}
+        // --- INTEGRATION BOUTON WHATSAPP RAPPEL ---
+        let waButton = "";
+        if (isModeDette && finalPerson && (t.snapshotDette || t.ancienneDette)) {
+            const rUSD = t.snapshotDette ? t.snapshotDette.USD : 0;
+            const rCDF = t.snapshotDette ? t.snapshotDette.CDF : 0;
+            
+            if (rUSD > 0.1 || rCDF > 100) {
+                waButton = `<button onclick="sendWhatsAppReminder('${finalPerson.replace(/'/g, "\\'")}', ${rUSD}, ${rCDF})" 
+                            style="background:#25D366; color:white; border:none; padding:4px 8px; border-radius:6px; font-size:10px; margin-top:5px; cursor:pointer; font-weight:bold;">
+                            📱 Rappel WhatsApp
+                            </button>`;
+            }
+        }
 
         let stockDisplay = "";
         const qteStock = parseFloat(t.stk || (t.impacts && t.impacts.stock) || 0);
@@ -1246,149 +1274,98 @@ else if (finalPerson && isModeDette) {
         else if(normalize(type).includes("vente")) icon = "🛒";  
         else if(isModeDette) icon = "📝";
 
-// --- 1. CALCULS DES COMMISSIONS ---
-const cUSD = (t.commission && t.commission.usd) ? t.commission.usd : 0;
-const cCDF = (t.commission && t.commission.cdf) ? t.commission.cdf : 0;
+        const cUSD = (t.commission && t.commission.usd) ? t.commission.usd : 0;
+        const cCDF = (t.commission && t.commission.cdf) ? t.commission.cdf : 0;
 
-// --- 2. DÉTECTION SOURCE SIM ---
-let simSourceName = "";
-if (t.impacts && t.impacts.virtuel && t.impacts.virtuel.opIdx !== null) {
-    const sourceOp = data.operators[t.impacts.virtuel.opIdx];
-    simSourceName = sourceOp ? ` (via ${sourceOp.name})` : " (SIM inconnue)";
-}
+        let simSourceName = "";
+        if (t.impacts && t.impacts.virtuel && t.impacts.virtuel.opIdx !== null) {
+            const sourceOp = data.operators[t.impacts.virtuel.opIdx];
+            simSourceName = sourceOp ? ` (via ${sourceOp.name})` : " (SIM inconnue)";
+        }
 
-// --- 3. NORMALISATION DU MODE (CORRECTION PRINCIPALE) ---
-let rawMode = normalize(t.mode || "");
+        let rawMode = normalize(t.mode || "");
+        if (rawMode.includes("credit")) rawMode = "dette_client";
+        if (!rawMode || rawMode === "-") {
+            if ((t.usdCash || 0) > 0 || (t.cdfCash || 0) > 0) rawMode = "cash";
+            else if (t.impacts && t.impacts.virtuel) rawMode = "virtuel";
+            else if (isModeDette) rawMode = "dette_client";
+            else rawMode = "cash";
+        }
 
-// 🔥 1. SUPPRESSION DÉFINITIVE "CRÉDIT PUR"
-if (rawMode.includes("credit")) {
-    rawMode = "dette_client";
-}
+        const modeLabel = {
+            "cash": "💵 CASH",
+            "virtuel": `📱 INTER-SIM${simSourceName}`,
+            "depense": "🚫 DÉPENSE",
+            "dette_client": "📝 DETTE CLIENT",
+            "dette_moi": "📝 DETTE MOI",
+            "transfert": "🔄 TRANSFERT"
+        };
 
-// 🔥 2. DÉTECTION AUTOMATIQUE SI MODE VIDE OU MAL FORMÉ
-if (!rawMode || rawMode === "-") {
+        let displayMode = modeLabel[rawMode] || "❓ MODE INCONNU";
+        const badgeColor = isModeDette ? "#ef4444" : "#475569"; 
 
-    // 💵 CAS CASH
-    if ((t.usdCash || 0) > 0 || (t.cdfCash || 0) > 0) {
-        rawMode = "cash";
-    }
+        let finalCashDisplay = `<div style="color:${badgeColor}; font-size:10px; font-weight:bold; background:#f1f5f9; padding:4px 8px; border-radius:6px; display:inline-block; border:1px solid ${badgeColor}44; text-transform: uppercase;">${displayMode}</div>`;
 
-    // 📱 CAS SIM / VIRTUEL
-    else if (t.impacts && t.impacts.virtuel) {
-        rawMode = "virtuel";
-    }
+        if (t.usdCash > 0 || t.cdfCash > 0) {
+            finalCashDisplay += `<div style="color:#16a34a; font-size:10px; font-weight:700;">CASH: ${fmt(t.usdCash || 0)}$ | ${fmt(t.cdfCash || 0)}FC</div>`;
+        }
+        if (t.mode === "virtuel") {
+            finalCashDisplay += `<div style="color:#64748b; font-size:9px; font-style:italic;">Via SIM</div>`;
+        }
 
-    // 🧾 CAS DETTE
-    else if (isModeDette) {
-        rawMode = "dette_client";
-    }
+        // --- 5. RETURN FINAL ---
+        return `  
+        <div style="background:#ffffff; border-radius:16px; padding:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); border-left:5px solid ${isModeDette ? '#f59e0b' : '#0ea5e9'};">  
 
-    // 🔄 FALLBACK
-    else {
-        rawMode = "cash";
-    }
-}
+            ${isAdmin ? `  
+            <div style="display:flex; gap:6px; justify-content:flex-end; margin-bottom: 5px;">  
+                <button onclick="cancelTransaction(${realIdx})" style="background:#f59e0b;color:#fff;border:none;padding:5px 10px;border-radius:8px;font-size:10px;cursor:pointer;">↩ Annuler</button>  
+                <button onclick="deleteTransaction(${realIdx})" style="background:#ef4444;color:#fff;border:none;padding:5px 10px;border-radius:8px;font-size:10px;cursor:pointer;">Suppr</button>  
+            </div>` : ""}  
 
-// 🔥 3. LABELS PROPRES
-const modeLabel = {
-    "cash": "💵 CASH",
-    "virtuel": `📱 INTER-SIM${simSourceName}`,
-    "depense": "🚫 DÉPENSE",
-    "dette_client": "📝 DETTE CLIENT",
-    "dette_moi": "📝 DETTE MOI",
-    "transfert": "🔄 TRANSFERT"
-};
+            <div style="display:grid; grid-template-columns: 1.2fr 1fr 1fr 1.6fr 1.5fr 1fr; gap:6px; align-items:center; font-size:12px;">  
 
-let displayMode = modeLabel[rawMode] || "❓ MODE INCONNU";
+                <div style="color:#64748b;">${t.date}</div>  
 
-let finalCashDisplay = ""; 
+                <div style="font-weight:bold; color:#1e293b;">
+                    ${t.operator || opNameFromDesc}
+                </div>  
 
-// 🔥 PRIORITÉ : toujours afficher le MODE utilisé
-const badgeColor = isModeDette ? "#ef4444" : "#475569"; 
+                <div style="background:#f1f5f9; padding:3px 6px; border-radius:6px; text-align:center; font-size:10px; border:1px solid #e2e8f0;">  
+                    ${icon} ${type || "-"} ${stockDisplay} 
+                </div>  
 
-finalCashDisplay = `<div style="
-    color:${badgeColor}; 
-    font-size:10px; 
-    font-weight:bold; 
-    background:#f1f5f9; 
-    padding:4px 8px; 
-    border-radius:6px; 
-    display:inline-block; 
-    border:1px solid ${badgeColor}44; 
-    text-transform: uppercase;">
-    ${displayMode}
-</div>`;
+                <div style="color:#475569; font-weight:500;">
+                    ${motif || "-"}
+                </div>  
+                
+                <div style="line-height:1.3;">  
+                    <div style="font-weight:bold; color:#0f172a;">
+                        SIM: ${fmt(t.amtSIM || t.amt)} ${t.curSIM || t.cur}
+                    </div>
+                
+                    <div style="font-size:9px; color:#64748b; font-style:italic;">
+                        Taux: ${t.tauxApplique || data.taux} FC
+                    </div>
 
-// 🔥 SI cash existe → on ajoute en PLUS (pas remplacer)
-if (t.usdCash > 0 || t.cdfCash > 0) {
-    finalCashDisplay += `<div style="color:#16a34a; font-size:10px; font-weight:700;">
-        CASH: ${fmt(t.usdCash || 0)}$ | ${fmt(t.cdfCash || 0)}FC
-    </div>`;
-}
+                    ${finalCashDisplay}
 
-// 🔥 SI virtuel → info en plus
-if (t.mode === "virtuel") {
-    finalCashDisplay += `<div style="color:#64748b; font-size:9px; font-style:italic;">
-        Via SIM
-    </div>`;
-}
+                    ${(cUSD > 0 || cCDF > 0) ? 
+                        `<div style="color:#0ea5e9; font-size:10px; font-weight:bold; background:#f0f9ff; border-radius:4px; padding:1px 3px;">
+                            + COM: ${fmt(cUSD)}$ | ${fmt(cCDF)}FC
+                        </div>` 
+                        : ""
+                    }
+                </div>  
 
-// --- 5. RETURN FINAL ---
-return `  
-<div style="background:#ffffff; border-radius:16px; padding:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); border-left:5px solid ${isModeDette ? '#f59e0b' : '#0ea5e9'};">  
+                <div style="font-weight:800; color:${resteColor}; text-align:right; font-size:11px;">
+                    ${resteTxt}
+                    <br>${waButton}
+                </div>  
 
-    ${isAdmin ? `  
-    <div style="display:flex; gap:6px; justify-content:flex-end; margin-bottom: 5px;">  
-        <button onclick="cancelTransaction(${realIdx})" style="background:#f59e0b;color:#fff;border:none;padding:5px 10px;border-radius:8px;font-size:10px;cursor:pointer;">↩ Annuler</button>  
-        <button onclick="deleteTransaction(${realIdx})" style="background:#ef4444;color:#fff;border:none;padding:5px 10px;border-radius:8px;font-size:10px;cursor:pointer;">Suppr</button>  
-    </div>` : ""}  
+            </div>  
+        </div>`;
 
-    <div style="display:grid; grid-template-columns: 1.2fr 1fr 1fr 1.6fr 1.5fr 1fr; gap:6px; align-items:center; font-size:12px;">  
-
-        <div style="color:#64748b;">${t.date}</div>  
-
-        <div style="font-weight:bold; color:#1e293b;">
-            ${t.operator || opNameFromDesc}
-        </div>  
-
-        <div style="background:#f1f5f9; padding:3px 6px; border-radius:6px; text-align:center; font-size:10px; border:1px solid #e2e8f0;">  
-            ${icon} ${type || "-"} ${stockDisplay} 
-        </div>  
-
-        <div style="color:#475569; font-weight:500;">
-            ${motif || "-"}
-        </div>  
-        
-        <div style="line-height:1.3;">  
-        <div style="font-weight:bold; color:#0f172a;">
-        SIM: ${fmt(t.amtSIM || t.amt)} ${t.curSIM || t.cur}
-        </div>
-    
-        <div style="font-size:9px; color:#64748b; font-style:italic;">
-        Taux: ${t.tauxApplique || data.taux} FC
-        </div>
-
-    ${finalCashDisplay}
-
-
-            ${(cUSD > 0 || cCDF > 0) ? 
-                `<div style="color:#0ea5e9; font-size:10px; font-weight:bold; background:#f0f9ff; border-radius:4px; padding:1px 3px;">
-                    + COM: ${fmt(cUSD)}$ | ${fmt(cCDF)}FC
-                </div>` 
-                : ""
-            }
-
-        </div>  
-
-        <div style="font-weight:800; color:${resteColor}; text-align:right; font-size:11px;">
-            ${resteTxt}
-        </div>  
-
-    </div>  
-
-</div>`;
-
- 
     }).join("");  
   
     html += `</div>`;  
@@ -1666,8 +1643,35 @@ window.cancelTransaction = (index) => {
         alert("Erreur lors de la génération visuelle.");
     }
 };
+    
+    // Fonction pour envoyer un rappel de dette impayée
+window.sendWhatsAppReminder = (person, usd, cdf) => {
+    const message = `Bonjour *${person}*, c'est MKA SHOP. Nous vous envoyons ce petit rappel concernant votre dette en cours qui s'élève à *${usd}$* et *${cdf} FC*. Merci de passer au bureau pour régulariser. Bonne journée !`;
+    const encodedMsg = encodeURIComponent(message);
+    window.open(`https://wa.me/?text=${encodedMsg}`, '_blank');
+};
+
+// Fonction pour envoyer un reçu de règlement
+window.sendWhatsAppReceipt = (person, usdPaye, cdfPaye, resteUsd, resteCdf) => {
+    const estSolde = (resteUsd <= 0.1 && resteCdf <= 100);
+    let message = `*MKA SHOP - REÇU DE PAIEMENT*\n\nMerci *${person}* pour votre règlement de *${usdPaye}$* et *${cdfPaye} FC*.\n`;
+    
+    if (estSolde) {
+        message += `✅ Votre compte est maintenant *COMPLÈTEMENT SOLDÉ*. Merci de votre fidélité !`;
+    } else {
+        message += `📈 Reste à payer : *${resteUsd}$* et *${resteCdf} FC*.`;
+    }
+    
+    const encodedMsg = encodeURIComponent(message);
+    window.open(`https://wa.me/?text=${encodedMsg}`, '_blank');
+};
 
     function render() {
+      const fmt = (n) => parseFloat(n || 0).toLocaleString('fr-FR', { 
+    minimumFractionDigits: 0, 
+    maximumFractionDigits: 2 
+}).replace(/,/g, '.');
+
 
     // 🔥 NETTOYAGE CORRIGÉ
     data.transactions.forEach(t => {
