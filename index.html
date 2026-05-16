@@ -848,6 +848,8 @@ if (t.impacts?.virtuel) {
     const backupData = JSON.parse(JSON.stringify(data));
 
     try {
+        const uniqueTimestamp = Date.now();
+        
         const isMoi = normalize(opDette.name).includes("moi");
         const typeDette = isMoi ? "dette moi" : "dette client";
         const key = `${normalize(typeDette)}_${normalize(person)}`;
@@ -1468,6 +1470,8 @@ window.cancelTransaction = (index) => {
     const backupData = JSON.parse(JSON.stringify(data));
 
     try {
+        const uniqueTimestamp = Date.now();
+        
         const sourceName = sIdx === "caisse" ? "Caisse" : data.operators[sIdx].name;
         const destName = dIdx === "caisse" ? "Caisse" : data.operators[dIdx].name;
 
