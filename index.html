@@ -324,7 +324,7 @@ let data = {
 let isDataLoaded = false;
 
 // ==========================================
-// 📥 LECTURE EN TEMPS RÉEL (SYNC ACTIVE)
+// 📥 LECTURE EN TEMPS RÉEL (SYNCHRO SÉCURISÉE)
 // ==========================================
 onValue(ref(db, 'mka_data'), (snap) => {
     const incoming = snap.val();
@@ -334,7 +334,7 @@ onValue(ref(db, 'mka_data'), (snap) => {
         return;
     }
 
-    // Mise à jour de l'objet global
+    // Mise à jour de l'objet global sans rompre les références
     data.operators = incoming.operators || [];
     data.types = incoming.types || [];
     data.config = incoming.config || data.config;
@@ -342,14 +342,13 @@ onValue(ref(db, 'mka_data'), (snap) => {
     data.caisse = incoming.caisse || { USD: 0, CDF: 0 };
     data.taux = incoming.taux || 2800;
 
-    // Conversion des transactions (Objet Firebase -> Tableau trié)
+    // Conversion des transactions (Objet Firebase -> Tableau trié du plus récent au plus ancien)
     const obj = incoming.transactions || {};
     data.transactions = Object.values(obj).sort((a, b) => b.timestamp - a.timestamp);
 
     isDataLoaded = true;
-    console.log("MKA Shop : Données Firebase synchronisées.");
+    console.log("MKA Shop : Données Firebase synchronisées avec succès.");
 
-    // Rappel de la fonction d'affichage
     try {
         render(); 
     } catch(e) {
@@ -358,25 +357,15 @@ onValue(ref(db, 'mka_data'), (snap) => {
 });
 
 // ==========================================
-// 📤 ÉCRITURE DIRECTE (SANS ATTENTE)
+// 📤 ÉCRITURE ATOMIQUE SÉCURISÉE (PAS DE PERTE)
 // ==========================================
-const ajouterTransaction = async (nouvelleTransaction) => {
-    // On utilise le timestamp comme ID unique
-    const id = nouvelleTransaction.timestamp; 
-    
-    try {
-        // Enregistrement direct
-        await set(ref(db, `mka_data/transactions/${id}`), nouvelleTransaction);
-        console.log("MKA Shop : Transaction enregistrée !");
-    } catch (error) {
-        console.error("Erreur d'enregistrement :", error);
-        alert("Erreur de connexion : l'opération n'a pas pu être envoyée à Firebase.");
-    }
-};
-
-// À l'intérieur du script type="module"
 window.save = async function() {
-    // 1. Préparation des transactions sous forme d'objet pour Firebase
+    if (!isDataLoaded) {
+        console.warn("Sauvegarde bloquée : Les données initiales ne sont pas encore chargées.");
+        return;
+    }
+
+    // Transformation du tableau local en objet indexé par timestamp pour Firebase
     const transObj = {};
     data.transactions.forEach(t => {
         if (t.timestamp) {
@@ -385,31 +374,30 @@ window.save = async function() {
     });
 
     try {
-        // 2. Mise à jour de TOUTE la structure d'un coup
-        // On utilise 'set' pour être sûr que la base de données 
-        // reflète exactement l'état de votre variable 'data'
-        await set(ref(db, 'mka_data'), {
-            caisse: data.caisse,
-            operators: data.operators,
-            taux: data.taux,
-            config: data.config,
-            debts: data.debts,
-            transactions: transObj, // Écrase l'ancienne liste par la nouvelle (nettoyée/modifiée)
-            types: data.types
-        });
-        
-        console.log("Synchronisation Firebase réussie ✅");
+        // PROTECTION MAXIMALE : On prépare les mises à jour ciblées
+        const updates = {};
+        updates['mka_data/caisse'] = data.caisse;
+        updates['mka_data/operators'] = data.operators;
+        updates['mka_data/taux'] = data.taux;
+        updates['mka_data/config'] = data.config;
+        updates['mka_data/debts'] = data.debts;
+        updates['mka_data/transactions'] = transObj;
+        updates['mka_data/types'] = data.types;
+
+        // L'utilisation de 'update' empêche l'effacement accidentel des nœuds adjacents
+        await update(ref(db), updates);
+        console.log("Synchronisation Firebase globale réussie ✅");
     } catch (error) {
         console.error("Erreur de sauvegarde Firebase ❌ :", error);
-        alert("Erreur de connexion. Les modifications ne sont pas enregistrées sur internet.");
+        alert("⚠️ Problème de connexion. L'action est enregistrée localement mais pas encore sur internet.");
     }
 };
 
-// Optionnel : Créer un alias local si vous préférez écrire save() au lieu de window.save()
 const save = window.save;
 
-    const fmt = (n) => parseFloat(n || 0).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).replace(/,/g, '.');    
-    const normalize = (str) => str ? str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : "";
+const fmt = (n) => parseFloat(n || 0).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).replace(/,/g, '.');    
+const normalize = (str) => str ? str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : "";
+
 
     window.login = () => {    
         const p = document.getElementById("pinInput").value;    
@@ -658,8 +646,12 @@ if (t.impacts?.virtuel) {
     }
 }
 
-  window.addTransaction = async () => { // Ajout de async pour la sécurité
-    if (!data.config) { alert("Erreur config"); return; }
+  window.addTransaction = async () => { 
+    // DOUBLE SÉCURITÉ : Bloque la validation tant que la base n'est pas chargée à 100%
+    if (!isDataLoaded || !data.config) { 
+        alert("⚠️ Application non connectée ou configuration indisponible. Veuillez patienter."); 
+        return; 
+    }
 
     const opI = document.getElementById("operatorSelect").value;
     const tyI = document.getElementById("typeSelect").value;
@@ -686,6 +678,9 @@ if (t.impacts?.virtuel) {
     const isDepensePrincipal = opNorm.includes("depense");
     const isInterSim = (modeNorm.includes("inter") || modeNorm.includes("sim") || modeNorm.includes("virtuel"));
 
+    // Génération d'un timestamp unique pour cette transaction précise
+    const uniqueTimestamp = Date.now();
+
     const t = createTransaction({
         typeNom: ty.name,
         operator: op.name,
@@ -697,13 +692,15 @@ if (t.impacts?.virtuel) {
         mix: { USD: mixUSD, CDF: mixCDF }
     });
 
+    t.id = uniqueTimestamp; // ID unique propre à cette transaction
+    t.timestamp = uniqueTimestamp;
     t.stk = stkM;
     t.impacts = t.impacts || {};
     t.impacts.operator = t.impacts.operator || { USD:0, CDF:0 };
     t.impacts.caisse = t.impacts.caisse || { USD:0, CDF:0 };
 
     // ==========================================
-    // VOS CALCULS (CONSERVÉS À 100%)
+    // VOS CALCULS ET CONDITIONS CONSERVÉS À 100%
     // ==========================================
     if (!isDettePrincipal && !isInterSim) {
         t.impacts.operator.USD = (cur === "USD" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
@@ -752,11 +749,11 @@ if (t.impacts?.virtuel) {
         t.impacts.caisse.CDF = (mixCDF * dirCaisse) + commCDF;
     }
 
-    // --- SÉCURITÉ : SAUVEGARDE L'ÉTAT AVANT MODIFICATION ---
+    // --- CLONE DE SÉCURITÉ EN CAS DE COUPURE INTERNET ---
     const backupData = JSON.parse(JSON.stringify(data));
 
     try {
-        // Appliquer localement les changements pour le calcul des dettes
+        // Application locale immédiate du calcul financier
         applyImpacts(t);
 
         if (person && t.typeDette) {
@@ -774,7 +771,6 @@ if (t.impacts?.virtuel) {
         const newEntry = {
             ...t,
             person,
-            timestamp: Date.now(),
             date: new Date().toLocaleString("fr-FR", {
                 timeZone: "Africa/Kinshasa",
                 year: "numeric", month: "2-digit", day: "2-digit",
@@ -788,23 +784,24 @@ if (t.impacts?.virtuel) {
             commission: { usd: commUSD, cdf: commCDF }
         };
 
-        // Préparer l'objet complet pour Firebase
+        // Ajout immédiat en haut de la liste locale
         data.transactions.unshift(newEntry);
-        const transObj = {};
-        data.transactions.forEach(tr => { if (tr.timestamp) transObj[tr.timestamp] = tr; });
 
-        // --- ENVOI FIREBASE (ATTENTE DU OK) ---
-        await set(ref(db, 'mka_data'), {
-            ...data,
-            transactions: transObj
-        });
+        // --- ENVOI ATOMIQUE ET CIBLÉ SUR FIREBASE ---
+        const updates = {};
+        updates[`mka_data/transactions/${uniqueTimestamp}`] = newEntry; // On ajoute la ligne unique
+        updates['mka_data/caisse'] = data.caisse;                      // On met à jour la caisse globale
+        updates['mka_data/operators'] = data.operators;                // On met à jour les SIMs
+        updates['mka_data/debts'] = data.debts;                        // On met à jour le registre des dettes
 
-        // --- SI RÉUSSI ---
+        // Exécution sécurisée sans écraser le reste
+        await update(ref(db), updates);
+
         render();
-        console.log("Synchro Firebase réussie ✅");
+        console.log(`MKA Shop : Transaction ${uniqueTimestamp} synchronisée.`);
         alert("✅ Opération enregistrée et synchronisée !");
 
-        // Reset des champs
+        // Réinitialisation des éléments du formulaire
         ["amount","mixUSD","mixCDF","commUSD","commCDF","motif","personName","stkMove"].forEach(id => {
             const el = document.getElementById(id); if (el) el.value = "";
         });
@@ -813,13 +810,14 @@ if (t.impacts?.virtuel) {
         });
 
     } catch (error) {
-        // --- SI ÉCHEC ---
-        data = backupData; // On annule tout le calcul local
-        console.error("Erreur Firebase ❌:", error);
-        alert("⚠️ ERREUR RÉSEAU : Impossible de sauvegarder. L'opération a été ANNULÉE pour protéger vos soldes.");
+        // EN CAS D'ÉCHEC RÉSEAU : Restauration immédiate des comptes pour éviter les faux écarts
+        data = backupData; 
+        console.error("Erreur critique Firebase ❌ :", error);
+        alert("⚠️ ERREUR RÉSEAU : Impossible d'atteindre Firebase. L'opération a été ANNULÉE localement pour protéger vos soldes.");
         render();
     }
 };
+
 
  window.settleAccountV2 = async () => {
     const opIdx = document.getElementById("settleOpIdx").value;
@@ -922,14 +920,14 @@ if (t.impacts?.virtuel) {
 
         data.transactions.unshift(finalEntry);
 
-        // --- ENVOI FIREBASE GLOBAL ---
-        const transObj = {};
-        data.transactions.forEach(tr => { if (tr.timestamp) transObj[tr.timestamp] = tr; });
-        
-        await set(ref(db, 'mka_data'), { 
-            ...data, 
-            transactions: transObj 
-        });
+        // --- ENVOI FIREBASE CIBLÉ (PAS DE SET GLOBAL) ---
+        const updates = {};
+        updates[`mka_data/transactions/${uniqueTimestamp}`] = finalEntry;
+        updates['mka_data/caisse'] = data.caisse;
+        updates['mka_data/operators'] = data.operators;
+        updates['mka_data/debts'] = data.debts;
+
+        await update(ref(db), updates);
 
         render();
         alert("✅ Règlement mémorisé et synchronisé !");
@@ -1216,9 +1214,10 @@ if (t.mode === 'depense' || t.isDepense || normalize(desc).includes("depense")) 
              normalize(type || "").includes("dette")
         );
 
-        // --- CALCUL DU RESTE ET COULEUR ---
+                // --- CALCUL DU RESTE, COULEUR ET BOUTONS WHATSAPP ---
         let resteTxt = "✔ Cash"; 
         let resteColor = "#16a34a";  
+        let waButtonsHtml = ""; // Conteneur pour accumuler nos boutons WhatsApp
 
         if (t.snapshotDette) {
             const duUSD = t.snapshotDette.USD;
@@ -1231,6 +1230,14 @@ if (t.mode === 'depense' || t.isDepense || normalize(desc).includes("depense")) 
             } else {
                 resteTxt = `Reste: ${fmt(duUSD)}$ | ${fmt(duCDF)}FC`;
                 resteColor = "#dc2626"; 
+                
+                // Si la dette n'est pas soldée, on ajoute le bouton RAPPEL
+                if (isModeDette && finalPerson) {
+                    waButtonsHtml += `<button onclick="sendWhatsAppReminder('${finalPerson.replace(/'/g, "\\'")}', ${duUSD}, ${duCDF})" 
+                                    style="background:#25D366; color:white; border:none; padding:4px 8px; border-radius:6px; font-size:10px; margin-top:5px; cursor:pointer; font-weight:bold; display:block; width:100%;">
+                                    📱 Rappel WhatsApp
+                                    </button>`;
+                }
             }
         } 
         else if (t.person && (t.mode?.includes("dette") || t.typeDette)) {
@@ -1244,20 +1251,29 @@ if (t.mode === 'depense' || t.isDepense || normalize(desc).includes("depense")) 
             
             resteTxt = `Reste: ${fmt(currentDebt.USD)}$ | ${fmt(currentDebt.CDF)}FC`;
             resteColor = "#dc2626"; 
+
+            if (currentDebt.USD > 0.1 || currentDebt.CDF > 100) {
+                waButtonsHtml += `<button onclick="sendWhatsAppReminder('${finalPerson.replace(/'/g, "\\'")}', ${currentDebt.USD}, ${currentDebt.CDF})" 
+                                style="background:#25D366; color:white; border:none; padding:4px 8px; border-radius:6px; font-size:10px; margin-top:5px; cursor:pointer; font-weight:bold; display:block; width:100%;">
+                                📱 Rappel WhatsApp
+                                </button>`;
+            }
         }
 
-        // --- INTEGRATION BOUTON WHATSAPP RAPPEL ---
-        let waButton = "";
-        if (isModeDette && finalPerson && (t.snapshotDette || t.ancienneDette)) {
-            const rUSD = t.snapshotDette ? t.snapshotDette.USD : 0;
-            const rCDF = t.snapshotDette ? t.snapshotDette.CDF : 0;
-            
-            if (rUSD > 0.1 || rCDF > 100) {
-                waButton = `<button onclick="sendWhatsAppReminder('${finalPerson.replace(/'/g, "\\'")}', ${rUSD}, ${rCDF})" 
-                            style="background:#25D366; color:white; border:none; padding:4px 8px; border-radius:6px; font-size:10px; margin-top:5px; cursor:pointer; font-weight:bold;">
-                            📱 Rappel WhatsApp
+        // 🔥 LOGIQUE D'INTEGRATION DU BOUTON "MESSAGE DE CONFIANCE"
+        if (isModeDette && finalPerson && !t.isReglement) {
+            const typeDette = (t.mode === "dette_moi" || (t.typeDette && t.typeDette.includes("moi"))) ? "dette moi" : "dette client";
+            const debtKey = `${normalize(typeDette)}_${normalize(finalPerson)}`;  
+            const currentDebt = data.debts[debtKey] || { USD: 0, CDF: 0 };
+
+            // Montant ajouté lors de cette opération précise
+            const addedUsd = t.detteUSD || (t.curSIM === "USD" ? (t.amtSIM || t.amt) : 0);
+            const addedCdf = t.detteCDF || (t.curSIM === "CDF" ? (t.amtSIM || t.amt) : 0);
+
+            waButtonsHtml += `<button onclick="sendWhatsAppTrustMessage('${finalPerson.replace(/'/g, "\\'")}', ${addedUsd}, ${addedCdf}, ${currentDebt.USD}, ${currentDebt.CDF})" 
+                            style="background:#0ea5e9; color:white; border:none; padding:4px 8px; border-radius:6px; font-size:10px; margin-top:4px; cursor:pointer; font-weight:bold; display:block; width:100%;">
+                            🤝 Reçu de Confiance
                             </button>`;
-            }
         }
 
         let stockDisplay = "";
@@ -1360,11 +1376,12 @@ if (t.mode === 'depense' || t.isDepense || normalize(desc).includes("depense")) 
 
                 <div style="font-weight:800; color:${resteColor}; text-align:right; font-size:11px;">
                     ${resteTxt}
-                    <br>${waButton}
+                    <div style="margin-top: 5px;">${waButtonsHtml}</div>
                 </div>  
 
             </div>  
         </div>`;
+
 
     }).join("");  
   
@@ -1478,11 +1495,13 @@ window.cancelTransaction = (index) => {
 
         data.transactions.unshift(t);
 
-        // --- ENVOI FIREBASE FORCÉ ---
-        const transObj = {};
-        data.transactions.forEach(tr => { if (tr.timestamp) transObj[tr.timestamp] = tr; });
-        
-        await set(ref(db, 'mka_data'), { ...data, transactions: transObj });
+        // --- ENVOI FIREBASE CIBLÉ ET ATOMIQUE ---
+        const updates = {};
+        updates[`mka_data/transactions/${uniqueTimestamp}`] = t;
+        updates['mka_data/caisse'] = data.caisse;
+        updates['mka_data/operators'] = data.operators;
+
+        await update(ref(db), updates);
 
         render();
         alert("✅ Transfert/Change synchronisé !");
@@ -1675,10 +1694,14 @@ window.cancelTransaction = (index) => {
 
     if (estDetteMoi) {
         // Message général pour celui à qui vous devez (Respectueux et rassurant)
-        message = `Bonjour, c'est *MKA SHOP*. Je vous contacte pour vous rassurer concernant mon solde de *${usd}$ / ${cdf} FC*. Soyez certain que je mets tout en œuvre pour vous honorer. Merci encore pour votre confiance à mon égard.`;
+        message = `*MKA SHOP - GESTE DE CONFIANCE*\n\n` +
+        `Bonjour, c'est *MKA SHOP*. Je vous contacte pour vous rassurer concernant le solde de *${usd}$ / ${cdf} FC* que je vous dois. 
+        Soyez certain que je mets tout en œuvre pour vous honorer. Merci encore pour votre confiance à mon égard.`;
     } else {
         // Message pour le client (Relance polie)
-        message = `Bonjour cher(e) client(e) *${person}*, c'est *MKA SHOP*. Nous vous envoyons ce petit rappel concernant votre solde de *${usd}$* et *${cdf} FC*. Nous comptons sur votre passage habituel pour la régularisation. Merci de votre confiance.`;
+        message = `*MKA SHOP - RAPPEL DE PAIEMENT*\n\n` +
+        `Bonjour cher(e) client(e) *${person}*, c'est *MKA SHOP*. Nous vous envoyons ce petit rappel concernant votre solde de *${usd}$* et *${cdf} FC*. 
+        Nous comptons sur votre passage habituel pour la régularisation. Merci de votre confiance.`;
     }
 
     const encodedMsg = encodeURIComponent(message);
