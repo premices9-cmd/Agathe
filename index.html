@@ -1699,12 +1699,14 @@ window.cancelTransaction = (index) => {
     if (estDetteMoi) {
         // Message général pour celui à qui vous devez (Respectueux et rassurant)
         message = `*MKA SHOP - GESTE DE CONFIANCE*\n\n` +
-        `Bonjour, c'est *MKA SHOP*. Je vous contacte pour vous rassurer concernant le solde de *${usd}$ / ${cdf} FC* que je vous dois. 
+        `Bonjour cher(e) *${person}*, 
+        Je vous contacte pour vous rassurer concernant le solde de *${usd}$ / ${cdf} FC* que je vous dois. 
         Soyez certain que je mets tout en œuvre pour vous honorer. Merci encore pour votre confiance à mon égard.`;
     } else {
         // Message pour le client (Relance polie)
         message = `*MKA SHOP - RAPPEL DE PAIEMENT*\n\n` +
-        `Bonjour cher(e) client(e) *${person}*, c'est *MKA SHOP*. Nous vous envoyons ce petit rappel concernant votre solde de *${usd}$* et *${cdf} FC*. 
+        `Bonjour cher(e) client(e) *${person}*,
+        Nous vous envoyons ce petit rappel concernant votre solde de *${usd}$* et *${cdf} FC*. 
         Nous comptons sur votre passage habituel pour la régularisation. Merci de votre confiance.`;
     }
 
@@ -1720,7 +1722,8 @@ window.cancelTransaction = (index) => {
     let message = `*MKA SHOP - SUIVI DE PAIEMENT*\n\n`;
 
     if (estDetteMoi) {
-        message += `Je viens de verser *${usdPaye}$* et *${cdfPaye} FC* sur ma dette.\n`;
+        message += `Bonjour cher(e) *${person}*,
+        Je viens de verser *${usdPaye}$* et *${cdfPaye} FC* sur la somme que je vous dois.\n`;
         if (estSolde) {
             message += `✅ La dette est maintenant *TOTALEMENT SOLDÉE*. Merci pour votre confiance !`;
         } else {
