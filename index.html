@@ -357,7 +357,7 @@ onValue(ref(db, 'mka_data'), (snap) => {
 });
 
 // ==========================================
-// 📤 ÉCRITURE ATOMIQUE SÉCURISÉE (PAS DE PERTE)
+// 📤 ÉCRITURE ATOMIQUE SÉCURISÉE (ANTI-ÉCRASEMENT MULTI-TEL)
 // ==========================================
 window.save = async function() {
     if (!isDataLoaded) {
@@ -365,34 +365,25 @@ window.save = async function() {
         return;
     }
 
-    // Transformation du tableau local en objet indexé par timestamp pour Firebase
-    const transObj = {};
-    data.transactions.forEach(t => {
-        if (t.timestamp) {
-            transObj[t.timestamp] = t;
-        }
-    });
-
     try {
-        // PROTECTION MAXIMALE : On prépare les mises à jour ciblées
         const updates = {};
         updates['mka_data/caisse'] = data.caisse;
         updates['mka_data/operators'] = data.operators;
         updates['mka_data/taux'] = data.taux;
         updates['mka_data/config'] = data.config;
         updates['mka_data/debts'] = data.debts;
-        updates['mka_data/transactions'] = transObj;
         updates['mka_data/types'] = data.types;
 
-        // L'utilisation de 'update' empêche l'effacement accidentel des nœuds adjacents
+        // 🔥 CRUCIAL : On n'envoie plus TOUTES les transactions d'un coup ici.
+        // Les transactions individuelles sont déjà gérées à leur création.
+
         await update(ref(db), updates);
-        console.log("Synchronisation Firebase globale réussie ✅");
+        console.log("Synchronisation des soldes réussie ✅");
     } catch (error) {
         console.error("Erreur de sauvegarde Firebase ❌ :", error);
-        alert("⚠️ Problème de connexion. L'action est enregistrée localement mais pas encore sur internet.");
+        alert("⚠️ Problème de connexion. Les soldes ne sont pas synchronisés.");
     }
 };
-
 const save = window.save;
 
 const fmt = (n) => parseFloat(n || 0).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).replace(/,/g, '.');    
@@ -1392,38 +1383,70 @@ if (t.mode === 'depense' || t.isDepense || normalize(desc).includes("depense")) 
     document.getElementById("historyModal").classList.remove("hidden");     
 };
 
-window.cancelTransaction = (index) => {  
+window.cancelTransaction = async function(index) {  
     if(!confirm("Annuler cette opération ?")) return;  
   
     const t = data.transactions[index];  
-    if(!t) return;
-    // 2. CAS SPÉCIFIQUE DU TRANSFERT / CHANGE
-    if(t.mode === 'transfert' && t.impacts && t.impacts.isTransfer) {
-        const { source, dest } = t.impacts;
-
-        // On remet l'argent à la source initiale
-        if(source.idx === "caisse") data.caisse[source.cur] += source.amt;
-        else if(data.operators[source.idx]) data.operators[source.idx][source.cur] += source.amt;
-
-        // On retire l'argent de la destination
-        if(dest.idx === "caisse") data.caisse[dest.cur] -= dest.amt;
-        else if(data.operators[dest.idx]) data.operators[dest.idx][dest.cur] -= dest.amt;
-
-        alert("Transfert/Change inversé avec succès ✅");
-    } 
-    else {
-        // 3. LOGIQUE NORMALE (Vente, Retrait, Dépôt, Dette, Dépense)
-        // Le paramètre "true" inverse les impacts dans applyImpacts
-        applyImpacts(t, true);
+    if(!t || !t.timestamp) {
+        alert("Impossible de trouver l'identifiant de cette opération.");
+        return;
     }
-  
-    // Suppression définitive de la transaction
-    data.transactions.splice(index, 1);  
-    
-    save();  
-    render();  
-    showFullHistory("general");  
-    alert("Opération annulée et soldes mis à jour !");
+
+    try {
+        // =======================================================
+        // 1. VOS CONDITIONS EXACTES (CONSERVÉES À 100%)
+        // =======================================================
+        if(t.mode === 'transfert' && t.impacts && t.impacts.isTransfer) {
+            const { source, dest } = t.impacts;
+
+            // On remet l'argent à la source initiale
+            if(source.idx === "caisse") data.caisse[source.cur] += source.amt;
+            else if(data.operators[source.idx]) data.operators[source.idx][source.cur] += source.amt;
+
+            // On retire l'argent de la destination
+            if(dest.idx === "caisse") data.caisse[dest.cur] -= dest.amt;
+            else if(data.operators[dest.idx]) data.operators[dest.idx][dest.cur] -= dest.amt;
+
+            alert("Transfert/Change inversé avec succès ✅");
+        } 
+        else {
+            // Logique normale (Vente, Retrait, Dépôt, Dette, Dépense)
+            // Le paramètre "true" inverse les impacts dans applyImpacts
+            applyImpacts(t, true);
+        }
+
+        // =======================================================
+        // 2. SYNCHRONISATION CIBLÉE SUR FIREBASE (ANTI-CONFLIT)
+        // =======================================================
+        const updates = {};
+        
+        // On sauvegarde les soldes mis à jour (Caisse, Opérateurs/SIMs, Dettes)
+        updates['mka_data/caisse'] = data.caisse;
+        updates['mka_data/operators'] = data.operators;
+        if(data.debts) updates['mka_data/debts'] = data.debts; // Au cas où applyImpacts touche aux dettes
+
+        // 🔥 ON SUPPRIME UNIQUEMENT CETTE TRANSACTION SANS TOUCHER AUX AUTRES
+        updates[`mka_data/transactions/${t.timestamp}`] = null;
+
+        // Envoi sécurisé à Firebase
+        await update(ref(db), updates);
+
+        // =======================================================
+        // 3. MISE À JOUR DE L'AFFICHAGE LOCAL
+        // =======================================================
+        // On retire la transaction de la liste locale SEULEMENT si Firebase a réussi
+        data.transactions.splice(index, 1);  
+        
+        render();  
+        if (typeof showFullHistory === "function") {
+            showFullHistory(window.currentHistoryType || "general");  
+        }
+        alert("🔄 Opération annulée et soldes mis à jour partout !");
+
+    } catch (error) {
+        console.error("Erreur lors de l'annulation Firebase :", error);
+        alert("❌ Erreur réseau : Impossible d'annuler sur Firebase. Réessaye.");
+    }
 };
 
     window.quickEditOp = (i) => {    
@@ -1560,31 +1583,39 @@ window.cancelTransaction = (index) => {
         if(name) { data.types.push({ name, impO, impC, impS }); save(); alert("Type créé"); }    
     };  
   
-    // À placer dans votre fichier JS principal
- window.deleteTransaction = async function(idx) {
-    if (!confirm("Supprimer définitivement ?")) return;
+    window.deleteTransaction = async function(idx) {
+    if (!confirm("Supprimer définitivement cette opération ?")) return;
+    
     const t = data.transactions[idx];
-    if (!t) return;
-
-    // 1. Supprimer du tableau local
-    data.transactions.splice(idx, 1);
-
-    // 2. Lancer la synchronisation globale
-    await window.save(); 
-    
-    // 3. Mettre à jour l'interface principale (soldes, etc.)
-    render();
-
-    // 4. RÉ-AFFICHER la liste de l'historique pour masquer l'élément supprimé
-    // On passe généralement le type (ex: "general", "Airtel", etc.) 
-    // ou on utilise une variable qui stocke le dernier type affiché.
-    if (typeof showFullHistory === "function") {
-        // Si vous avez une variable 'currentHistoryType' qui stocke le filtre actuel
-        showFullHistory(window.currentHistoryType || 'general');
+    if (!t || !t.timestamp) {
+        alert("Impossible de trouver l'identifiant de la transaction.");
+        return;
     }
-    
-    alert("Supprimé de la base de données");
+
+    try {
+        // 1. Supprimer l'élément ciblé sur Firebase en lui attribuant la valeur null
+        const updates = {};
+        updates[`mka_data/transactions/${t.timestamp}`] = null;
+        
+        // 2. Mettre à jour Firebase de manière ciblée
+        await update(ref(db), updates);
+
+        // 3. Supprimer du tableau local pour l'affichage
+        data.transactions.splice(idx, 1);
+        
+        render();
+        
+        if (typeof showFullHistory === "function") {
+            showFullHistory(window.currentHistoryType || 'general');
+        }
+        
+        alert("🗑️ Supprimé définitivement de la base de données !");
+    } catch (error) {
+        console.error("Erreur lors de la suppression :", error);
+        alert("❌ Erreur réseau : Impossible de supprimer sur Firebase.");
+    }
 };
+
 
     window.closeHistory = () => document.getElementById("historyModal").classList.add("hidden");    
     window.updateDefaultStockMove = () => { const ty = data.types[document.getElementById("typeSelect").value]; if(ty) document.getElementById("stkMove").value = ty.impS || 0; };  
@@ -1952,36 +1983,58 @@ const runAutoCleanup = () => {
         return true;
     });
 
-    if (hasOldData) {
+        if (hasOldData) {
         pendingCleanup = filtered;
         document.getElementById("cleanupNotify").classList.remove("hidden");
-        console.log("🔥 Nettoyage détecté !");
+        console.log("🔥 Nettoyage disponible (En attente de l'admin) !");
     } else {
         document.getElementById("cleanupNotify").classList.add("hidden");
     }
 
-    // 🔥 SAUVEGARDE automatique si correction faite
-    save();
+    // 🛑 CORRECTION SÉCURITÉ : On NE met PLUS "save();" ici !
+    // La sauvegarde se fera UNIQUEMENT quand l'admin cliquera sur "NETTOYER MAINTENANT"
 }; 
+
     
-    window.confirmCleanup = () => {
-    if (confirm("As-tu bien téléchargé ton PDF ? Les vieilles transactions seront définitivement supprimées.")) {
-        data.transactions = pendingCleanup;
-        save();
-        document.getElementById("cleanupNotify").classList.add("hidden");
-        alert("Application allégée avec succès !");
-        render();
+    window.confirmCleanup = async () => {
+    if (confirm("As-tu bien téléchargé ton PDF ? Les vieilles transactions affichées comme 'à nettoyer' seront définitivement supprimées.")) {
+        
+        try {
+            // 1. On applique le nettoyage localement
+            data.transactions = pendingCleanup;
+            
+            // 2. On reconstruit l'objet propre pour Firebase
+            const transObj = {};
+            data.transactions.forEach(t => {
+                if (t.timestamp) transObj[t.timestamp] = t;
+            });
+            
+            // 3. On force le remplacement propre du nœud transactions sur Firebase
+            const updates = {};
+            updates['mka_data/transactions'] = transObj;
+            
+            await update(ref(db), updates);
+            
+            document.getElementById("cleanupNotify").classList.add("hidden");
+            alert("🧹 Application allégée avec succès sur tous les téléphones !");
+            render();
+        } catch (error) {
+            console.error(error);
+            alert("❌ Échec du nettoyage : Connexion instable.");
+        }
     }
 };
-    // =========================
+
+// =========================
 // AUTO CLEANUP LOOP
 // =========================
 setInterval(runAutoCleanup, 30000);
 
-    window.onload = () => {
+window.onload = () => {
     runAutoCleanup();
 };
-    window.deleteOperator = function(index){
+
+window.deleteOperator = function(index){
     if(!confirm("Supprimer cet opérateur ?")) return;
 
     data.operators.splice(index, 1);
