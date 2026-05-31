@@ -1116,10 +1116,11 @@ if (t.isReglement) {
     const rUSD = a.USD;
     const rCDF = a.CDF;
 
-    const receiptButton = `<button onclick="sendWhatsAppReceipt('${t.person.replace(/'/g, "\\'")}', ${pUSD}, ${pCDF}, ${rUSD}, ${rCDF})" 
-                            style="background:#25D366; color:white; border:none; padding:4px 8px; border-radius:6px; font-size:9px; margin-top:5px; cursor:pointer; width:100%; font-weight:bold;">
-                            ✉️ Envoyer Reçu
-                           </button>`;
+    const receiptButton = `<button onclick="sendWhatsAppReceipt('${t.person.replace(/'/g, "\\'")}', ${pUSD}, ${pCDF}, ${rUSD}, ${rCDF}, '${t.operator ? t.operator.replace(/'/g, "\\'") : ''}')" 
+                        style="background:#25D366; color:white; border:none; padding:4px 8px; border-radius:6px; font-size:9px; margin-top:5px; cursor:pointer; width:100%; font-weight:bold;">
+                        ✉️ Envoyer Reçu
+                       </button>`;
+
 
     return `
     <div style="background:#fff7ed; border-radius:16px; padding:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); border-left:5px solid #eab308; margin-bottom:12px;">
