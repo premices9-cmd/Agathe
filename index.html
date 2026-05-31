@@ -1764,17 +1764,17 @@ window.cancelTransaction = async function(index) {
     }
 };
     
-    window.sendWhatsAppTrustMessage = (person, montantAjouteUsd, montantAjouteCdf, totalUsd, totalCdf) => {
+    window.sendWhatsAppTrustMessage = (person, montantAjouteUsd, montantAjouteCdf, ancienTotalUsd, ancienTotalCdf) => {
     const filter = document.querySelector(".nav-hist button.active")?.id;
     const estDetteMoi = (filter === "btn-h-dette_moi");
+
+    // CALCUL DU NOUVEAU TOTAL : On additionne l'ancien total avec le montant ajouté
+    const nouveauTotalUsd = (parseFloat(ancienTotalUsd) || 0) + (parseFloat(montantAjouteUsd) || 0);
+    const nouveauTotalCdf = (parseFloat(ancienTotalCdf) || 0) + (parseFloat(montantAjouteCdf) || 0);
 
     let message = "";
 
     if (estDetteMoi) {
-        // Total après ajout
-        const nouveauTotalUsd = Number(totalUsd);
-        const nouveauTotalCdf = Number(totalCdf);
-
         message = `*MKA SHOP — RECONNAISSANCE DE DETTE*\n\n` +
                   `Bonjour,\n\n` +
                   `Notre établissement *MKA SHOP* enregistre officiellement et reconnaît qu'il vous doit ce jour un montant complémentaire de *${fmt(montantAjouteUsd)}$ / ${fmt(montantAjouteCdf)} FC*.\n\n` +
@@ -1784,14 +1784,13 @@ window.cancelTransaction = async function(index) {
         message = `*MKA SHOP — ACCORD DE CRÉDIT*\n\n` +
                   `Cher(e) client(e) *${person.toUpperCase()}*,\n\n` +
                   `Nous vous informons qu'un crédit complémentaire de *${fmt(montantAjouteUsd)}$ / ${fmt(montantAjouteCdf)} FC* a été accordé sur votre compte.\n\n` +
-                  `Votre solde débiteur total est désormais de *${fmt(totalUsd)}$* et *${fmt(totalCdf)} FC*.\n` +
+                  `Votre solde débiteur total est désormais de *${fmt(nouveauTotalUsd)}$* et *${fmt(nouveauTotalCdf)} FC*.\n` +
                   `Nous vous remercions pour votre fidélité et votre honnêteté habituelle.`;
     }
 
     const encodedMsg = encodeURIComponent(message);
     window.open(`https://wa.me/?text=${encodedMsg}`, '_blank');
 };
-
 
 window.sendWhatsAppReminder = (person, usd, cdf) => {
     const filter = document.querySelector(".nav-hist button.active")?.id;
@@ -1816,32 +1815,37 @@ window.sendWhatsAppReminder = (person, usd, cdf) => {
     window.open(`https://wa.me/?text=${encodedMsg}`, '_blank');
 };
 
-
-window.sendWhatsAppReceipt = (person, usdPaye, cdfPaye, resteUsd, resteCdf) => {
+// Ajout d'un 6ème paramètre optionnel "canalPaiementArg" au cas où l'appel se fait depuis un historique sans formulaire actif
+window.sendWhatsAppReceipt = (person, usdPaye, cdfPaye, resteUsd, resteCdf, canalPaiementArg = null) => {
     const estSolde = (resteUsd <= 0.1 && resteCdf <= 100);
     const filter = document.querySelector(".nav-hist button.active")?.id;
     const estDetteMoi = (filter === "btn-h-dette_moi");
-
-    // Détermination automatique du canal de paiement
+    
     let canalPaiement = "en espèces (Cash)";
 
-    const destSelect = document.getElementById("settleDest");
-
-    if (
-        destSelect &&
-        destSelect.selectedIndex >= 0 &&
-        destSelect.value &&
-        destSelect.value !== "caisse"
-    ) {
-        canalPaiement = `via le compte SIM *${destSelect.options[destSelect.selectedIndex].text}*`;
+    // 1. Si le canal est passé directement dans la fonction (ex: depuis la base de données)
+    if (canalPaiementArg && canalPaiementArg.trim() !== "") {
+        if (canalPaiementArg.toLowerCase().includes("caisse") || canalPaiementArg.toLowerCase().includes("cash")) {
+            canalPaiement = "en espèces (Cash)";
+        } else {
+            canalPaiement = `via le compte SIM *${canalPaiementArg}*`;
+        }
+    } else {
+        // 2. Sinon, on lit le DOM. Vérification de 'settleDest' ET 'settleSource' 
+        const destSelect = document.getElementById("settleDest") || document.getElementById("settleSource");
+        
+        // .toLowerCase() évite les bugs si la valeur est "Caisse" au lieu de "caisse"
+        if (destSelect && destSelect.value && destSelect.value.toLowerCase() !== "caisse") {
+            const nomCompte = destSelect.options[destSelect.selectedIndex].text;
+            canalPaiement = `via le compte SIM *${nomCompte}*`;
+        }
     }
 
     let message = `*MKA SHOP — REÇU DE PAIEMENT*\n\n`;
 
     if (estDetteMoi) {
         message += `Bonjour,\n\n` +
-                   `Nous vous confirmons que notre établissement vous a versé la somme de *${fmt(usdPaye)}$* et *${fmt(cdfPaye)} FC* par ${canalPaiement}.\n\n`;
-
+                   `Nous vous confirmons que notre établissement vous a versé la somme de *${fmt(usdPaye)}$* et *${fmt(cdfPaye)} FC* ${canalPaiement}.\n\n`;
         if (estSolde) {
             message += `✅ Cette dette est désormais *TOTALEMENT SOLDÉE*. Merci infiniment pour votre confiance !`;
         } else {
@@ -1849,8 +1853,7 @@ window.sendWhatsAppReceipt = (person, usdPaye, cdfPaye, resteUsd, resteCdf) => {
         }
     } else {
         message += `Cher(e) client(e) *${person.toUpperCase()}*,\n\n` +
-                   `Nous vous confirmons la bonne réception de votre versement de *${fmt(usdPaye)}$* et *${fmt(cdfPaye)} FC* effectué par ${canalPaiement}.\n\n`;
-
+                   `Nous vous confirmons la bonne réception de votre versement de *${fmt(usdPaye)}$* et *${fmt(cdfPaye)} FC* effectué ${canalPaiement}.\n\n`;
         if (estSolde) {
             message += `✅ Votre compte est désormais *ENTIÈREMENT SOLDÉ*. Merci pour votre confiance et votre fidélité !`;
         } else {
@@ -1858,10 +1861,11 @@ window.sendWhatsAppReceipt = (person, usdPaye, cdfPaye, resteUsd, resteCdf) => {
                        `Au plaisir de vous revoir lors de vos passages habituels.`;
         }
     }
-
+    
     const encodedMsg = encodeURIComponent(message);
     window.open(`https://wa.me/?text=${encodedMsg}`, '_blank');
 };
+
 
 
     function render() {
