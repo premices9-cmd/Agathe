@@ -122,6 +122,32 @@
         <select id="settleOpIdx" onchange="checkDebtBalance()"></select>    
         <input type="text" id="debtPersonName" placeholder="NOM DU CLIENT" oninput="checkDebtBalance()">  
     </div>
+    
+    <div class="grid-2" style="margin: 8px 0;">
+        <div>
+            <label class="label-sm" style="color:#854d0e;">Taux du Règlement :</label>
+            <div style="display:flex; gap:2px;">
+                <input type="number" id="settleRate" placeholder="Taux" oninput="checkDebtBalance()">
+                <button type="button" onclick="document.getElementById('settleRate').value = data.taux; checkDebtBalance();" style="width:45px; background:#64748b; font-size:10px; color:white;">DEF</button>
+            </div>
+        </div>
+                <div>
+            <label class="label-sm" style="color:#b91c1c; font-weight: bold;">🎁 Réduction / Commission :</label>
+            <div class="grid-2" style="gap:2px;">
+                <input type="number" id="settleRemiseUSD" placeholder="Frais/Com $">
+                <input type="number" id="settleRemiseCDF" placeholder="Frais/Com FC">
+            </div>
+        </div>
+    </div>
+
+    <div style="margin: 8px 0; background: #f0fdf4; border: 1px dashed #16a34a; padding: 10px; border-radius: 8px;">
+        <label class="label-sm" style="color:#15803d; font-weight: bold;">💖 Pourboire (Ajout direct Caisse) :</label>
+        <div class="grid-2" style="gap:2px;">
+            <input type="number" id="settlePourboireUSD" placeholder="Pourboire $">
+            <input type="number" id="settlePourboireCDF" placeholder="Pourboire FC">
+        </div>
+    </div>
+
 
     <div style="background:#fef9c3; border:1px dashed #eab308; padding:10px; border-radius:8px; margin-top:10px;">
         <span class="label-sm" style="color:#a16207;">Paiement sur Dette USD ($)</span>
@@ -143,7 +169,8 @@
     <select id="settleDest" style="border: 1px solid #16a34a;"></select>  
     
     <button onclick="settleAccountV2()" style="background:#eab308; color:black; font-weight:bold; margin-top:10px;">VALIDER LE RÈGLEMENT DÉTAILLÉ</button>    
-    </div>
+</div>
+
 
     <hr>    
     <h2>Opérations Clients</h2>    
@@ -648,6 +675,7 @@ if (t.impacts?.virtuel) {
     const tyI = document.getElementById("typeSelect").value;
     const amtSIM = parseFloat(document.getElementById("amount").value) || 0;
     const cur = document.getElementById("currency").value;
+    const opTauxSaisi = parseFloat(document.getElementById("opTaux").value) || parseFloat(data.taux);
 
     const mixUSD = parseFloat(document.getElementById("mixUSD").value) || 0;
     const mixCDF = parseFloat(document.getElementById("mixCDF").value) || 0;
@@ -767,12 +795,15 @@ if (t.impacts?.virtuel) {
                 year: "numeric", month: "2-digit", day: "2-digit",
                 hour: "2-digit", minute: "2-digit", second: "2-digit"
             }),
-            desc: `${ty.name} - ${op.name}${simSourceName} (${person ? 'NOM: '+person+' | ' : ''}${motif})`,
+            desc: `${ty.name} - ${op.name}${simSourceName} (${person ? `NOM: ${person} | ` : ''})${motif}`,
+
             amtSIM,
             curSIM: cur,
             usdCash: mixUSD,
             cdfCash: mixCDF,
-            commission: { usd: commUSD, cdf: commCDF }
+            commission: { usd: commUSD, cdf: commCDF },
+            opTaux: opTauxSaisi,
+
         };
 
         // Ajout immédiat en haut de la liste locale
@@ -810,11 +841,13 @@ if (t.impacts?.virtuel) {
 };
 
 
- window.settleAccountV2 = async () => {
+  window.settleAccountV2 = async () => {
     const opIdx = document.getElementById("settleOpIdx").value;
     const person = document.getElementById("debtPersonName").value.trim();
     const destIdx = document.getElementById("settleDest").value;
-    const taux = parseFloat(data.taux) || 1; 
+    
+    const settleRateInput = parseFloat(document.getElementById("settleRate").value);
+    const taux = (!isNaN(settleRateInput) && settleRateInput > 0) ? settleRateInput : (parseFloat(data.taux) || 1); 
 
     const opDette = data.operators[opIdx];
     if (!opDette || !person) {
@@ -822,20 +855,28 @@ if (t.impacts?.virtuel) {
         return;
     }
 
+    // Récupération des paiements
     const pOnUsd_USD = parseFloat(document.getElementById("payOnUsd_USD").value) || 0;
     const pOnUsd_CDF = parseFloat(document.getElementById("payOnUsd_CDF").value) || 0;
     const pOnCdf_USD = parseFloat(document.getElementById("payOnCdf_USD").value) || 0;
     const pOnCdf_CDF = parseFloat(document.getElementById("payOnCdf_CDF").value) || 0;
 
+    // Récupération de la commission / réduction accordée
+    const remiseUSD = parseFloat(document.getElementById("settleRemiseUSD").value) || 0;
+    const remiseCDF = parseFloat(document.getElementById("settleRemiseCDF").value) || 0;
+
+    // NOUEAU : Récupération des pourboires
+    const pourboireUSD = parseFloat(document.getElementById("settlePourboireUSD").value) || 0;
+    const pourboireCDF = parseFloat(document.getElementById("settlePourboireCDF").value) || 0;
+
     const totalPaidUSD = pOnUsd_USD + pOnCdf_USD;
     const totalPaidCDF = pOnUsd_CDF + pOnCdf_CDF;
 
-    if (totalPaidUSD === 0 && totalPaidCDF === 0) {
-        alert("Veuillez saisir au moins un montant.");
+    if (totalPaidUSD === 0 && totalPaidCDF === 0 && remiseUSD === 0 && remiseCDF === 0 && pourboireUSD === 0 && pourboireCDF === 0) {
+        alert("Veuillez saisir au moins un montant (paiement, commission ou pourboire).");
         return;
     }
 
-    // --- SÉCURITÉ : BACKUP AVANT CALCUL ---
     const backupData = JSON.parse(JSON.stringify(data));
 
     try {
@@ -846,10 +887,10 @@ if (t.impacts?.virtuel) {
         const key = `${normalize(typeDette)}_${normalize(person)}`;
         const oldDebt = JSON.parse(JSON.stringify(data.debts[key] || { USD: 0, CDF: 0 }));
 
-        const reductionTotaleUSD = pOnUsd_USD + (pOnUsd_CDF / taux);
-        const reductionTotaleCDF = pOnCdf_CDF + (pOnCdf_USD * taux);
+        // Calcul de la réduction globale de la dette (Paiements + Commission)
+        const reductionTotaleUSD = pOnUsd_USD + (pOnUsd_CDF / taux) + remiseUSD + (remiseCDF / taux);
+        const reductionTotaleCDF = pOnCdf_CDF + (pOnCdf_USD * taux) + remiseCDF + (remiseUSD * taux);
 
-        // --- RÉINTÉGRATION LOGIQUE SURPLUS (OMIS PRÉCÉDEMMENT) ---
         let redUSD = reductionTotaleUSD;
         let surplusUSD = 0;
         if (reductionTotaleUSD > oldDebt.USD) {
@@ -878,42 +919,55 @@ if (t.impacts?.virtuel) {
         });
 
         t.isReglement = true;
-        t.surplusUSD = surplusUSD; // RÉINTÉGRÉ
-        t.surplusCDF = surplusCDF; // RÉINTÉGRÉ
+        t.surplusUSD = surplusUSD; 
+        t.surplusCDF = surplusCDF; 
         t.isMoi = isMoi;
-        t.payDetail = { // RÉINTÉGRÉ
+        t.remise = { usd: remiseUSD, cdf: remiseCDF };
+        t.pourboire = { usd: pourboireUSD, cdf: pourboireCDF }; // Stockage pourboire
+        t.payDetail = { 
             onUsd: { usd: pOnUsd_USD, cdf: pOnUsd_CDF },
             onCdf: { usd: pOnCdf_USD, cdf: pOnCdf_CDF }
         };
         t.debtBefore = oldDebt; 
 
+        // La dette diminue du cumul (Paiement + Commission)
         t.impacts.dette = { USD: -redUSD, CDF: -redCDF };
 
+        // Configuration des impacts sur la destination principale choisie
         if (destIdx === "caisse") {
             t.impacts.caisse = { USD: totalPaidUSD * direction, CDF: totalPaidCDF * direction };
         } else {
             t.impacts.operator = { USD: totalPaidUSD * direction, CDF: totalPaidCDF * direction };
+            t.impacts.caisse = { USD: 0, CDF: 0 };
         }
 
-        // Application locale pour obtenir le snapshot final
+        // 🔥 LOGIQUE CRUCIALE : Le pourboire va TOUJOURS dans la caisse physique, peu importe la SIM réceptrice
+        t.impacts.caisse.USD += pourboireUSD;
+        t.impacts.caisse.CDF += pourboireCDF;
+
         applyImpacts(t);
 
         const newDebt = data.debts[key] || { USD: 0, CDF: 0 };
-        t.snapshotDette = { USD: newDebt.USD, CDF: newDebt.CDF }; // RÉINTÉGRÉ
+        t.snapshotDette = { USD: newDebt.USD, CDF: newDebt.CDF }; 
+
+        // Construction du libellé de description
+        let bonusDesc = "";
+        if (remiseUSD > 0 || remiseCDF > 0) bonusDesc += ` [Com/Réduction: ${remiseUSD}$ / ${remiseCDF}FC]`;
+        if (pourboireUSD > 0 || pourboireCDF > 0) bonusDesc += ` [Pourboire Caisse: ${pourboireUSD}$ / ${pourboireCDF}FC]`;
 
         const finalEntry = {
             ...t,
-            timestamp: Date.now(),
+            timestamp: uniqueTimestamp,
             date: new Date().toLocaleString("fr-FR", { timeZone: "Africa/Kinshasa" }),
-            desc: `RÈGLEMENT: ${person.toUpperCase()} (${typeDette}) vers ${operatorName}`,
+            desc: `RÈGLEMENT: ${person.toUpperCase()} (${typeDette})${bonusDesc} vers ${operatorName}`,
             usdCash: totalPaidUSD,
             cdfCash: totalPaidCDF,
-            typeNom: "REGLEMENT"
+            typeNom: "REGLEMENT",
+            tauxApplique: taux
         };
 
         data.transactions.unshift(finalEntry);
 
-        // --- ENVOI FIREBASE CIBLÉ (PAS DE SET GLOBAL) ---
         const updates = {};
         updates[`mka_data/transactions/${uniqueTimestamp}`] = finalEntry;
         updates['mka_data/caisse'] = data.caisse;
@@ -923,10 +977,10 @@ if (t.impacts?.virtuel) {
         await update(ref(db), updates);
 
         render();
-        alert("✅ Règlement mémorisé et synchronisé !");
+        alert("✅ Règlement et pourboire enregistrés avec succès !");
 
-        // Reset
-        ["payOnUsd_USD", "payOnUsd_CDF", "payOnCdf_USD", "payOnCdf_CDF", "debtPersonName"].forEach(id => {
+        // Réinitialisation de tous les champs du formulaire
+        ["payOnUsd_USD", "payOnUsd_CDF", "payOnCdf_USD", "payOnCdf_CDF", "debtPersonName", "settleRate", "settleRemiseUSD", "settleRemiseCDF", "settlePourboireUSD", "settlePourboireCDF"].forEach(id => {
             const el = document.getElementById(id);
             if(el) el.value = "";
         });
@@ -934,11 +988,10 @@ if (t.impacts?.virtuel) {
     } catch (error) {
         data = backupData; 
         console.error("Erreur Sync:", error);
-        alert("❌ ERREUR RÉSEAU : Impossible de valider le règlement sur Firebase.");
+        alert("❌ ERREUR RÉSEAU : Impossible de valider le règlement.");
         render();
     }
 };
-
 
     // RESTAURATION DE LA LOGIQUE D'HISTORIQUE PAR MOTS-CLÉS 
 window.showFullHistory = (filter) => {     
@@ -1046,20 +1099,18 @@ window.showFullHistory = (filter) => {
             </div>`;
         }
 
-// --- DESIGN RÈGLEMENT AVEC ACTIONS (ANNULER + SUPPRIMER) ---
 if (t.isReglement) {
     const b = t.debtBefore || { USD: 0, CDF: 0 };
     const a = t.snapshotDette || { USD: 0, CDF: 0 };
     const p = t.payDetail || { onUsd: { usd: 0, cdf: 0 }, onCdf: { usd: 0, cdf: 0 } };
+    const rem = t.remise || { usd: 0, cdf: 0 };
     
-    // Détection du solde
     const estSolde = (a.USD <= 0.1 && a.CDF <= 100);
     
     const sUSD = parseFloat(t.surplusUSD || 0);
     const sCDF = parseFloat(t.surplusCDF || 0);
     const labelSurplus = t.isMoi ? "PERTE" : "INTÉRÊT";
 
-    // --- LOGIQUE BOUTON REÇU WHATSAPP ---
     const pUSD = t.usdCash || 0;
     const pCDF = t.cdfCash || 0;
     const rUSD = a.USD;
@@ -1103,6 +1154,19 @@ if (t.isReglement) {
                     <span style="color:#64748b;">Sur Dette FC:</span> 
                     <b style="color:#166534;">${fmt(p.onCdf.usd)}$+${fmt(p.onCdf.cdf)}F</b>
                 </div>
+
+                                ${(rem.usd > 0 || rem.cdf > 0) ? `
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px; background:#fee2e2; padding:2px 4px; border-radius:4px;">
+                    <span style="color:#991b1b; font-weight:bold;">🎁 Com/Réduction:</span> 
+                    <b style="color:#b91c1c;">${fmt(rem.usd)}$+${fmt(rem.cdf)}F</b>
+                </div>` : ''}
+
+                ${(t.pourboire && (t.pourboire.usd > 0 || t.pourboire.cdf > 0)) ? `
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px; background:#dcfce7; padding:2px 4px; border-radius:4px;">
+                    <span style="color:#166534; font-weight:bold;">💖 Pourboire (Caisse):</span> 
+                    <b style="color:#15803d;">${fmt(t.pourboire.usd)}$+${fmt(t.pourboire.cdf)}F</b>
+                </div>` : ''}
+
 
                 <div style="text-align:center; font-size:9px; color:#9a3412; border-top:1px dashed #fed7aa; padding-top:4px;">
                     Dest: <b>${t.operator}</b>
@@ -1348,24 +1412,26 @@ if (t.mode === 'depense' || t.isDepense || normalize(desc).includes("depense")) 
                     ${motif || "-"}
                 </div>  
                 
+
                 <div style="line-height:1.3;">  
-                    <div style="font-weight:bold; color:#0f172a;">
-                        SIM: ${fmt(t.amtSIM || t.amt)} ${t.curSIM || t.cur}
-                    </div>
-                
-                    <div style="font-size:9px; color:#64748b; font-style:italic;">
-                        Taux: ${t.tauxApplique || data.taux} FC
-                    </div>
+                <div style="font-weight:bold; color:#0f172a;">
+        SIM: ${fmt(t.amtSIM || t.amt)} ${t.curSIM || t.cur}
+    </div>
 
-                    ${finalCashDisplay}
+                <div style="font-size:9px; color:#64748b; font-style:italic;">
+        Taux: ${t.tauxApplique || t.opTaux || (t.transferDetails && t.transferDetails.appliedRate) || data.taux} FC
+    </div>
 
-                    ${(cUSD > 0 || cCDF > 0) ? 
-                        `<div style="color:#0ea5e9; font-size:10px; font-weight:bold; background:#f0f9ff; border-radius:4px; padding:1px 3px;">
-                            + COM: ${fmt(cUSD)}$ | ${fmt(cCDF)}FC
-                        </div>` 
-                        : ""
-                    }
-                </div>  
+    ${finalCashDisplay}
+
+    ${(cUSD > 0 || cCDF > 0) ? 
+                `<div style="color:#0ea5e9; font-size:10px; font-weight:bold; background:#f0f9ff; border-radius:4px; padding:1px 3px;">
+            + COM: ${fmt(cUSD)}$ | ${fmt(cCDF)}FC
+        </div>` 
+        : ""
+    }
+</div>
+  
 
                 <div style="font-weight:800; color:${resteColor}; text-align:right; font-size:11px;">
                     ${resteTxt}
@@ -1705,73 +1771,85 @@ window.cancelTransaction = async function(index) {
     let message = "";
 
     if (estDetteMoi) {
-        // Message pour celui qui vous prête (Prêteur/Fournisseur/Ami)
-        message = `*MKA SHOP - MESSAGE DE GRATITUDE*\n\n` +
-                  `Je tiens à vous remercier sincèrement pour la confiance renouvelée en m'accordant ce complément de *${montantAjouteUsd}$ / ${montantAjouteCdf} FC*.\n` +
-                  `Ceci porte mon engagement total envers vous à *${totalUsd}$* et *${totalCdf} FC*. Votre soutien est précieux pour mes activités. Merci encore.`;
+        message = `*MKA SHOP — RECONNAISSANCE DE DETTE*\n\n` +
+                  `Bonjour,\n\n` +
+                  `Notre établissement *MKA SHOP* enregistre officiellement et reconnaît qu'il vous doit ce jour un montant complémentaire de *${fmt(montantAjouteUsd)}$ / ${fmt(montantAjouteCdf)} FC*.\n\n` +
+                  `Cela porte notre dette totale envers vous à *${fmt(totalUsd)}$* et *${fmt(totalCdf)} FC*.\n` +
+                  `Nous vous rassurons que nous mettons tout en œuvre pour vous payer à votre demande, à tout moment. Merci beaucoup pour votre confiance auprès de notre établissement.`;
     } else {
-        // Message pour le Client à qui vous accordez plus de crédit
-        message = `*MKA SHOP - GESTE DE CONFIANCE*\n\n` +
-                  `Cher(e) client(e) *${person}*, nous avons bien enregistré l'ajout de *${montantAjouteUsd}$ / ${montantAjouteCdf} FC* à votre compte.\n` +
-                  `Normalement, nous n'augmentons pas le crédit non soldé, mais nous le faisons pour vous par *CONFIANCE* en votre parole.\n` +
-                  `Votre nouveau solde total est de : *${totalUsd}$* et *${totalCdf} FC*. Merci pour votre honnêteté habituelle.`;
+        message = `*MKA SHOP — ACCORD DE CRÉDIT*\n\n` +
+                  `Cher(e) client(e) *${person.toUpperCase()}*,\n\n` +
+                  `Nous vous informons qu'un crédit complémentaire de *${fmt(montantAjouteUsd)}$ / ${fmt(montantAjouteCdf)} FC* a été accordé sur votre compte.\n\n` +
+                  `Votre solde débiteur total est désormais de *${fmt(totalUsd)}$* et *${fmt(totalCdf)} FC*.\n` +
+                  `Nous vous remercions pour votre fidélité et votre honnêteté habituelle.`;
     }
 
     const encodedMsg = encodeURIComponent(message);
     window.open(`https://wa.me/?text=${encodedMsg}`, '_blank');
 };
 
-    window.sendWhatsAppReminder = (person, usd, cdf) => {
+window.sendWhatsAppReminder = (person, usd, cdf) => {
     const filter = document.querySelector(".nav-hist button.active")?.id;
     const estDetteMoi = (filter === "btn-h-dette_moi");
 
     let message = "";
 
     if (estDetteMoi) {
-        // Message général pour celui à qui vous devez (Respectueux et rassurant)
-        message = `*MKA SHOP - GESTE DE CONFIANCE*\n\n` +
-        `Bonjour cher(e) *${person}*, 
-        Je vous contacte pour vous rassurer concernant le solde de *${usd}$ / ${cdf} FC* que je vous dois. 
-        Soyez certain que je mets tout en œuvre pour vous honorer. Merci encore pour votre confiance à mon égard.`;
+        message = `*MKA SHOP — ENGAGEMENT DE PAIEMENT*\n\n` +
+                  `Bonjour,\n\n` +
+                  `Notre établissement *MKA SHOP* enregistre et reconnaît qu'il vous doit actuellement les montants de : *${fmt(usd)}$* et *${fmt(cdf)} FC*.\n\n` +
+                  `Nous tenons à vous rassurer que nous sommes prêts à vous payer à votre demande, à tout moment. Merci beaucoup pour votre confiance continue auprès de notre établissement.`;
     } else {
-        // Message pour le client (Relance polie)
-        message = `*MKA SHOP - RAPPEL DE PAIEMENT*\n\n` +
-        `Bonjour cher(e) client(e) *${person}*,
-        Nous vous envoyons ce petit rappel concernant votre solde de *${usd}$* et *${cdf} FC*. 
-        Nous comptons sur votre passage habituel pour la régularisation. Merci de votre confiance.`;
+        message = `*MKA SHOP — RAPPEL DE RÉGULARISATION*\n\n` +
+                  `Bonjour cher(e) client(e) *${person.toUpperCase()}*,\n\n` +
+                  `Nous prenons contact pour vous informer que vous avez contracté une dette au sein de notre établissement.\n\n` +
+                  `Le montant à payer est de : *${fmt(usd)}$* et *${fmt(cdf)} FC*.\n\n` +
+                  `Nous vous invitons à bien vouloir régulariser cette situation au plus tôt, idéalement lors de vos prochains passages habituels. Merci pour votre confiance auprès de notre établissement.`;
     }
 
     const encodedMsg = encodeURIComponent(message);
     window.open(`https://wa.me/?text=${encodedMsg}`, '_blank');
 };
 
-    window.sendWhatsAppReceipt = (person, usdPaye, cdfPaye, resteUsd, resteCdf) => {
+window.sendWhatsAppReceipt = (person, usdPaye, cdfPaye, resteUsd, resteCdf) => {
     const estSolde = (resteUsd <= 0.1 && resteCdf <= 100);
     const filter = document.querySelector(".nav-hist button.active")?.id;
     const estDetteMoi = (filter === "btn-h-dette_moi");
     
-    let message = `*MKA SHOP - SUIVI DE PAIEMENT*\n\n`;
+    // Détermination automatique du canal de paiement (Cash ou le nom de la SIM)
+    let canalPaiement = "en espèces (Cash)";
+    const opSelect = document.getElementById("settleOpIdx");
+    const destSelect = document.getElementById("settleDest");
+    
+    if (destSelect && destSelect.value !== "caisse") {
+        canalPaiement = `via le compte SIM *${destSelect.options[destSelect.selectedIndex].text}*`;
+    }
+
+    let message = `*MKA SHOP — REÇU DE PAIEMENT*\n\n`;
 
     if (estDetteMoi) {
-        message += `Bonjour cher(e) *${person}*,
-        Je viens de verser *${usdPaye}$* et *${cdfPaye} FC* sur la somme que je vous dois.\n`;
+        message += `Bonjour,\n\n` +
+                   `Nous vous confirmons que notre établissement vous a versé la somme de *${fmt(usdPaye)}$* et *${fmt(cdfPaye)} FC* par ${canalPaiement}.\n\n`;
         if (estSolde) {
-            message += `✅ La dette est maintenant *TOTALEMENT SOLDÉE*. Merci pour votre confiance !`;
+            message += `✅ Cette dette est désormais *TOTALEMENT SOLDÉE*. Merci infiniment pour votre confiance !`;
         } else {
-            message += `📉 Solde restant à vous payer : *${resteUsd}$* et *${resteCdf} FC*.`;
+            message += `📉 Le solde restant que notre établissement vous doit est de : *${fmt(resteUsd)}$* et *${fmt(resteCdf)} FC*.`;
         }
     } else {
-        message += `Cher(e) client(e) *${person}*, nous confirmons la réception de votre versement de *${usdPaye}$* et *${cdfPaye} FC*.\n`;
+        message += `Cher(e) client(e) *${person.toUpperCase()}*,\n\n` +
+                   `Nous vous confirmons la bonne réception de votre versement de *${fmt(usdPaye)}$* et *${fmt(cdfPaye)} FC* effectué par ${canalPaiement}.\n\n`;
         if (estSolde) {
-            message += `✅ Votre compte est maintenant *SOLDÉ*. Merci pour votre fidélité !`;
+            message += `✅ Votre compte est désormais *ENTIÈREMENT SOLDÉ*. Merci pour votre confiance et votre fidélité !`;
         } else {
-            message += `📉 Votre solde restant est de : *${resteUsd}$* et *${resteCdf} FC*.`;
+            message += `📉 Votre solde restant à payer est de : *${fmt(resteUsd)}$* et *${fmt(resteCdf)} FC*.\n\n` +
+                       `Au plaisir de vous revoir lors de vos passages habituels.`;
         }
     }
     
     const encodedMsg = encodeURIComponent(message);
     window.open(`https://wa.me/?text=${encodedMsg}`, '_blank');
 };
+
 
     function render() {
       const fmt = (n) => parseFloat(n || 0).toLocaleString('fr-FR', { 
