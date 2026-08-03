@@ -39,14 +39,62 @@
     .nav-hist button { width: auto; font-size: 11px; white-space: nowrap; background: #64748b; padding: 8px 12px; }    
     .nav-hist button.active { background: #0ea5e9; }    
     .debt-alert { background: #fff7ed; border: 1px solid #ea580c; color: #9a3412; padding: 8px; border-radius: 8px; font-size: 12px; margin-bottom: 5px; }  
-    /* Styles pour les suggestions de noms */
-#debtNameSuggestions div:hover {
-    background: #f1f5f9 !important;
-}
 
-#debtNameSuggestions div:last-child {
-    border-bottom: none;
-}
+    /* Styles pour la liste déroulante améliorée du règlement dette */
+    .debt-search-wrapper { position: relative; width: 100%; }
+    .debt-search-wrapper input { width: 100%; padding: 10px; font-size: 15px; border-radius: 8px; border: 1px solid #cbd5e1; box-sizing: border-box; }
+    .debt-suggestions {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid #cbd5e1;
+        border-top: none;
+        border-radius: 0 0 8px 8px;
+        max-height: 250px;
+        overflow-y: auto;
+        z-index: 1000;
+        box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+        display: none;
+    }
+    .debt-suggestions .suggestion-item {
+        padding: 10px 12px;
+        cursor: pointer;
+        border-bottom: 1px solid #f1f5f9;
+        font-size: 14px;
+        color: #0f172a;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: background 0.15s;
+    }
+    .debt-suggestions .suggestion-item:hover {
+        background: #f1f5f9;
+    }
+    .debt-suggestions .suggestion-item .debt-detail {
+        font-size: 12px;
+        font-weight: bold;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+    .debt-suggestions .suggestion-item .debt-detail .client-debt {
+        color: #dc2626;
+    }
+    .debt-suggestions .suggestion-item .debt-detail .moi-debt {
+        color: #16a34a;
+    }
+    .debt-suggestions .suggestion-item .debt-detail .badge {
+        font-size: 9px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-weight: bold;
+    }
+    .badge-client { background: #fee2e2; color: #991b1b; }
+    .badge-moi { background: #dcfce7; color: #166534; }
+    .badge-both { background: #fef3c7; color: #92400e; }
 </style>
 
 </head>    
@@ -128,7 +176,10 @@
     
     <div class="grid-2">
         <select id="settleOpIdx" onchange="checkDebtBalance()"></select>    
-        <input type="text" id="debtPersonName" placeholder="NOM DU CLIENT" oninput="checkDebtBalance()">  
+        <div class="debt-search-wrapper">
+            <input type="text" id="debtPersonName" placeholder="NOM DU CLIENT" autocomplete="off" oninput="filterDebtSuggestions()">
+            <div id="debtSuggestions" class="debt-suggestions"></div>
+        </div>
     </div>
     
     <div class="grid-2" style="margin: 8px 0;">
@@ -424,6 +475,20 @@ const save = window.save;
 const fmt = (n) => parseFloat(n || 0).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).replace(/,/g, '.');    
 const normalize = (str) => str ? str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : "";
 
+// ============================================
+// 🔥 NOUVELLE FONCTION : Normalisation ultra-permissive
+// Ignore les accents, points, virgules, espaces, majuscules
+// ============================================
+const normalizeStrict = (str) => {
+    if (!str) return "";
+    return str
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")      // Supprime les accents
+        .replace(/[.,;:!?'"()\[\]{}]/g, "")   // Supprime la ponctuation
+        .replace(/\s+/g, " ")                 // Réduit les espaces multiples
+        .trim();
+};
 
     window.login = () => {    
         const p = document.getElementById("pinInput").value;    
@@ -1875,7 +1940,147 @@ window.sendWhatsAppReceipt = (person, usdPaye, cdfPaye, resteUsd, resteCdf, cana
     window.open(`https://wa.me/?text=${encodedMsg}`, '_blank');
 };
 
+// =============================================
+// 🔥 NOUVEAU : Filtrage amélioré avec normalisation stricte
+// Ignore les accents, points, majuscules/minuscules, espaces
+// =============================================
+window.filterDebtSuggestions = function() {
+    const input = document.getElementById("debtPersonName");
+    const suggestionsBox = document.getElementById("debtSuggestions");
+    const query = input.value.trim();
+    
+    // Si la recherche est vide, on cache les suggestions
+    if (query.length === 0) {
+        suggestionsBox.style.display = "none";
+        return;
+    }
 
+    // Normalisation de la requête pour la comparaison
+    const queryNormalized = normalizeStrict(query);
+
+    // 1. Récupérer tous les noms uniques depuis les dettes (client + moi)
+    const debtNames = new Map(); // Utiliser un Map pour regrouper les infos
+
+    Object.keys(data.debts).forEach(key => {
+        // Format: "dette client_nom" ou "dette moi_nom"
+        const underscoreIndex = key.indexOf('_');
+        if (underscoreIndex === -1) return;
+        
+        const type = key.substring(0, underscoreIndex);
+        const name = key.substring(underscoreIndex + 1);
+        
+        if (!name || name.trim().length === 0) return;
+        
+        const normalizedName = name.trim();
+        const normalizedKey = normalizeStrict(normalizedName);
+        
+        if (!debtNames.has(normalizedKey)) {
+            debtNames.set(normalizedKey, { 
+                original: normalizedName,
+                client: { USD: 0, CDF: 0 }, 
+                moi: { USD: 0, CDF: 0 } 
+            });
+        }
+        
+        const debtData = data.debts[key] || { USD: 0, CDF: 0 };
+        
+        if (type === 'dette client') {
+            debtNames.get(normalizedKey).client = { USD: debtData.USD, CDF: debtData.CDF };
+        } else if (type === 'dette moi') {
+            debtNames.get(normalizedKey).moi = { USD: debtData.USD, CDF: debtData.CDF };
+        }
+    });
+
+    // 2. Ajouter les noms depuis les transactions (fallback)
+    data.transactions.forEach(t => {
+        if (t.person && t.person.trim().length > 0) {
+            const name = t.person.trim();
+            const normalizedKey = normalizeStrict(name);
+            if (!debtNames.has(normalizedKey)) {
+                debtNames.set(normalizedKey, { 
+                    original: name,
+                    client: { USD: 0, CDF: 0 }, 
+                    moi: { USD: 0, CDF: 0 } 
+                });
+            }
+        }
+    });
+
+    // 3. Filtrer selon la saisie avec normalisation stricte
+    const matchingNames = Array.from(debtNames.entries())
+        .filter(([key, data]) => key.includes(queryNormalized))
+        .sort((a, b) => a[0].localeCompare(b[0]));
+
+    // 4. Construire la liste des suggestions
+    if (matchingNames.length === 0) {
+        suggestionsBox.innerHTML = `<div style="padding:10px; color:#94a3b8; text-align:center; font-size:13px;">Aucun nom trouvé pour "${query}"</div>`;
+        suggestionsBox.style.display = "block";
+        return;
+    }
+
+    let html = '';
+    matchingNames.forEach(([normalizedKey, debts]) => {
+        const originalName = debts.original;
+        const clientDebt = debts.client || { USD: 0, CDF: 0 };
+        const moiDebt = debts.moi || { USD: 0, CDF: 0 };
+        
+        const hasClientDebt = clientDebt.USD > 0.01 || clientDebt.CDF > 50;
+        const hasMoiDebt = moiDebt.USD > 0.01 || moiDebt.CDF > 50;
+
+        let debtDisplay = '';
+        let badgeHtml = '';
+
+        if (hasClientDebt && hasMoiDebt) {
+            badgeHtml = `<span class="badge badge-both">🔁 Client & Moi</span>`;
+            debtDisplay = `
+                <span class="client-debt">${fmt(clientDebt.USD)}$ / ${fmt(clientDebt.CDF)}FC</span>
+                <span style="color:#94a3b8;">|</span>
+                <span class="moi-debt">${fmt(moiDebt.USD)}$ / ${fmt(moiDebt.CDF)}FC</span>
+            `;
+        } else if (hasClientDebt) {
+            badgeHtml = `<span class="badge badge-client">Client doit</span>`;
+            debtDisplay = `<span class="client-debt">${fmt(clientDebt.USD)}$ / ${fmt(clientDebt.CDF)}FC</span>`;
+        } else if (hasMoiDebt) {
+            badgeHtml = `<span class="badge badge-moi">Vous devez</span>`;
+            debtDisplay = `<span class="moi-debt">${fmt(moiDebt.USD)}$ / ${fmt(moiDebt.CDF)}FC</span>`;
+        } else {
+            debtDisplay = `<span style="color:#94a3b8; font-size:11px;">Aucune dette</span>`;
+        }
+
+        // Mettre en évidence la correspondance
+        const displayName = originalName;
+
+        html += `
+            <div class="suggestion-item" onclick="selectDebtName('${originalName.replace(/'/g, "\\'")}')">
+                <span style="font-weight:500;">${displayName}</span>
+                <div class="debt-detail">
+                    ${badgeHtml}
+                    ${debtDisplay}
+                </div>
+            </div>
+        `;
+    });
+
+    suggestionsBox.innerHTML = html;
+    suggestionsBox.style.display = "block";
+};
+
+window.selectDebtName = function(name) {
+    document.getElementById("debtPersonName").value = name;
+    document.getElementById("debtSuggestions").style.display = "none";
+    checkDebtBalance();
+};
+
+// Clic en dehors de la liste pour la fermer
+document.addEventListener('click', function(e) {
+    const wrapper = document.querySelector('.debt-search-wrapper');
+    if (wrapper && !wrapper.contains(e.target)) {
+        const suggestions = document.getElementById('debtSuggestions');
+        if (suggestions) suggestions.style.display = 'none';
+    }
+});
+
+// =============================================
 
     function render() {
       const fmt = (n) => parseFloat(n || 0).toLocaleString('fr-FR', { 
