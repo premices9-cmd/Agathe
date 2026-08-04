@@ -1,103 +1,184 @@
-<!DOCTYPE html>  <html lang="fr">    <head>    
-   <meta charset="UTF-8">    
-   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">    
-
+<!DOCTYPE html>  
+<html lang="fr">  
+<head>  
+   <meta charset="UTF-8">  
+   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">  
    <link rel="manifest" href="manifest.json">
-
-   <meta name="apple-mobile-web-app-capable" content="yes">    
+   <meta name="apple-mobile-web-app-capable" content="yes">  
    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
    <meta name="apple-mobile-web-app-title" content="MKA Shop">
    <link rel="apple-touch-icon" href="icon.png">
-   <link rel="icon" href="icon.png"> <title>MKA Pro Business V5.3.0 - Full Logic</title>    
+   <link rel="icon" href="icon.png"> 
+   <title>MKA Pro Business V5.3.0 - Full Logic</title>  
    <meta name="theme-color" content="#0f172a">  
-
    <meta name="mobile-web-app-capable" content="yes">
-   
    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
- <style>    
-    body { font-family: 'Segoe UI', sans-serif; background: #0f172a; margin: 0; color: white; padding-bottom: 50px; }    
-    .container { background: white; color: black; margin: 10px; padding: 15px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }    
-    input, select, button { padding: 12px; margin: 5px 0; border-radius: 8px; border: 1px solid #cbd5e1; width: 100%; box-sizing: border-box; font-size: 15px; }    
-    button { cursor: pointer; background: #0f172a; color: white; font-weight: bold; border: none; transition: 0.2s; }    
-    button:active { transform: scale(0.96); opacity: 0.8; }    
-    .card { background: #f1f5f9; padding: 10px; margin: 8px 0; border-radius: 8px; border-left: 5px solid #0f172a; font-size: 13px; position: relative; }    
-    .card.negative { border-left: 5px solid #ef4444; color: #b91c1c; background: #fef2f2; }    
-    .hidden { display: none !important; }    
-    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }    
-    .vnc-box { background: linear-gradient(135deg, #1e293b, #0f172a); color: white; padding: 18px; border-radius: 15px; text-align: center; margin-bottom: 15px; border: 2px solid #facc15; }    
-    .vnc-val { font-size: 28px; font-weight: bold; color: #facc15; }    
-    .mixed-box { background: #f8fafc; border: 2px solid #1e293b; padding: 10px; border-radius: 10px; margin: 10px 0; }    
-    .change-box { background: #f0f9ff; border: 2px solid #0ea5e9; padding: 12px; border-radius: 12px; margin: 15px 0; }    
-    .admin-box { border: 2px solid #ef4444; padding: 15px; border-radius: 12px; margin-top: 20px; background: #fff1f2; color: #991b1b; }    
-    .label-sm { font-size: 11px; font-weight: bold; color: #64748b; margin-top: 5px; display: block; text-transform: uppercase; }    
-    .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; z-index: 9999; }    
-    .modal-content { background: white; color: black; padding: 20px; border-radius: 15px; width: 95%; max-height: 90vh; overflow-y: auto; }    
-    .btn-del { background: #ef4444; padding: 4px 8px; font-size: 10px; width: auto; position: absolute; right: 10px; top: 10px; color: white; border-radius: 5px; cursor: pointer; }    
-    .nav-hist { display: flex; overflow-x: auto; gap: 5px; margin-bottom: 15px; padding-bottom: 5px; }    
-    .nav-hist button { width: auto; font-size: 11px; white-space: nowrap; background: #64748b; padding: 8px 12px; }    
-    .nav-hist button.active { background: #0ea5e9; }    
-    .debt-alert { background: #fff7ed; border: 1px solid #ea580c; color: #9a3412; padding: 8px; border-radius: 8px; font-size: 12px; margin-bottom: 5px; }  
+<style>  
+   body { font-family: 'Segoe UI', sans-serif; background: #0f172a; margin: 0; color: white; padding-bottom: 50px; }  
+   .container { background: white; color: black; margin: 10px; padding: 15px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }  
+   input, select, button { padding: 12px; margin: 5px 0; border-radius: 8px; border: 1px solid #cbd5e1; width: 100%; box-sizing: border-box; font-size: 15px; }  
+   button { cursor: pointer; background: #0f172a; color: white; font-weight: bold; border: none; transition: 0.2s; }  
+   button:active { transform: scale(0.96); opacity: 0.8; }  
+   .card { background: #f1f5f9; padding: 10px; margin: 8px 0; border-radius: 8px; border-left: 5px solid #0f172a; font-size: 13px; position: relative; }  
+   .card.negative { border-left: 5px solid #ef4444; color: #b91c1c; background: #fef2f2; }  
+   .hidden { display: none !important; }  
+   .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }  
+   .vnc-box { background: linear-gradient(135deg, #1e293b, #0f172a); color: white; padding: 18px; border-radius: 15px; text-align: center; margin-bottom: 15px; border: 2px solid #facc15; }  
+   .vnc-val { font-size: 28px; font-weight: bold; color: #facc15; }  
+   .mixed-box { background: #f8fafc; border: 2px solid #1e293b; padding: 10px; border-radius: 10px; margin: 10px 0; }  
+   .change-box { background: #f0f9ff; border: 2px solid #0ea5e9; padding: 12px; border-radius: 12px; margin: 15px 0; }  
+   .admin-box { border: 2px solid #ef4444; padding: 15px; border-radius: 12px; margin-top: 20px; background: #fff1f2; color: #991b1b; }  
+   .label-sm { font-size: 11px; font-weight: bold; color: #64748b; margin-top: 5px; display: block; text-transform: uppercase; }  
+   .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; z-index: 9999; }  
+   .modal-content { background: white; color: black; padding: 20px; border-radius: 15px; width: 95%; max-height: 90vh; overflow-y: auto; }  
+   .btn-del { background: #ef4444; padding: 4px 8px; font-size: 10px; width: auto; position: absolute; right: 10px; top: 10px; color: white; border-radius: 5px; cursor: pointer; }  
+   .nav-hist { display: flex; overflow-x: auto; gap: 5px; margin-bottom: 15px; padding-bottom: 5px; }  
+   .nav-hist button { width: auto; font-size: 11px; white-space: nowrap; background: #64748b; padding: 8px 12px; }  
+   .nav-hist button.active { background: #0ea5e9; }  
+   .debt-alert { background: #fff7ed; border: 1px solid #ea580c; color: #9a3412; padding: 8px; border-radius: 8px; font-size: 12px; margin-bottom: 5px; }  
 
-    /* Styles pour la liste déroulante améliorée du règlement dette */
-    .debt-search-wrapper { position: relative; width: 100%; }
-    .debt-search-wrapper input { width: 100%; padding: 10px; font-size: 15px; border-radius: 8px; border: 1px solid #cbd5e1; box-sizing: border-box; }
-    .debt-suggestions {
-        position: absolute;
-        top: 100%;
-        left: 0;
-        right: 0;
-        background: white;
-        border: 1px solid #cbd5e1;
-        border-top: none;
-        border-radius: 0 0 8px 8px;
-        max-height: 250px;
-        overflow-y: auto;
-        z-index: 1000;
-        box-shadow: 0 8px 16px rgba(0,0,0,0.1);
-        display: none;
-    }
-    .debt-suggestions .suggestion-item {
-        padding: 10px 12px;
-        cursor: pointer;
-        border-bottom: 1px solid #f1f5f9;
-        font-size: 14px;
-        color: #0f172a;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        transition: background 0.15s;
-    }
-    .debt-suggestions .suggestion-item:hover {
-        background: #f1f5f9;
-    }
-    .debt-suggestions .suggestion-item .debt-detail {
-        font-size: 12px;
-        font-weight: bold;
-        display: flex;
-        gap: 10px;
-        align-items: center;
-        flex-wrap: wrap;
-    }
-    .debt-suggestions .suggestion-item .debt-detail .client-debt {
-        color: #dc2626;
-    }
-    .debt-suggestions .suggestion-item .debt-detail .moi-debt {
-        color: #16a34a;
-    }
-    .debt-suggestions .suggestion-item .debt-detail .badge {
-        font-size: 9px;
-        padding: 2px 6px;
-        border-radius: 4px;
-        font-weight: bold;
-    }
-    .badge-client { background: #fee2e2; color: #991b1b; }
-    .badge-moi { background: #dcfce7; color: #166534; }
-    .badge-both { background: #fef3c7; color: #92400e; }
+   /* Styles pour la liste déroulante améliorée du règlement dette */
+   .debt-search-wrapper { position: relative; width: 100%; }
+   .debt-search-wrapper input { width: 100%; padding: 10px; font-size: 15px; border-radius: 8px; border: 1px solid #cbd5e1; box-sizing: border-box; }
+   .debt-suggestions {
+       position: absolute;
+       top: 100%;
+       left: 0;
+       right: 0;
+       background: white;
+       border: 1px solid #cbd5e1;
+       border-top: none;
+       border-radius: 0 0 8px 8px;
+       max-height: 250px;
+       overflow-y: auto;
+       z-index: 1000;
+       box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+       display: none;
+   }
+   .debt-suggestions .suggestion-item {
+       padding: 10px 12px;
+       cursor: pointer;
+       border-bottom: 1px solid #f1f5f9;
+       font-size: 14px;
+       color: #0f172a;
+       display: flex;
+       justify-content: space-between;
+       align-items: center;
+       transition: background 0.15s;
+   }
+   .debt-suggestions .suggestion-item:hover {
+       background: #f1f5f9;
+   }
+   .debt-suggestions .suggestion-item .debt-detail {
+       font-size: 12px;
+       font-weight: bold;
+       display: flex;
+       gap: 10px;
+       align-items: center;
+       flex-wrap: wrap;
+   }
+   .debt-suggestions .suggestion-item .debt-detail .client-debt {
+       color: #dc2626;
+   }
+   .debt-suggestions .suggestion-item .debt-detail .moi-debt {
+       color: #16a34a;
+   }
+   .debt-suggestions .suggestion-item .debt-detail .badge {
+       font-size: 9px;
+       padding: 2px 6px;
+       border-radius: 4px;
+       font-weight: bold;
+   }
+   .badge-client { background: #fee2e2; color: #991b1b; }
+   .badge-moi { background: #dcfce7; color: #166534; }
+   .badge-both { background: #fef3c7; color: #92400e; }
+
+   /* Styles pour la recherche de noms dans les opérations clients */
+   .client-name-search-wrapper { position: relative; width: 100%; }
+   .client-name-search-wrapper input { width: 100%; padding: 10px; font-size: 15px; border-radius: 8px; border: 1px solid #cbd5e1; box-sizing: border-box; }
+   .client-name-suggestions {
+       position: absolute;
+       top: 100%;
+       left: 0;
+       right: 0;
+       background: white;
+       border: 1px solid #cbd5e1;
+       border-top: none;
+       border-radius: 0 0 8px 8px;
+       max-height: 200px;
+       overflow-y: auto;
+       z-index: 1000;
+       box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+       display: none;
+   }
+   .client-name-suggestions .suggestion-item {
+       padding: 8px 12px;
+       cursor: pointer;
+       border-bottom: 1px solid #f1f5f9;
+       font-size: 13px;
+       color: #0f172a;
+       display: flex;
+       justify-content: space-between;
+       align-items: center;
+       transition: background 0.15s;
+   }
+   .client-name-suggestions .suggestion-item:hover {
+       background: #f1f5f9;
+   }
+   .client-name-suggestions .suggestion-item .delete-name-btn {
+       background: #ef4444;
+       color: white;
+       border: none;
+       border-radius: 50%;
+       width: 22px;
+       height: 22px;
+       font-size: 12px;
+       font-weight: bold;
+       cursor: pointer;
+       display: flex;
+       align-items: center;
+       justify-content: center;
+       transition: 0.2s;
+   }
+   .client-name-suggestions .suggestion-item .delete-name-btn:hover {
+       transform: scale(1.1);
+       background: #dc2626;
+   }
+   .client-name-suggestions .suggestion-item .name-info {
+       display: flex;
+       flex-direction: column;
+       gap: 2px;
+   }
+   .client-name-suggestions .suggestion-item .name-info .name-status {
+       font-size: 10px;
+       color: #64748b;
+   }
+   .client-name-suggestions .suggestion-item .name-info .name-status .badge-client-small {
+       background: #fee2e2;
+       color: #991b1b;
+       padding: 1px 6px;
+       border-radius: 4px;
+       font-weight: bold;
+   }
+   .client-name-suggestions .suggestion-item .name-info .name-status .badge-moi-small {
+       background: #dcfce7;
+       color: #166534;
+       padding: 1px 6px;
+       border-radius: 4px;
+       font-weight: bold;
+   }
+   .client-name-suggestions .suggestion-item .name-info .name-status .badge-both-small {
+       background: #fef3c7;
+       color: #92400e;
+       padding: 1px 6px;
+       border-radius: 4px;
+       font-weight: bold;
+   }
 </style>
 
-</head>    
+</head>  
 <body style="margin:0; padding:0;">
     <div style="text-align:center; padding: 20px 10px; background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%); border-bottom: 3px solid #facc15;">
         <img src="logo.png" 
@@ -114,11 +195,11 @@
      </button>
     </div>
 
-    <div class="container">    
-    <div id="loginSection">    
-        <h2 style="text-align:center">Connexion</h2>    
-        <input type="password" id="pinInput" placeholder="Code PIN Accès">    
-        <button onclick="login()">OUVRIR SESSION</button>    
+    <div class="container">  
+    <div id="loginSection">  
+        <h2 style="text-align:center">Connexion</h2>  
+        <input type="password" id="pinInput" placeholder="Code PIN Accès">  
+        <button onclick="login()">OUVRIR SESSION</button>  
     </div>    <div id="appSection" class="hidden"> 
     <div id="cleanupNotify" class="hidden" style="background: #fff7ed; border: 2px solid #ea580c; padding: 15px; border-radius: 12px; margin-bottom: 15px; text-align: center;">
     <strong style="color: #9a3412;">🧹 Nettoyage disponible</strong><br>
@@ -129,27 +210,27 @@
     </div>
 </div>
 
-    <div class="vnc-box">    
-        <span style="font-size: 11px; opacity: 0.8;">VALEUR NETTE COMPTABLE (VNC)</span><br>    
-        <div class="vnc-val" id="totalVNC">0.00 $</div>    
-        <div style="font-size: 10px;">Taux: <span id="rateM"></span> | Stock: <span id="totalStock">0</span></div>    
-    </div>    
+    <div class="vnc-box">  
+        <span style="font-size: 11px; opacity: 0.8;">VALEUR NETTE COMPTABLE (VNC)</span><br>  
+        <div class="vnc-val" id="totalVNC">0.00 $</div>  
+        <div style="font-size: 10px;">Taux: <span id="rateM"></span> | Stock: <span id="totalStock">0</span></div>  
+    </div>  
 
-    <div style="display:flex; justify-content:space-between; margin-bottom:15px;">    
-        <button onclick="logout()" style="background:#ef4444; width:auto; padding:8px 15px;">QUITTER</button>    
-        <div style="text-align:right; font-size: 13px;">    
-            <strong>Tiroir :</strong> <span id="caisseUSD" style="color:#16a34a">0</span>$ | <span id="caisseCDF" style="color:#16a34a">0</span>FC    
-        </div>    
-    </div>    
+    <div style="display:flex; justify-content:space-between; margin-bottom:15px;">  
+        <button onclick="logout()" style="background:#ef4444; width:auto; padding:8px 15px;">QUITTER</button>  
+        <div style="text-align:right; font-size: 13px;">  
+            <strong>Tiroir :</strong> <span id="caisseUSD" style="color:#16a34a">0</span>$ | <span id="caisseCDF" style="color:#16a34a">0</span>FC  
+        </div>  
+    </div>  
 
-    <div id="operatorBalances"></div>    
+    <div id="operatorBalances"></div>  
 
-    <div class="change-box">    
-        <h4 style="margin:0 0 10px 0; color:#0369a1;">🔄 Change & Transfert</h4>    
-        <select id="srcWallet" onchange="calcDest()"></select>    
-        <div class="grid-2">    
-            <input type="number" id="srcAmt" placeholder="Montant" oninput="calcDest()">    
-            <select id="srcCurr" onchange="calcDest()"><option value="USD">USD</option><option value="CDF">CDF</option></select>    
+    <div class="change-box">  
+        <h4 style="margin:0 0 10px 0; color:#0369a1;">🔄 Change & Transfert</h4>  
+        <select id="srcWallet" onchange="calcDest()"></select>  
+        <div class="grid-2">  
+            <input type="number" id="srcAmt" placeholder="Montant" oninput="calcDest()">  
+            <select id="srcCurr" onchange="calcDest()"><option value="USD">USD</option><option value="CDF">CDF</option></select>  
         </div>   
         <div style="margin: 5px 0;">
     <label class="label-sm" style="color:#0ea5e9;">Taux de l'opération :</label>
@@ -159,17 +240,17 @@
     </div>
 </div>
 
-        <label class="label-sm">Vers :</label>    
-        <select id="destWallet"></select>    
-        <div class="grid-2">    
-            <input type="number" id="destAmt" readonly style="background:#e2e8f0; font-weight:bold">    
-            <select id="destCurr" onchange="calcDest()"><option value="CDF">CDF</option><option value="USD">USD</option></select>    
-        </div>    
-        <input type="text" id="transferMotif" placeholder="Motif Transfert">    
-        <button onclick="executeGlobalChange()" style="background:#0ea5e9; width:100%;">VALIDER TRANSFERT</button>    
-    </div>    
+        <label class="label-sm">Vers :</label>  
+        <select id="destWallet"></select>  
+        <div class="grid-2">  
+            <input type="number" id="destAmt" readonly style="background:#e2e8f0; font-weight:bold">  
+            <select id="destCurr" onchange="calcDest()"><option value="CDF">CDF</option><option value="USD">USD</option></select>  
+        </div>  
+        <input type="text" id="transferMotif" placeholder="Motif Transfert">  
+        <button onclick="executeGlobalChange()" style="background:#0ea5e9; width:100%;">VALIDER TRANSFERT</button>  
+    </div>  
 
-    <hr>    
+    <hr>  
     <div id="debtSettlementBox" style="background:#fefce8; border:2px solid #eab308; padding:15px; border-radius:12px; margin-bottom:15px;">  
     <h4 style="margin:0 0 5px 0; color:#854d0e;">💰 Règlement Précis des Dettes</h4>  
     <div id="debtStatus" class="debt-alert hidden"></div>  
@@ -231,150 +312,146 @@
 </div>
 
 
-    <hr>    
-    <h2>Opérations Clients</h2>    
-    <div class="grid-2">    
-        <select id="operatorSelect" onchange="togglePaySim()"></select>    
-        <select id="typeSelect" onchange="updateDefaultStockMove()"></select>    
-    </div>    
-    <div class="grid-2">    
-    <input type="number" id="amount" placeholder="Montant Opération">    
+    <hr>  
+    <h2>Opérations Clients</h2>  
+    <div class="grid-2">  
+        <select id="operatorSelect" onchange="togglePaySim()"></select>  
+        <select id="typeSelect" onchange="updateDefaultStockMove()"></select>  
+    </div>  
+    <div class="grid-2">  
+    <input type="number" id="amount" placeholder="Montant Opération">  
     <div style="display:flex; gap:2px;">
         <input type="number" id="opTaux" placeholder="Taux (ex: 2850)">
         <button type="button" onclick="document.getElementById('opTaux').value = data.taux" style="width:45px; background:#64748b; font-size:10px;">DEFAUT</button>
         </div>
     </div>
-       <input type="number" id="stkMove" step="any" inputmode="decimal" placeholder="Stock (+/-)">
+    <input type="number" id="stkMove" step="any" inputmode="decimal" placeholder="Stock (+/-)">
 
-    
-    <select id="currency" style="margin-bottom: 10px;"><option value="USD">USD</option><option value="CDF">CDF</option></select>    
+    <select id="currency" style="margin-bottom: 10px;"><option value="USD">USD</option><option value="CDF">CDF</option></select>  
 
-    <div id="mixedFields" class="mixed-box">    
-        <label class="label-sm" style="color:#1e293b">Détail Cash (Tiroir) :</label>    
-        <div class="grid-2">    
-            <input type="number" id="mixUSD" placeholder="Cash $">    
-            <div style="display:flex; gap:2px;">    
-                <input type="number" id="mixCDF" placeholder="Cash FC">    
-                <button onclick="autoCalcMix()" style="width:45px; background:#1e293b; font-size:10px;">CALC</button>    
-            </div>    
-        </div>    
-        <div class="grid-2" style="margin-top:5px;">    
-            <input type="number" id="commUSD" placeholder="+ Frais $">    
-            <input type="number" id="commCDF" placeholder="+ Frais FC">    
-        </div>    
-    </div>    
+    <div id="mixedFields" class="mixed-box">  
+        <label class="label-sm" style="color:#1e293b">Détail Cash (Tiroir) :</label>  
+        <div class="grid-2">  
+            <input type="number" id="mixUSD" placeholder="Cash $">  
+            <div style="display:flex; gap:2px;">  
+                <input type="number" id="mixCDF" placeholder="Cash FC">  
+                <button onclick="autoCalcMix()" style="width:45px; background:#1e293b; font-size:10px;">CALC</button>  
+            </div>  
+        </div>  
+        <div class="grid-2" style="margin-top:5px;">  
+            <input type="number" id="commUSD" placeholder="+ Frais $">  
+            <input type="number" id="commCDF" placeholder="+ Frais FC">  
+        </div>  
+    </div>  
 
-    <label class="label-sm">Mode de Règlement :</label>    
-    <select id="payMode" onchange="togglePaySim()">    
-        <option value="cash">Paiement Cash (Tiroir)</option>    
-        <option value="virtuel">Via une autre SIM (Inter-SIM)</option>    
-        <option value="depense">Dépense (Sortie SIM)</option>    
-        <option value="dette_client">Dette Client (Sortie non payée)</option>    
-        <option value="dette_moi">Dette Moi (Entrée non payée)</option>    
-    </select>    
+    <label class="label-sm">Mode de Règlement :</label>  
+    <select id="payMode" onchange="togglePaySim()">  
+        <option value="cash">Paiement Cash (Tiroir)</option>  
+        <option value="virtuel">Via une autre SIM (Inter-SIM)</option>  
+        <option value="depense">Dépense (Sortie SIM)</option>  
+        <option value="dette_client">Dette Client (Sortie non payée)</option>  
+        <option value="dette_moi">Dette Moi (Entrée non payée)</option>  
+    </select>  
         
-    <div id="paySimBox" class="hidden" style="margin-top:5px;">    
-        <label class="label-sm" style="color:#8b5cf6;">Choisir la SIM source :</label>    
-        <select id="paySimSelect" style="border: 2px solid #8b5cf6;"></select>    
-    </div>    
+    <div id="paySimBox" class="hidden" style="margin-top:5px;">  
+        <label class="label-sm" style="color:#8b5cf6;">Choisir la SIM source :</label>  
+        <select id="paySimSelect" style="border: 2px solid #8b5cf6;"></select>  
+    </div>  
 
     <div id="debtNameBox" class="hidden">  
         <label class="label-sm" style="color:#ef4444;">Nom de la personne (Dette) :</label>  
-        <input type="text" id="personName" placeholder="Ex: Maman Rose, Agent Airtel...">  
+        <div class="client-name-search-wrapper">
+            <input type="text" id="personName" placeholder="Ex: Maman Rose, Agent Airtel..." autocomplete="off" oninput="filterClientNames()">
+            <div id="clientNameSuggestions" class="client-name-suggestions"></div>
+        </div>
     </div>  
         
-    <input type="text" id="motif" placeholder="Référence / Client" oninput="togglePaySim()">    
-    <button onclick="addTransaction()" style="background:#16a34a; margin-top:10px;">ENREGISTRER L'OPÉRATION</button>    
-    <button onclick="showFullHistory('general')" style="background:#64748b; margin-top:10px;">HISTORIQUES DÉTAILLÉS</button>    
+    <input type="text" id="motif" placeholder="Référence / Client" oninput="togglePaySim()">  
+    <button onclick="addTransaction()" style="background:#16a34a; margin-top:10px;">ENREGISTRER L'OPÉRATION</button>  
+    <button onclick="showFullHistory('general')" style="background:#64748b; margin-top:10px;">HISTORIQUES DÉTAILLÉS</button>  
 
-    <div id="adminSection" class="hidden">    
-        <div class="admin-box">    
-            <h3>🔧 Configuration Admin</h3>    
-            <div style="background:#fee2e2; padding:10px; border-radius:8px; margin-bottom:10px; color:black; border:1px solid #ef4444;">    
-                <h4>🔐 Sécurité & Codes PIN</h4>    
-                <div class="grid-2">    
-                    <div><label class="label-sm">PIN Admin</label><input type="text" id="newPinAdmin" placeholder="Code Admin"></div>    
-                    <div><label class="label-sm">PIN Employé</label><input type="text" id="newPinUser" placeholder="Code Employé"></div>    
-                </div>    
-                <button onclick="updatePins()" style="background:#b91c1c">CHANGER LES CODES</button>    
-            </div>    
+    <div id="adminSection" class="hidden">  
+        <div class="admin-box">  
+            <h3>🔧 Configuration Admin</h3>  
+            <div style="background:#fee2e2; padding:10px; border-radius:8px; margin-bottom:10px; color:black; border:1px solid #ef4444;">  
+                <h4>🔐 Sécurité & Codes PIN</h4>  
+                <div class="grid-2">  
+                    <div><label class="label-sm">PIN Admin</label><input type="text" id="newPinAdmin" placeholder="Code Admin"></div>  
+                    <div><label class="label-sm">PIN Employé</label><input type="text" id="newPinUser" placeholder="Code Employé"></div>  
+                </div>  
+                <button onclick="updatePins()" style="background:#b91c1c">CHANGER LES CODES</button>  
+            </div>  
 
-            <div style="background:white; padding:10px; border-radius:8px; margin-bottom:10px; color:black;">    
-                <h4>Créer Type d'Action</h4>    
-                <input type="text" id="newTypeName" placeholder="Nom (ex: Vente SIM)">    
-                <div class="grid-2">    
-                    <label class="label-sm">SIM (-/+)</label>    
-                    <select id="impO"><option value="-1">SIM (-)</option><option value="1">SIM (+)</option><option value="0">SIM (0)</option></select>    
-                </div>    
-                <div class="grid-2">    
-                    <label class="label-sm">Caisse (-/+)</label>    
-                    <select id="impC"><option value="1">Caisse (+)</option><option value="-1">Caisse (-)</option><option value="0">Caisse (0)</option></select>    
-                </div>    
-                <div class="grid-2">    
-                    <label class="label-sm">Impact Stock</label>    
-                    <select id="impS"><option value="0">Aucun (0)</option><option value="-1">Vente (-1)</option><option value="1">Achat (+1)</option></select>    
-                </div>    
-                <button onclick="addType()" style="background:#0f172a; margin-top:5px;">CRÉER TYPE</button>    
-                <div id="adminTypeList" style="margin-top:10px; font-size:11px;"></div>    
-            </div>    
+            <div style="background:white; padding:10px; border-radius:8px; margin-bottom:10px; color:black;">  
+                <h4>Créer Type d'Action</h4>  
+                <input type="text" id="newTypeName" placeholder="Nom (ex: Vente SIM)">  
+                <div class="grid-2">  
+                    <label class="label-sm">SIM (-/+)</label>  
+                    <select id="impO"><option value="-1">SIM (-)</option><option value="1">SIM (+)</option><option value="0">SIM (0)</option></select>  
+                </div>  
+                <div class="grid-2">  
+                    <label class="label-sm">Caisse (-/+)</label>  
+                    <select id="impC"><option value="1">Caisse (+)</option><option value="-1">Caisse (-)</option><option value="0">Caisse (0)</option></select>  
+                </div>  
+                <div class="grid-2">  
+                    <label class="label-sm">Impact Stock</label>  
+                    <select id="impS"><option value="0">Aucun (0)</option><option value="-1">Vente (-1)</option><option value="1">Achat (+1)</option></select>  
+                </div>  
+                <button onclick="addType()" style="background:#0f172a; margin-top:5px;">CRÉER TYPE</button>  
+                <div id="adminTypeList" style="margin-top:10px; font-size:11px;"></div>  
+            </div>  
 
-            <div style="background:white; padding:10px; border-radius:8px; margin-bottom:10px; color:black;">    
-                <h4>Paramètres Généraux</h4>    
-                <input type="number" id="newTaux" placeholder="Taux">    
-                <div class="grid-2">    
-                    <input type="number" id="editCashUSD" placeholder="Caisse $">    
-                    <input type="number" id="editCashCDF" placeholder="Caisse FC">    
-                </div>    
-                <button onclick="updateAdminBasics()" style="background:#0f172a">APPLIQUER</button>    
-                </div>    
+            <div style="background:white; padding:10px; border-radius:8px; margin-bottom:10px; color:black;">  
+                <h4>Paramètres Généraux</h4>  
+                <input type="number" id="newTaux" placeholder="Taux">  
+                <div class="grid-2">  
+                    <input type="number" id="editCashUSD" placeholder="Caisse $">  
+                    <input type="number" id="editCashCDF" placeholder="Caisse FC">  
+                </div>  
+                <button onclick="updateAdminBasics()" style="background:#0f172a">APPLIQUER</button>  
+                </div>  
 
-            <div style="background:white; padding:10px; border-radius:8px; margin-bottom:10px; color:black; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">    
-                <h4 style="margin-top:0; margin-bottom:10px; color:#b91c1c;">Nouveau Compte</h4>    
-    
-                <input type="text" id="newOpName" placeholder="Nom du compte (ex: Airtel 01)" style="width:100%; margin-bottom:8px; padding:8px; border:1px solid #ccc; border-radius:4px;">    
-    
-                <div class="grid-2" style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:8px;">    
-                    <input type="number" id="initUSD" placeholder="Solde Initial $" step="any" style="padding:8px; border:1px solid #ccc; border-radius:4px;">    
-                    <input type="number" id="initCDF" placeholder="Solde Initial FC" step="any" style="padding:8px; border:1px solid #ccc; border-radius:4px;">    
-               </div>    
-    
-               <div class="grid-2" style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:10px;">    
+            <div style="background:white; padding:10px; border-radius:8px; margin-bottom:10px; color:black; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">  
+                <h4 style="margin-top:0; margin-bottom:10px; color:#b91c1c;">Nouveau Compte</h4>  
+                <input type="text" id="newOpName" placeholder="Nom du compte (ex: Airtel 01)" style="width:100%; margin-bottom:8px; padding:8px; border:1px solid #ccc; border-radius:4px;">  
+                <div class="grid-2" style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:8px;">  
+                    <input type="number" id="initUSD" placeholder="Solde Initial $" step="any" style="padding:8px; border:1px solid #ccc; border-radius:4px;">  
+                    <input type="number" id="initCDF" placeholder="Solde Initial FC" step="any" style="padding:8px; border:1px solid #ccc; border-radius:4px;">  
+               </div>  
+               <div class="grid-2" style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:10px;">  
                   <input type="number" id="initStock" placeholder="Stock SIM initial" step="any" inputmode="decimal" style="padding:8px; border:1px solid #ccc; border-radius:4px;">
-    
-                  <input type="number" id="initPrice" placeholder="Prix Achat SIM $" step="any" style="padding:8px; border:1px solid #ccc; border-radius:4px;">    
-               </div>    
-    
+                  <input type="number" id="initPrice" placeholder="Prix Achat SIM $" step="any" style="padding:8px; border:1px solid #ccc; border-radius:4px;">  
+               </div>  
                <button onclick="addOperator()" style="background:#b91c1c; color:white; width:100%; padding:10px; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">
         🚀 CRÉER LE COMPTE
-                </button>    
+                </button>  
                </div>
     
-               <div id="adminOpEditList" style="margin-top:10px; color:black;"></div>    
-        </div>    
-    </div>    
+               <div id="adminOpEditList" style="margin-top:10px; color:black;"></div>  
+        </div>  
+    </div>  
 </div>
 
-</div>    <div id="historyModal" class="modal hidden">    
-    <div class="modal-content">    
-        <button onclick="closeHistory()" style="background:#ef4444; float:right;">X</button>    
+</div>    <div id="historyModal" class="modal hidden">  
+    <div class="modal-content">  
+        <button onclick="closeHistory()" style="background:#ef4444; float:right;">X</button>  
         <button onclick="exportHistory()" style="background:#16a34a; float:left; width:auto; padding:8px 15px;">📥 EXPORT PDF</button>
-    
-        <div style="clear:both;"></div>    
-        <h2 id="histTitle" style="text-align:center; margin:10px 0;">Historique</h2>    
-        <div class="nav-hist">    
+        <div style="clear:both;"></div>  
+        <h2 id="histTitle" style="text-align:center; margin:10px 0;">Historique</h2>  
+        <div class="nav-hist">  
             <button id="btn-h-general" onclick="showFullHistory('general')">GÉNÉRAL</button>
             <button id="btn-h-money" onclick="showFullHistory('money')" style="background: #16a34a; font-weight: bold;">📊 MONEY SERVICE</button>  
-            <button id="btn-h-ventes" onclick="showFullHistory('ventes')">VENTES</button>    
-            <button id="btn-h-dette_client" onclick="showFullHistory('dette_client')">DETTES CLIENTS</button>    
+            <button id="btn-h-ventes" onclick="showFullHistory('ventes')">VENTES</button>  
+            <button id="btn-h-dette_client" onclick="showFullHistory('dette_client')">DETTES CLIENTS</button>  
             <button id="btn-h-dette_moi" onclick="showFullHistory('dette_moi')">DETTES MOI</button> 
             <button id="btn-h-depenses" onclick="showFullHistory('depenses')">DÉPENSES</button>
-
-        </div>    
-        <div id="fullHistoryList"></div>    
-    </div>    
-</div>    <script type="module">    
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";    
-    import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-database.js";    
+            <button id="btn-h-suppressions" onclick="showFullHistory('suppressions')" style="background: #ef4444; color:white;">🗑️ SUPPRESSIONS</button>
+        </div>  
+        <div id="fullHistoryList"></div>  
+    </div>  
+</div>    <script type="module">  
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";  
+    import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-database.js";  
 
 // --- 1. ENREGISTREMENT DU SERVICE WORKER ---
 if ('serviceWorker' in navigator) {
@@ -386,12 +463,12 @@ if ('serviceWorker' in navigator) {
 }
 
 // --- 2. CONFIGURATION FIREBASE ---
-const firebaseConfig = {    
-    apiKey: "AIzaSyDSK9sIPu8fvGebZQG9EdHBhlf7nl8Dmzs",    
-    authDomain: "mka-mobile-money.firebaseapp.com",    
-    databaseURL: "https://mka-mobile-money-default-rtdb.firebaseio.com",    
-    projectId: "mka-mobile-money"    
-};    
+const firebaseConfig = {  
+    apiKey: "AIzaSyDSK9sIPu8fvGebZQG9EdHBhlf7nl8Dmzs",  
+    authDomain: "mka-mobile-money.firebaseapp.com",  
+    databaseURL: "https://mka-mobile-money-default-rtdb.firebaseio.com",  
+    projectId: "mka-mobile-money"  
+};  
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
@@ -404,7 +481,8 @@ let data = {
     transactions: [],
     taux: 2800,
     config: { pinAdmin: "1234", pinUser: "0000" },
-    debts: {}
+    debts: {},
+    deletedNames: [] // Nouveau tableau pour garder la trace des noms supprimés
 };
 
 let isDataLoaded = false;
@@ -420,15 +498,14 @@ onValue(ref(db, 'mka_data'), (snap) => {
         return;
     }
 
-    // Mise à jour de l'objet global sans rompre les références
     data.operators = incoming.operators || [];
     data.types = incoming.types || [];
     data.config = incoming.config || data.config;
     data.debts = incoming.debts || {};
     data.caisse = incoming.caisse || { USD: 0, CDF: 0 };
     data.taux = incoming.taux || 2800;
+    data.deletedNames = incoming.deletedNames || [];
 
-    // Conversion des transactions (Objet Firebase -> Tableau trié du plus récent au plus ancien)
     const obj = incoming.transactions || {};
     data.transactions = Object.values(obj).sort((a, b) => b.timestamp - a.timestamp);
 
@@ -443,7 +520,7 @@ onValue(ref(db, 'mka_data'), (snap) => {
 });
 
 // ==========================================
-// 📤 ÉCRITURE ATOMIQUE SÉCURISÉE (ANTI-ÉCRASEMENT MULTI-TEL)
+// 📤 ÉCRITURE ATOMIQUE SÉCURISÉE
 // ==========================================
 window.save = async function() {
     if (!isDataLoaded) {
@@ -459,12 +536,10 @@ window.save = async function() {
         updates['mka_data/config'] = data.config;
         updates['mka_data/debts'] = data.debts;
         updates['mka_data/types'] = data.types;
-
-        // 🔥 CRUCIAL : On n'envoie plus TOUTES les transactions d'un coup ici.
-        // Les transactions individuelles sont déjà gérées à leur création.
+        updates['mka_data/deletedNames'] = data.deletedNames;
 
         await update(ref(db), updates);
-        console.log("Synchronisation des soldes réussie ✅");
+        console.log("Synchronisation réussie ✅");
     } catch (error) {
         console.error("Erreur de sauvegarde Firebase ❌ :", error);
         alert("⚠️ Problème de connexion. Les soldes ne sont pas synchronisés.");
@@ -472,55 +547,359 @@ window.save = async function() {
 };
 const save = window.save;
 
-const fmt = (n) => parseFloat(n || 0).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).replace(/,/g, '.');    
+const fmt = (n) => parseFloat(n || 0).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).replace(/,/g, '.');  
 const normalize = (str) => str ? str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : "";
 
 // ============================================
-// 🔥 NOUVELLE FONCTION : Normalisation ultra-permissive
-// Ignore les accents, points, virgules, espaces, majuscules
+// 🔥 NORMALISATION ULTRA-PERMISSIVE
 // ============================================
 const normalizeStrict = (str) => {
     if (!str) return "";
     return str
         .toLowerCase()
         .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")      // Supprime les accents
-        .replace(/[.,;:!?'"()\[\]{}]/g, "")   // Supprime la ponctuation
-        .replace(/\s+/g, " ")                 // Réduit les espaces multiples
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[.,;:!?'"()\[\]{}]/g, "")
+        .replace(/\s+/g, " ")
         .trim();
 };
 
-    window.login = () => {    
-        const p = document.getElementById("pinInput").value;    
-        if(p === data.config.pinAdmin) {    
-            document.getElementById("loginSection").classList.add("hidden");    
-            document.getElementById("appSection").classList.remove("hidden");    
-            document.getElementById("adminSection").classList.remove("hidden");    
-            document.getElementById("newPinAdmin").value = data.config.pinAdmin;    
-            document.getElementById("newPinUser").value = data.config.pinUser;    
-        } else if(p === data.config.pinUser) {    
-            document.getElementById("loginSection").classList.add("hidden");    
-            document.getElementById("appSection").classList.remove("hidden");    
-            document.getElementById("adminSection").classList.add("hidden");    
-        } else { alert("Code PIN Incorrect"); }    
-    };    
-  
-    window.logout = () => location.reload();    
-  
-    window.updatePins = () => {    
-        const pa = document.getElementById("newPinAdmin").value, pu = document.getElementById("newPinUser").value;    
-        if(pa && pu) { data.config.pinAdmin = pa; data.config.pinUser = pu; save(); alert("PIN mis à jour !"); }    
+// ============================================
+// 🔥 RÉCUPÉRATION DE TOUS LES NOMS UNIQUES AVEC LEUR SITUATION
+// ============================================
+function getAllClientNames() {
+    const nameMap = new Map();
+
+    // 1. Depuis les dettes
+    Object.keys(data.debts).forEach(key => {
+        const underscoreIndex = key.indexOf('_');
+        if (underscoreIndex === -1) return;
+        const type = key.substring(0, underscoreIndex);
+        const name = key.substring(underscoreIndex + 1);
+        if (!name || name.trim().length === 0) return;
+        const normalizedName = name.trim();
+        const normalizedKey = normalizeStrict(normalizedName);
+        if (!nameMap.has(normalizedKey)) {
+            nameMap.set(normalizedKey, { 
+                original: normalizedName,
+                client: { USD: 0, CDF: 0 }, 
+                moi: { USD: 0, CDF: 0 },
+                hasDebtClient: false,
+                hasDebtMoi: false
+            });
+        }
+        const debtData = data.debts[key] || { USD: 0, CDF: 0 };
+        if (type === 'dette client') {
+            nameMap.get(normalizedKey).client = { USD: debtData.USD, CDF: debtData.CDF };
+            nameMap.get(normalizedKey).hasDebtClient = debtData.USD > 0.01 || debtData.CDF > 50;
+        } else if (type === 'dette moi') {
+            nameMap.get(normalizedKey).moi = { USD: debtData.USD, CDF: debtData.CDF };
+            nameMap.get(normalizedKey).hasDebtMoi = debtData.USD > 0.01 || debtData.CDF > 50;
+        }
+    });
+
+    // 2. Depuis les transactions
+    data.transactions.forEach(t => {
+        if (t.person && t.person.trim().length > 0) {
+            const name = t.person.trim();
+            const normalizedKey = normalizeStrict(name);
+            if (!nameMap.has(normalizedKey)) {
+                nameMap.set(normalizedKey, { 
+                    original: name,
+                    client: { USD: 0, CDF: 0 }, 
+                    moi: { USD: 0, CDF: 0 },
+                    hasDebtClient: false,
+                    hasDebtMoi: false
+                });
+            }
+        }
+    });
+
+    // 3. Exclure les noms supprimés
+    const deletedKeys = data.deletedNames.map(n => normalizeStrict(n));
+    const result = Array.from(nameMap.entries())
+        .filter(([key]) => !deletedKeys.includes(key))
+        .map(([key, value]) => ({
+            key: key,
+            original: value.original,
+            client: value.client,
+            moi: value.moi,
+            hasDebtClient: value.hasDebtClient,
+            hasDebtMoi: value.hasDebtMoi
+        }))
+        .sort((a, b) => a.original.localeCompare(b.original));
+
+    return result;
+}
+
+// ============================================
+// 🔥 FILTRAGE DES NOMS POUR LE CHAMP CLIENT (Opérations)
+// ============================================
+window.filterClientNames = function() {
+    const input = document.getElementById("personName");
+    const suggestionsBox = document.getElementById("clientNameSuggestions");
+    const query = input.value.trim();
+    
+    const allNames = getAllClientNames();
+    
+    if (query.length === 0 || allNames.length === 0) {
+        suggestionsBox.style.display = "none";
+        return;
+    }
+
+    const queryNormalized = normalizeStrict(query);
+    const matchingNames = allNames
+        .filter(item => item.key.includes(queryNormalized) || normalizeStrict(item.original).includes(queryNormalized))
+        .slice(0, 15); // Limite pour éviter trop de résultats
+
+    if (matchingNames.length === 0) {
+        suggestionsBox.innerHTML = `<div style="padding:10px; color:#94a3b8; text-align:center; font-size:13px;">Aucun nom trouvé pour "${query}"</div>`;
+        suggestionsBox.style.display = "block";
+        return;
+    }
+
+    let html = '';
+    matchingNames.forEach(item => {
+        // Déterminer le statut
+        let statusHtml = '';
+        if (item.hasDebtClient && item.hasDebtMoi) {
+            statusHtml = `<span class="badge-both-small">🔁 Client doit ${fmt(item.client.USD)}$ / ${fmt(item.client.CDF)}FC & Vous devez ${fmt(item.moi.USD)}$ / ${fmt(item.moi.CDF)}FC</span>`;
+        } else if (item.hasDebtClient) {
+            statusHtml = `<span class="badge-client-small">📝 Client doit ${fmt(item.client.USD)}$ / ${fmt(item.client.CDF)}FC</span>`;
+        } else if (item.hasDebtMoi) {
+            statusHtml = `<span class="badge-moi-small">📝 Vous devez ${fmt(item.moi.USD)}$ / ${fmt(item.moi.CDF)}FC</span>`;
+        } else {
+            statusHtml = `<span style="color:#94a3b8; font-size:10px;">✅ Aucune dette active</span>`;
+        }
+
+        html += `
+            <div class="suggestion-item">
+                <div class="name-info" onclick="selectClientName('${item.original.replace(/'/g, "\\'")}')">
+                    <span style="font-weight:500;">${item.original}</span>
+                    <span class="name-status">${statusHtml}</span>
+                </div>
+                <button class="delete-name-btn" onclick="deleteClientName('${item.original.replace(/'/g, "\\'")}')" title="Supprimer ce nom du système">✕</button>
+            </div>
+        `;
+    });
+
+    suggestionsBox.innerHTML = html;
+    suggestionsBox.style.display = "block";
+};
+
+window.selectClientName = function(name) {
+    document.getElementById("personName").value = name;
+    document.getElementById("clientNameSuggestions").style.display = "none";
+    // Vérifier automatiquement le mode de paiement
+    togglePaySim();
+};
+
+// ============================================
+// 🔥 SUPPRESSION D'UN NOM DU SYSTÈME
+// ============================================
+window.deleteClientName = async function(name) {
+    if (!name || name.trim().length === 0) return;
+    const confirmMsg = `⚠️ Voulez-vous vraiment supprimer le nom "${name}" du système ?\n\nCette action :\n- Supprime ce nom des suggestions\n- Les transactions restent dans l'historique\n- Une trace sera enregistrée dans l'historique des suppressions`;
+    
+    if (!confirm(confirmMsg)) return;
+
+    try {
+        const normalizedName = normalizeStrict(name);
+        
+        // Ajouter à la liste des noms supprimés
+        if (!data.deletedNames.includes(name.trim())) {
+            data.deletedNames.push(name.trim());
+        }
+
+        // Enregistrer dans l'historique des suppressions
+        const uniqueTimestamp = Date.now();
+        const deleteEntry = {
+            timestamp: uniqueTimestamp,
+            date: new Date().toLocaleString("fr-FR", { timeZone: "Africa/Kinshasa" }),
+            typeNom: "SUPPRESSION_NOM",
+            desc: `🗑️ Suppression du nom "${name}" du système`,
+            person: name,
+            mode: 'suppression',
+            isDeletion: true
+        };
+
+        data.transactions.unshift(deleteEntry);
+
+        // Sauvegarder sur Firebase
+        const updates = {};
+        updates[`mka_data/transactions/${uniqueTimestamp}`] = deleteEntry;
+        updates['mka_data/deletedNames'] = data.deletedNames;
+
+        await update(ref(db), updates);
+
+        // Cacher les suggestions et vider le champ
+        document.getElementById("clientNameSuggestions").style.display = "none";
+        document.getElementById("personName").value = "";
+
+        alert(`✅ Le nom "${name}" a été supprimé du système. Une trace est enregistrée dans l'historique des suppressions.`);
+        render();
+
+    } catch (error) {
+        console.error("Erreur lors de la suppression du nom :", error);
+        alert("❌ Erreur réseau : Impossible de supprimer ce nom.");
+    }
+};
+
+// ============================================
+// 🔥 FILTRAGE DES SUGGESTIONS POUR LE RÈGLEMENT DES DETTES
+// ============================================
+window.filterDebtSuggestions = function() {
+    const input = document.getElementById("debtPersonName");
+    const suggestionsBox = document.getElementById("debtSuggestions");
+    const query = input.value.trim();
+    
+    if (query.length === 0) {
+        suggestionsBox.style.display = "none";
+        return;
+    }
+
+    const queryNormalized = normalizeStrict(query);
+    const debtNames = new Map();
+
+    Object.keys(data.debts).forEach(key => {
+        const underscoreIndex = key.indexOf('_');
+        if (underscoreIndex === -1) return;
+        const type = key.substring(0, underscoreIndex);
+        const name = key.substring(underscoreIndex + 1);
+        if (!name || name.trim().length === 0) return;
+        const normalizedName = name.trim();
+        const normalizedKey = normalizeStrict(normalizedName);
+        
+        // Vérifier si le nom n'a pas été supprimé
+        if (data.deletedNames.includes(normalizedName)) return;
+        
+        if (!debtNames.has(normalizedKey)) {
+            debtNames.set(normalizedKey, { 
+                original: normalizedName,
+                client: { USD: 0, CDF: 0 }, 
+                moi: { USD: 0, CDF: 0 } 
+            });
+        }
+        const debtData = data.debts[key] || { USD: 0, CDF: 0 };
+        if (type === 'dette client') {
+            debtNames.get(normalizedKey).client = { USD: debtData.USD, CDF: debtData.CDF };
+        } else if (type === 'dette moi') {
+            debtNames.get(normalizedKey).moi = { USD: debtData.USD, CDF: debtData.CDF };
+        }
+    });
+
+    const matchingNames = Array.from(debtNames.entries())
+        .filter(([key, data]) => key.includes(queryNormalized))
+        .sort((a, b) => a[0].localeCompare(b[0]));
+
+    if (matchingNames.length === 0) {
+        suggestionsBox.innerHTML = `<div style="padding:10px; color:#94a3b8; text-align:center; font-size:13px;">Aucun nom trouvé pour "${query}"</div>`;
+        suggestionsBox.style.display = "block";
+        return;
+    }
+
+    let html = '';
+    matchingNames.forEach(([normalizedKey, debts]) => {
+        const originalName = debts.original;
+        const clientDebt = debts.client || { USD: 0, CDF: 0 };
+        const moiDebt = debts.moi || { USD: 0, CDF: 0 };
+        
+        const hasClientDebt = clientDebt.USD > 0.01 || clientDebt.CDF > 50;
+        const hasMoiDebt = moiDebt.USD > 0.01 || moiDebt.CDF > 50;
+
+        let debtDisplay = '';
+        let badgeHtml = '';
+
+        if (hasClientDebt && hasMoiDebt) {
+            badgeHtml = `<span class="badge badge-both">🔁 Client & Moi</span>`;
+            debtDisplay = `
+                <span class="client-debt">${fmt(clientDebt.USD)}$ / ${fmt(clientDebt.CDF)}FC</span>
+                <span style="color:#94a3b8;">|</span>
+                <span class="moi-debt">${fmt(moiDebt.USD)}$ / ${fmt(moiDebt.CDF)}FC</span>
+            `;
+        } else if (hasClientDebt) {
+            badgeHtml = `<span class="badge badge-client">Client doit</span>`;
+            debtDisplay = `<span class="client-debt">${fmt(clientDebt.USD)}$ / ${fmt(clientDebt.CDF)}FC</span>`;
+        } else if (hasMoiDebt) {
+            badgeHtml = `<span class="badge badge-moi">Vous devez</span>`;
+            debtDisplay = `<span class="moi-debt">${fmt(moiDebt.USD)}$ / ${fmt(moiDebt.CDF)}FC</span>`;
+        } else {
+            debtDisplay = `<span style="color:#94a3b8; font-size:11px;">Aucune dette</span>`;
+        }
+
+        html += `
+            <div class="suggestion-item" onclick="selectDebtName('${originalName.replace(/'/g, "\\'")}')">
+                <span style="font-weight:500;">${originalName}</span>
+                <div class="debt-detail">
+                    ${badgeHtml}
+                    ${debtDisplay}
+                </div>
+            </div>
+        `;
+    });
+
+    suggestionsBox.innerHTML = html;
+    suggestionsBox.style.display = "block";
+};
+
+window.selectDebtName = function(name) {
+    document.getElementById("debtPersonName").value = name;
+    document.getElementById("debtSuggestions").style.display = "none";
+    checkDebtBalance();
+};
+
+// Clic en dehors des listes pour les fermer
+document.addEventListener('click', function(e) {
+    const debtWrapper = document.querySelector('.debt-search-wrapper');
+    if (debtWrapper && !debtWrapper.contains(e.target)) {
+        const debtSuggestions = document.getElementById('debtSuggestions');
+        if (debtSuggestions) debtSuggestions.style.display = 'none';
+    }
+    const clientWrapper = document.querySelector('.client-name-search-wrapper');
+    if (clientWrapper && !clientWrapper.contains(e.target)) {
+        const clientSuggestions = document.getElementById('clientNameSuggestions');
+        if (clientSuggestions) clientSuggestions.style.display = 'none';
+    }
+});
+
+    window.login = () => {  
+        const p = document.getElementById("pinInput").value;  
+        if(p === data.config.pinAdmin) {  
+            document.getElementById("loginSection").classList.add("hidden");  
+            document.getElementById("appSection").classList.remove("hidden");  
+            document.getElementById("adminSection").classList.remove("hidden");  
+            document.getElementById("newPinAdmin").value = data.config.pinAdmin;  
+            document.getElementById("newPinUser").value = data.config.pinUser;  
+        } else if(p === data.config.pinUser) {  
+            document.getElementById("loginSection").classList.add("hidden");  
+            document.getElementById("appSection").classList.remove("hidden");  
+            document.getElementById("adminSection").classList.add("hidden");  
+        } else { alert("Code PIN Incorrect"); }  
     };  
   
-    window.togglePaySim = () => {    
-        const mode = document.getElementById("payMode").value;    
+    window.logout = () => location.reload();  
+  
+    window.updatePins = () => {  
+        const pa = document.getElementById("newPinAdmin").value, pu = document.getElementById("newPinUser").value;  
+        if(pa && pu) { data.config.pinAdmin = pa; data.config.pinUser = pu; save(); alert("PIN mis à jour !"); }  
+    };  
+
+    window.togglePaySim = () => {  
+        const mode = document.getElementById("payMode").value;  
         const motif = normalize(document.getElementById("motif").value);  
         const opIdx = document.getElementById("operatorSelect").value;  
         const opName = data.operators[opIdx] ? normalize(data.operators[opIdx].name) : "";  
         document.getElementById("paySimBox").classList.toggle("hidden", mode !== "virtuel");  
         const isDebt = mode.includes("dette") || mode === "depense" || motif.includes("dette") || opName.includes("dette client") || opName.includes("dette moi");  
         document.getElementById("debtNameBox").classList.toggle("hidden", !isDebt);  
-    };    
+        // Rafraîchir les suggestions si le champ est visible
+        if (isDebt) {
+            const personName = document.getElementById("personName");
+            if (personName && personName.value.trim().length > 0) {
+                filterClientNames();
+            }
+        }
+    };  
   
     window.checkDebtBalance = () => {  
     const opIdx = document.getElementById("settleOpIdx").value;  
@@ -535,8 +914,7 @@ const normalizeStrict = (str) => {
 
     const person = normalize(personRaw);
     
-    // --- CORRECTION : Déterminer le type de dette selon l'opérateur ---
-    let typeDette = "dette client"; // Par défaut
+    let typeDette = "dette client"; 
     if(normalize(op.name).includes("moi") || normalize(op.name).includes("fournisseur")) {
         typeDette = "dette moi";
     }
@@ -544,7 +922,6 @@ const normalizeStrict = (str) => {
     const debtKey = `${normalize(typeDette)}_${person}`;  
     const debt = data.debts[debtKey] || { USD: 0, CDF: 0 };  
     
-    // Seuil de tolérance pour éviter les centimes inutiles
     const aDette = (Math.abs(debt.USD) > 0.01 || Math.abs(debt.CDF) > 50);
 
     if(aDette) {
@@ -574,13 +951,13 @@ const normalizeStrict = (str) => {
     }
 };
 
-    window.autoCalcMix = () => {    
-        const total = parseFloat(document.getElementById("amount").value) || 0;    
-        const usd = parseFloat(document.getElementById("mixUSD").value) || 0;    
-        const t = parseFloat(data.taux) || 1;    
-        const reste = total - usd;    
-        if(reste > 0) document.getElementById("mixCDF").value = Math.round(reste * t);    
-    };    
+    window.autoCalcMix = () => {  
+        const total = parseFloat(document.getElementById("amount").value) || 0;  
+        const usd = parseFloat(document.getElementById("mixUSD").value) || 0;  
+        const t = parseFloat(data.taux) || 1;  
+        const reste = total - usd;  
+        if(reste > 0) document.getElementById("mixCDF").value = Math.round(reste * t);  
+    };  
   
  function createTransaction({  
     typeNom, operator, mode, amt, cur, person, stk, mix
@@ -652,16 +1029,13 @@ const normalizeStrict = (str) => {
         op.CDF += (t.impacts.operator.CDF || 0) * factor;
 
         if (t.stk) {
-            // Utilise parseFloat pour accepter les virgules/points et additionner correctement
             op.stock = (parseFloat(op.stock) || 0) + (parseFloat(t.stk) * factor);
-            
-            // On arrondit à 2 décimales pour éviter les erreurs de calcul (ex: 1.1 + 0.2 = 1.3000000004)
             op.stock = Math.round(op.stock * 100) / 100;
         }
     }
 
 // =========================
-// 🔵 INTER-SIM (ANNULATION PARFAITE FIX)
+// 🔵 INTER-SIM
 // =========================
 if (t.impacts?.virtuel) {
 
@@ -674,7 +1048,7 @@ if (t.impacts?.virtuel) {
     }
 }
     // =========================
-    // 3. DETTES (🔥 FIX ANNULATION PARFAITE)
+    // 3. DETTES
     // =========================
     if (t.person && t.typeDette) {
 
@@ -715,16 +1089,12 @@ if (t.impacts?.virtuel) {
             data.debts[key].USD = Math.max(0, Math.round(data.debts[key].USD * 100) / 100);
             data.debts[key].CDF = Math.max(0, Math.round(data.debts[key].CDF));
 
-            // snapshot
             t.ancienneDette = { USD: oldUSD, CDF: oldCDF };
             t.nouvelleDette = {
                 USD: data.debts[key].USD,
                 CDF: data.debts[key].CDF
             };
 
-            // =========================
-            // GLOBAL DETTE
-            // =========================
             let opG = data.operators.find(o =>
                 normalize(o.name).includes(normalize(t.typeDette))
             );
@@ -738,7 +1108,6 @@ if (t.impacts?.virtuel) {
 }
 
   window.addTransaction = async () => { 
-    // DOUBLE SÉCURITÉ : Bloque la validation tant que la base n'est pas chargée à 100%
     if (!isDataLoaded || !data.config) { 
         alert("⚠️ Application non connectée ou configuration indisponible. Veuillez patienter."); 
         return; 
@@ -770,7 +1139,6 @@ if (t.impacts?.virtuel) {
     const isDepensePrincipal = opNorm.includes("depense");
     const isInterSim = (modeNorm.includes("inter") || modeNorm.includes("sim") || modeNorm.includes("virtuel"));
 
-    // Génération d'un timestamp unique pour cette transaction précise
     const uniqueTimestamp = Date.now();
 
     const t = createTransaction({
@@ -784,7 +1152,7 @@ if (t.impacts?.virtuel) {
         mix: { USD: mixUSD, CDF: mixCDF }
     });
 
-    t.id = uniqueTimestamp; // ID unique propre à cette transaction
+    t.id = uniqueTimestamp;
     t.timestamp = uniqueTimestamp;
     t.stk = stkM;
     t.impacts = t.impacts || {};
@@ -841,11 +1209,9 @@ if (t.impacts?.virtuel) {
         t.impacts.caisse.CDF = (mixCDF * dirCaisse) + commCDF;
     }
 
-    // --- CLONE DE SÉCURITÉ EN CAS DE COUPURE INTERNET ---
     const backupData = JSON.parse(JSON.stringify(data));
 
     try {
-        // Application locale immédiate du calcul financier
         applyImpacts(t);
 
         if (person && t.typeDette) {
@@ -879,24 +1245,20 @@ if (t.impacts?.virtuel) {
 
         };
 
-        // Ajout immédiat en haut de la liste locale
         data.transactions.unshift(newEntry);
 
-        // --- ENVOI ATOMIQUE ET CIBLÉ SUR FIREBASE ---
         const updates = {};
-        updates[`mka_data/transactions/${uniqueTimestamp}`] = newEntry; // On ajoute la ligne unique
-        updates['mka_data/caisse'] = data.caisse;                      // On met à jour la caisse globale
-        updates['mka_data/operators'] = data.operators;                // On met à jour les SIMs
-        updates['mka_data/debts'] = data.debts;                        // On met à jour le registre des dettes
+        updates[`mka_data/transactions/${uniqueTimestamp}`] = newEntry;
+        updates['mka_data/caisse'] = data.caisse;
+        updates['mka_data/operators'] = data.operators;
+        updates['mka_data/debts'] = data.debts;
 
-        // Exécution sécurisée sans écraser le reste
         await update(ref(db), updates);
 
         render();
         console.log(`MKA Shop : Transaction ${uniqueTimestamp} synchronisée.`);
         alert("✅ Opération enregistrée et synchronisée !");
 
-        // Réinitialisation des éléments du formulaire
         ["amount","mixUSD","mixCDF","commUSD","commCDF","motif","personName","stkMove"].forEach(id => {
             const el = document.getElementById(id); if (el) el.value = "";
         });
@@ -905,7 +1267,6 @@ if (t.impacts?.virtuel) {
         });
 
     } catch (error) {
-        // EN CAS D'ÉCHEC RÉSEAU : Restauration immédiate des comptes pour éviter les faux écarts
         data = backupData; 
         console.error("Erreur critique Firebase ❌ :", error);
         alert("⚠️ ERREUR RÉSEAU : Impossible d'atteindre Firebase. L'opération a été ANNULÉE localement pour protéger vos soldes.");
@@ -928,17 +1289,14 @@ if (t.impacts?.virtuel) {
         return;
     }
 
-    // Récupération des paiements
     const pOnUsd_USD = parseFloat(document.getElementById("payOnUsd_USD").value) || 0;
     const pOnUsd_CDF = parseFloat(document.getElementById("payOnUsd_CDF").value) || 0;
     const pOnCdf_USD = parseFloat(document.getElementById("payOnCdf_USD").value) || 0;
     const pOnCdf_CDF = parseFloat(document.getElementById("payOnCdf_CDF").value) || 0;
 
-    // Récupération de la commission / réduction accordée
     const remiseUSD = parseFloat(document.getElementById("settleRemiseUSD").value) || 0;
     const remiseCDF = parseFloat(document.getElementById("settleRemiseCDF").value) || 0;
 
-    // NOUEAU : Récupération des pourboires
     const pourboireUSD = parseFloat(document.getElementById("settlePourboireUSD").value) || 0;
     const pourboireCDF = parseFloat(document.getElementById("settlePourboireCDF").value) || 0;
 
@@ -960,7 +1318,6 @@ if (t.impacts?.virtuel) {
         const key = `${normalize(typeDette)}_${normalize(person)}`;
         const oldDebt = JSON.parse(JSON.stringify(data.debts[key] || { USD: 0, CDF: 0 }));
 
-        // Calcul de la réduction globale de la dette (Paiements + Commission)
         const reductionTotaleUSD = pOnUsd_USD + (pOnUsd_CDF / taux) + remiseUSD + (remiseCDF / taux);
         const reductionTotaleCDF = pOnCdf_CDF + (pOnCdf_USD * taux) + remiseCDF + (remiseUSD * taux);
 
@@ -996,17 +1353,15 @@ if (t.impacts?.virtuel) {
         t.surplusCDF = surplusCDF; 
         t.isMoi = isMoi;
         t.remise = { usd: remiseUSD, cdf: remiseCDF };
-        t.pourboire = { usd: pourboireUSD, cdf: pourboireCDF }; // Stockage pourboire
+        t.pourboire = { usd: pourboireUSD, cdf: pourboireCDF };
         t.payDetail = { 
             onUsd: { usd: pOnUsd_USD, cdf: pOnUsd_CDF },
             onCdf: { usd: pOnCdf_USD, cdf: pOnCdf_CDF }
         };
         t.debtBefore = oldDebt; 
 
-        // La dette diminue du cumul (Paiement + Commission)
         t.impacts.dette = { USD: -redUSD, CDF: -redCDF };
 
-        // Configuration des impacts sur la destination principale choisie
         if (destIdx === "caisse") {
             t.impacts.caisse = { USD: totalPaidUSD * direction, CDF: totalPaidCDF * direction };
         } else {
@@ -1014,7 +1369,6 @@ if (t.impacts?.virtuel) {
             t.impacts.caisse = { USD: 0, CDF: 0 };
         }
 
-        // 🔥 LOGIQUE CRUCIALE : Le pourboire va TOUJOURS dans la caisse physique, peu importe la SIM réceptrice
         t.impacts.caisse.USD += pourboireUSD;
         t.impacts.caisse.CDF += pourboireCDF;
 
@@ -1023,7 +1377,6 @@ if (t.impacts?.virtuel) {
         const newDebt = data.debts[key] || { USD: 0, CDF: 0 };
         t.snapshotDette = { USD: newDebt.USD, CDF: newDebt.CDF }; 
 
-        // Construction du libellé de description
         let bonusDesc = "";
         if (remiseUSD > 0 || remiseCDF > 0) bonusDesc += ` [Com/Réduction: ${remiseUSD}$ / ${remiseCDF}FC]`;
         if (pourboireUSD > 0 || pourboireCDF > 0) bonusDesc += ` [Pourboire Caisse: ${pourboireUSD}$ / ${pourboireCDF}FC]`;
@@ -1052,7 +1405,6 @@ if (t.impacts?.virtuel) {
         render();
         alert("✅ Règlement et pourboire enregistrés avec succès !");
 
-        // Réinitialisation de tous les champs du formulaire
         ["payOnUsd_USD", "payOnUsd_CDF", "payOnCdf_USD", "payOnCdf_CDF", "debtPersonName", "settleRate", "settleRemiseUSD", "settleRemiseCDF", "settlePourboireUSD", "settlePourboireCDF"].forEach(id => {
             const el = document.getElementById(id);
             if(el) el.value = "";
@@ -1080,8 +1432,8 @@ window.showFullHistory = (filter) => {
   
     // --- FILTRES ---
     if(filter === 'general') {
-    filtered = data.transactions; 
-} 
+        filtered = data.transactions; 
+    } 
     else if(filter === 'ventes') {  
         filtered = data.transactions.filter(t =>   
             normalize(t.typeNom || "").includes("vente") ||   
@@ -1108,7 +1460,6 @@ window.showFullHistory = (filter) => {
             normalize(t.desc || "").includes("depense")
         );
     }
-         // --- NOUVEAU FILTRE : MONEY SERVICE ---
     else if(filter === 'money') {
         filtered = data.transactions.filter(t => {
             const type = normalize(t.typeNom || "");
@@ -1116,13 +1467,9 @@ window.showFullHistory = (filter) => {
             const op = normalize(t.operator || "");
             const mode = normalize(t.mode || "");
 
-            // 1. Toute opération de type Retrait ou Dépôt
             const isFinancial = type.includes("retrait") || type.includes("depot");
-
-            // 2. Règlement ou transfert lié à "Money" ou "Pesa"
             const isMoneyKeyword = desc.includes("money") || desc.includes("pesa") || op.includes("money") || op.includes("pesa");
 
-            // 3. Mode de règlement via une autre SIM contenant "Money" ou "Pesa"
             let isVirtualMoney = false;
             if(t.mode === "virtuel" && t.impacts && t.impacts.virtuel && t.impacts.virtuel.opIdx !== null) {
                 const sourceSim = data.operators[t.impacts.virtuel.opIdx];
@@ -1135,6 +1482,13 @@ window.showFullHistory = (filter) => {
             return isFinancial || isMoneyKeyword || isVirtualMoney;
         });
     }
+    else if(filter === 'suppressions') {
+        filtered = data.transactions.filter(t => 
+            t.isDeletion === true || 
+            normalize(t.typeNom || "").includes("suppression") ||
+            normalize(t.desc || "").includes("suppression")
+        );
+    }
 
     let html = `<div style="display:flex; flex-direction:column; gap:12px;">`;  
   
@@ -1142,7 +1496,27 @@ window.showFullHistory = (filter) => {
         const realIdx = data.transactions.indexOf(t);
         const desc = t.desc || "";  
 
-        // --- 1. DESIGN SPÉCIAL POUR LES TRANSFERTS ---
+        // --- 1. DESIGN SPÉCIAL POUR LES SUPPRESSIONS DE NOMS ---
+        if (t.isDeletion || normalize(t.typeNom || "").includes("suppression")) {
+            return `
+            <div style="background:#fef2f2; border-radius:16px; padding:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); border-left:5px solid #ef4444;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <span style="font-size:11px; color:#64748b;">${t.date}</span>
+                    <span style="font-weight:bold; color:#991b1b; font-size:12px;">🗑️ SUPPRESSION DE NOM</span>
+                    ${isAdmin ? `
+                    <div style="display:flex; gap:5px;">
+                        <button onclick="cancelTransaction(${realIdx})" style="background:#f59e0b;color:#fff;border:none;padding:4px 8px;border-radius:6px;font-size:10px;cursor:pointer;">↩ Annuler</button>
+                        <button onclick="deleteTransaction(${realIdx})" style="background:#ef4444;color:#fff;border:none;padding:4px 8px;border-radius:6px;font-size:10px;cursor:pointer;">Suppr</button>
+                    </div>` : ""}
+                </div>
+                <div style="background:white; padding:12px; border-radius:8px;">
+                    <div style="font-weight:bold; color:#dc2626; font-size:14px;">✕ Nom supprimé : ${t.person}</div>
+                    <div style="font-size:11px; color:#64748b; margin-top:4px;">${t.desc}</div>
+                </div>
+            </div>`;
+        }
+
+        // --- 2. DESIGN SPÉCIAL POUR LES TRANSFERTS ---
         if (t.mode === 'transfert' && t.transferDetails) {
             const d = t.transferDetails;
             return `
@@ -1194,7 +1568,6 @@ if (t.isReglement) {
                         ✉️ Envoyer Reçu
                        </button>`;
 
-
     return `
     <div style="background:#fff7ed; border-radius:16px; padding:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); border-left:5px solid #eab308; margin-bottom:12px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
@@ -1229,7 +1602,7 @@ if (t.isReglement) {
                     <b style="color:#166534;">${fmt(p.onCdf.usd)}$+${fmt(p.onCdf.cdf)}F</b>
                 </div>
 
-                                ${(rem.usd > 0 || rem.cdf > 0) ? `
+                ${(rem.usd > 0 || rem.cdf > 0) ? `
                 <div style="display:flex; justify-content:space-between; margin-bottom:4px; background:#fee2e2; padding:2px 4px; border-radius:4px;">
                     <span style="color:#991b1b; font-weight:bold;">🎁 Com/Réduction:</span> 
                     <b style="color:#b91c1c;">${fmt(rem.usd)}$+${fmt(rem.cdf)}F</b>
@@ -1240,7 +1613,6 @@ if (t.isReglement) {
                     <span style="color:#166534; font-weight:bold;">💖 Pourboire (Caisse):</span> 
                     <b style="color:#15803d;">${fmt(t.pourboire.usd)}$+${fmt(t.pourboire.cdf)}F</b>
                 </div>` : ''}
-
 
                 <div style="text-align:center; font-size:9px; color:#9a3412; border-top:1px dashed #fed7aa; padding-top:4px;">
                     Dest: <b>${t.operator}</b>
@@ -1323,12 +1695,10 @@ if (t.mode === 'depense' || t.isDepense || normalize(desc).includes("depense")) 
   
         let finalPerson = t.person || "";
 
-        // 🔥 SÉCURISATION MAX : toujours récupérer depuis source fiable
         if (!finalPerson && t.desc && t.desc.includes("NOM:")) {
             finalPerson = t.desc.split("NOM:")[1].split("|")[0].trim();
         }
 
-        // 🔥 DERNIER RECOURS
         if (!finalPerson && t.payDetail && t.person) {
             finalPerson = t.person;
         }
@@ -1345,10 +1715,9 @@ if (t.mode === 'depense' || t.isDepense || normalize(desc).includes("depense")) 
              normalize(type || "").includes("dette")
         );
 
-                // --- CALCUL DU RESTE, COULEUR ET BOUTONS WHATSAPP ---
         let resteTxt = "✔ Cash"; 
         let resteColor = "#16a34a";  
-        let waButtonsHtml = ""; // Conteneur pour accumuler nos boutons WhatsApp
+        let waButtonsHtml = "";
 
         if (t.snapshotDette) {
             const duUSD = t.snapshotDette.USD;
@@ -1362,7 +1731,6 @@ if (t.mode === 'depense' || t.isDepense || normalize(desc).includes("depense")) 
                 resteTxt = `Reste: ${fmt(duUSD)}$ | ${fmt(duCDF)}FC`;
                 resteColor = "#dc2626"; 
                 
-                // Si la dette n'est pas soldée, on ajoute le bouton RAPPEL
                 if (isModeDette && finalPerson) {
                     waButtonsHtml += `<button onclick="sendWhatsAppReminder('${finalPerson.replace(/'/g, "\\'")}', ${duUSD}, ${duCDF})" 
                                     style="background:#25D366; color:white; border:none; padding:4px 8px; border-radius:6px; font-size:10px; margin-top:5px; cursor:pointer; font-weight:bold; display:block; width:100%;">
@@ -1391,13 +1759,11 @@ if (t.mode === 'depense' || t.isDepense || normalize(desc).includes("depense")) 
             }
         }
 
-        // 🔥 LOGIQUE D'INTEGRATION DU BOUTON "MESSAGE DE CONFIANCE"
         if (isModeDette && finalPerson && !t.isReglement) {
             const typeDette = (t.mode === "dette_moi" || (t.typeDette && t.typeDette.includes("moi"))) ? "dette moi" : "dette client";
             const debtKey = `${normalize(typeDette)}_${normalize(finalPerson)}`;  
             const currentDebt = data.debts[debtKey] || { USD: 0, CDF: 0 };
 
-            // Montant ajouté lors de cette opération précise
             const addedUsd = t.detteUSD || (t.curSIM === "USD" ? (t.amtSIM || t.amt) : 0);
             const addedCdf = t.detteCDF || (t.curSIM === "CDF" ? (t.amtSIM || t.amt) : 0);
 
@@ -1460,7 +1826,6 @@ if (t.mode === 'depense' || t.isDepense || normalize(desc).includes("depense")) 
             finalCashDisplay += `<div style="color:#64748b; font-size:9px; font-style:italic;">Via SIM</div>`;
         }
 
-        // --- 5. RETURN FINAL ---
         return `  
         <div style="background:#ffffff; border-radius:16px; padding:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); border-left:5px solid ${isModeDette ? '#f59e0b' : '#0ea5e9'};">  
 
@@ -1533,48 +1898,26 @@ window.cancelTransaction = async function(index) {
     }
 
     try {
-        // =======================================================
-        // 1. VOS CONDITIONS EXACTES (CONSERVÉES À 100%)
-        // =======================================================
         if(t.mode === 'transfert' && t.impacts && t.impacts.isTransfer) {
             const { source, dest } = t.impacts;
-
-            // On remet l'argent à la source initiale
             if(source.idx === "caisse") data.caisse[source.cur] += source.amt;
             else if(data.operators[source.idx]) data.operators[source.idx][source.cur] += source.amt;
-
-            // On retire l'argent de la destination
             if(dest.idx === "caisse") data.caisse[dest.cur] -= dest.amt;
             else if(data.operators[dest.idx]) data.operators[dest.idx][dest.cur] -= dest.amt;
-
             alert("Transfert/Change inversé avec succès ✅");
         } 
         else {
-            // Logique normale (Vente, Retrait, Dépôt, Dette, Dépense)
-            // Le paramètre "true" inverse les impacts dans applyImpacts
             applyImpacts(t, true);
         }
 
-        // =======================================================
-        // 2. SYNCHRONISATION CIBLÉE SUR FIREBASE (ANTI-CONFLIT)
-        // =======================================================
         const updates = {};
-        
-        // On sauvegarde les soldes mis à jour (Caisse, Opérateurs/SIMs, Dettes)
         updates['mka_data/caisse'] = data.caisse;
         updates['mka_data/operators'] = data.operators;
-        if(data.debts) updates['mka_data/debts'] = data.debts; // Au cas où applyImpacts touche aux dettes
-
-        // 🔥 ON SUPPRIME UNIQUEMENT CETTE TRANSACTION SANS TOUCHER AUX AUTRES
+        if(data.debts) updates['mka_data/debts'] = data.debts;
         updates[`mka_data/transactions/${t.timestamp}`] = null;
 
-        // Envoi sécurisé à Firebase
         await update(ref(db), updates);
 
-        // =======================================================
-        // 3. MISE À JOUR DE L'AFFICHAGE LOCAL
-        // =======================================================
-        // On retire la transaction de la liste locale SEULEMENT si Firebase a réussi
         data.transactions.splice(index, 1);  
         
         render();  
@@ -1589,15 +1932,14 @@ window.cancelTransaction = async function(index) {
     }
 };
 
-    window.quickEditOp = (i) => {    
-        const op = data.operators[i];    
-        const nName = prompt("Nom :", op.name), nUSD = prompt("USD :", op.USD), nCDF = prompt("CDF :", op.CDF), nStk = prompt("SIM :", op.stock);    
-        if(nName !== null) { data.operators[i] = { ...op, name: nName, USD: parseFloat(nUSD)||0, CDF: parseFloat(nCDF)||0, stock: parseInt(nStk)||0 }; save(); }    
+    window.quickEditOp = (i) => {  
+        const op = data.operators[i];  
+        const nName = prompt("Nom :", op.name), nUSD = prompt("USD :", op.USD), nCDF = prompt("CDF :", op.CDF), nStk = prompt("SIM :", op.stock);  
+        if(nName !== null) { data.operators[i] = { ...op, name: nName, USD: parseFloat(nUSD)||0, CDF: parseFloat(nCDF)||0, stock: parseInt(nStk)||0 }; save(); }  
     };  
   
-    window.calcDest = () => {    
+    window.calcDest = () => {  
     const amt = parseFloat(document.getElementById("srcAmt").value) || 0;
-    // On récupère le taux spécifique, sinon on prend le taux global
     const t = parseFloat(document.getElementById("transferRate").value) || parseFloat(data.taux) || 1;    
     const sc = document.getElementById("srcCurr").value;
     const dc = document.getElementById("destCurr").value;    
@@ -1608,13 +1950,13 @@ window.cancelTransaction = async function(index) {
     } else if (sc === "CDF" && dc === "USD") {
         result = amt / t;
     } else {
-        result = amt; // Même devise
+        result = amt;
     }
     
     document.getElementById("destAmt").value = result.toFixed(2);    
 };
 
-  window.executeGlobalChange = async () => { // Ajout de async
+  window.executeGlobalChange = async () => {
     const sIdx = document.getElementById("srcWallet").value;
     const dIdx = document.getElementById("destWallet").value;    
     const sAmt = parseFloat(document.getElementById("srcAmt").value) || 0;
@@ -1629,7 +1971,6 @@ window.cancelTransaction = async function(index) {
         return;
     }
 
-    // --- SAUVEGARDE POUR SÉCURITÉ ---
     const backupData = JSON.parse(JSON.stringify(data));
 
     try {
@@ -1638,7 +1979,6 @@ window.cancelTransaction = async function(index) {
         const sourceName = sIdx === "caisse" ? "Caisse" : data.operators[sIdx].name;
         const destName = dIdx === "caisse" ? "Caisse" : data.operators[dIdx].name;
 
-        // Mise à jour locale
         if(sIdx === "caisse") data.caisse[sc] -= sAmt; 
         else data.operators[sIdx][sc] -= sAmt;
 
@@ -1662,7 +2002,6 @@ window.cancelTransaction = async function(index) {
 
         data.transactions.unshift(t);
 
-        // --- ENVOI FIREBASE CIBLÉ ET ATOMIQUE ---
         const updates = {};
         updates[`mka_data/transactions/${uniqueTimestamp}`] = t;
         updates['mka_data/caisse'] = data.caisse;
@@ -1679,25 +2018,24 @@ window.cancelTransaction = async function(index) {
         document.getElementById("transferMotif").value = "";
 
     } catch (error) {
-        data = backupData; // Annulation locale
+        data = backupData;
         alert("❌ ÉCHEC FIREBASE : Le transfert a été annulé car la connexion est instable.");
         render();
     }
 };
 
   
-    window.updateAdminBasics = () => {    
-        const tX = document.getElementById("newTaux").value, uX = document.getElementById("editCashUSD").value, cX = document.getElementById("editCashCDF").value;    
-        if(tX) data.taux = parseFloat(tX); if(uX) data.caisse.USD = parseFloat(uX); if(cX) data.caisse.CDF = parseFloat(cX);    
-        save(); alert("Mis à jour !");    
+    window.updateAdminBasics = () => {  
+        const tX = document.getElementById("newTaux").value, uX = document.getElementById("editCashUSD").value, cX = document.getElementById("editCashCDF").value;  
+        if(tX) data.taux = parseFloat(tX); if(uX) data.caisse.USD = parseFloat(uX); if(cX) data.caisse.CDF = parseFloat(cX);  
+        save(); alert("Mis à jour !");  
     };  
   
-    window.addOperator = () => {    
+    window.addOperator = () => {  
     const op = { 
         name: document.getElementById("newOpName").value.trim(), 
         USD: parseFloat(document.getElementById("initUSD").value) || 0, 
         CDF: parseFloat(document.getElementById("initCDF").value) || 0, 
-        // --- AMÉLIORATION : Accepter les stocks décimaux (ex: 0.5) ---
         stock: parseFloat(document.getElementById("initStock").value) || 0, 
         prixAchat: parseFloat(document.getElementById("initPrice").value) || 0 
     };    
@@ -1707,20 +2045,19 @@ window.cancelTransaction = async function(index) {
         save(); 
         alert(`Compte "${op.name}" créé avec succès`); 
         
-        // --- AMÉLIORATION : Vider les champs après création ---
         ["newOpName", "initUSD", "initCDF", "initStock", "initPrice"].forEach(id => {
             if(document.getElementById(id)) document.getElementById(id).value = "";
         });
 
-        render(); // Mettre à jour l'affichage immédiatement
+        render();
     } else {
         alert("Veuillez entrer au moins un nom pour le compte.");
     }
 };
     
-    window.addType = () => {    
-        const name = document.getElementById("newTypeName").value, impO = parseInt(document.getElementById("impO").value), impC = parseInt(document.getElementById("impC").value), impS = parseInt(document.getElementById("impS").value);    
-        if(name) { data.types.push({ name, impO, impC, impS }); save(); alert("Type créé"); }    
+    window.addType = () => {  
+        const name = document.getElementById("newTypeName").value, impO = parseInt(document.getElementById("impO").value), impC = parseInt(document.getElementById("impC").value), impS = parseInt(document.getElementById("impS").value);  
+        if(name) { data.types.push({ name, impO, impC, impS }); save(); alert("Type créé"); }  
     };  
   
     window.deleteTransaction = async function(idx) {
@@ -1733,14 +2070,11 @@ window.cancelTransaction = async function(index) {
     }
 
     try {
-        // 1. Supprimer l'élément ciblé sur Firebase en lui attribuant la valeur null
         const updates = {};
         updates[`mka_data/transactions/${t.timestamp}`] = null;
         
-        // 2. Mettre à jour Firebase de manière ciblée
         await update(ref(db), updates);
 
-        // 3. Supprimer du tableau local pour l'affichage
         data.transactions.splice(idx, 1);
         
         render();
@@ -1771,7 +2105,6 @@ window.cancelTransaction = async function(index) {
     alert("Génération du rapport MKA SHOP (Multi-pages)...");
 
     try {
-        // 1. Capture de la totalité de la liste avec ton design
         const canvas = await html2canvas(element, {
             scale: 2,
             useCORS: true,
@@ -1785,22 +2118,17 @@ window.cancelTransaction = async function(index) {
         const pdfWidth = pdf.internal.pageSize.getWidth();
         const pdfHeight = pdf.internal.pageSize.getHeight();
         
-        // Largeur de l'image adaptée au PDF
         const imgWidth = pdfWidth;
         const imgHeight = (canvas.height * pdfWidth) / canvas.width;
         
-        // Hauteur disponible sur la page 1 (après l'en-tête)
         const firstPageContentHeight = pdfHeight - 40; 
-        // Hauteur disponible sur les pages suivantes
         const otherPageContentHeight = pdfHeight - 20;
 
         let heightLeft = imgHeight;
         let position = 0;
         let pageNumber = 1;
 
-        // --- PAGE 1 ---
-        // Ton En-tête stylisée
-        pdf.setFillColor(15, 23, 42); // Bleu sombre
+        pdf.setFillColor(15, 23, 42);
         pdf.rect(0, 0, pdfWidth, 25, 'F');
         pdf.setTextColor(255, 255, 255);
         pdf.setFontSize(16);
@@ -1810,17 +2138,14 @@ window.cancelTransaction = async function(index) {
         pdf.setFontSize(8);
         pdf.text(`Document généré le ${new Date().toLocaleString()}`, 10, 32);
 
-        // Ajout du début de l'image
         pdf.addImage(imgData, 'PNG', 0, 35, imgWidth, imgHeight);
         heightLeft -= firstPageContentHeight;
 
-        // --- BOUCLE POUR LES PAGES SUIVANTES ---
         while (heightLeft > 0) {
             pageNumber++;
             position = heightLeft - imgHeight; 
             pdf.addPage();
             
-            // On remet un petit rappel en haut de chaque page
             pdf.setFontSize(7);
             pdf.setTextColor(150);
             pdf.text(`MKA SHOP - Page ${pageNumber}`, 10, 10);
@@ -1842,7 +2167,6 @@ window.cancelTransaction = async function(index) {
     const filter = document.querySelector(".nav-hist button.active")?.id;
     const estDetteMoi = (filter === "btn-h-dette_moi");
 
-    // CALCUL DU NOUVEAU TOTAL : On additionne l'ancien total avec le montant ajouté
     const nouveauTotalUsd = (parseFloat(ancienTotalUsd) || 0) + (parseFloat(montantAjouteUsd) || 0);
     const nouveauTotalCdf = (parseFloat(ancienTotalCdf) || 0) + (parseFloat(montantAjouteCdf) || 0);
 
@@ -1889,7 +2213,6 @@ window.sendWhatsAppReminder = (person, usd, cdf) => {
     window.open(`https://wa.me/?text=${encodedMsg}`, '_blank');
 };
 
-// Ajout d'un 6ème paramètre optionnel "canalPaiementArg" au cas où l'appel se fait depuis un historique sans formulaire actif
 window.sendWhatsAppReceipt = (person, usdPaye, cdfPaye, resteUsd, resteCdf, canalPaiementArg = null) => {
     const estSolde = (resteUsd <= 0.1 && resteCdf <= 100);
     const filter = document.querySelector(".nav-hist button.active")?.id;
@@ -1897,7 +2220,6 @@ window.sendWhatsAppReceipt = (person, usdPaye, cdfPaye, resteUsd, resteCdf, cana
     
     let canalPaiement = "en espèces (Cash)";
 
-    // 1. Si le canal est passé directement dans la fonction (ex: depuis la base de données)
     if (canalPaiementArg && canalPaiementArg.trim() !== "") {
         if (canalPaiementArg.toLowerCase().includes("caisse") || canalPaiementArg.toLowerCase().includes("cash")) {
             canalPaiement = "en espèces (Cash)";
@@ -1905,10 +2227,7 @@ window.sendWhatsAppReceipt = (person, usdPaye, cdfPaye, resteUsd, resteCdf, cana
             canalPaiement = `via le compte SIM *${canalPaiementArg}*`;
         }
     } else {
-        // 2. Sinon, on lit le DOM. Vérification de 'settleDest' ET 'settleSource' 
         const destSelect = document.getElementById("settleDest") || document.getElementById("settleSource");
-        
-        // .toLowerCase() évite les bugs si la valeur est "Caisse" au lieu de "caisse"
         if (destSelect && destSelect.value && destSelect.value.toLowerCase() !== "caisse") {
             const nomCompte = destSelect.options[destSelect.selectedIndex].text;
             canalPaiement = `via le compte SIM *${nomCompte}*`;
@@ -1940,162 +2259,15 @@ window.sendWhatsAppReceipt = (person, usdPaye, cdfPaye, resteUsd, resteCdf, cana
     window.open(`https://wa.me/?text=${encodedMsg}`, '_blank');
 };
 
-// =============================================
-// 🔥 NOUVEAU : Filtrage amélioré avec normalisation stricte
-// Ignore les accents, points, majuscules/minuscules, espaces
-// =============================================
-window.filterDebtSuggestions = function() {
-    const input = document.getElementById("debtPersonName");
-    const suggestionsBox = document.getElementById("debtSuggestions");
-    const query = input.value.trim();
-    
-    // Si la recherche est vide, on cache les suggestions
-    if (query.length === 0) {
-        suggestionsBox.style.display = "none";
-        return;
-    }
-
-    // Normalisation de la requête pour la comparaison
-    const queryNormalized = normalizeStrict(query);
-
-    // 1. Récupérer tous les noms uniques depuis les dettes (client + moi)
-    const debtNames = new Map(); // Utiliser un Map pour regrouper les infos
-
-    Object.keys(data.debts).forEach(key => {
-        // Format: "dette client_nom" ou "dette moi_nom"
-        const underscoreIndex = key.indexOf('_');
-        if (underscoreIndex === -1) return;
-        
-        const type = key.substring(0, underscoreIndex);
-        const name = key.substring(underscoreIndex + 1);
-        
-        if (!name || name.trim().length === 0) return;
-        
-        const normalizedName = name.trim();
-        const normalizedKey = normalizeStrict(normalizedName);
-        
-        if (!debtNames.has(normalizedKey)) {
-            debtNames.set(normalizedKey, { 
-                original: normalizedName,
-                client: { USD: 0, CDF: 0 }, 
-                moi: { USD: 0, CDF: 0 } 
-            });
-        }
-        
-        const debtData = data.debts[key] || { USD: 0, CDF: 0 };
-        
-        if (type === 'dette client') {
-            debtNames.get(normalizedKey).client = { USD: debtData.USD, CDF: debtData.CDF };
-        } else if (type === 'dette moi') {
-            debtNames.get(normalizedKey).moi = { USD: debtData.USD, CDF: debtData.CDF };
-        }
-    });
-
-    // 2. Ajouter les noms depuis les transactions (fallback)
-    data.transactions.forEach(t => {
-        if (t.person && t.person.trim().length > 0) {
-            const name = t.person.trim();
-            const normalizedKey = normalizeStrict(name);
-            if (!debtNames.has(normalizedKey)) {
-                debtNames.set(normalizedKey, { 
-                    original: name,
-                    client: { USD: 0, CDF: 0 }, 
-                    moi: { USD: 0, CDF: 0 } 
-                });
-            }
-        }
-    });
-
-    // 3. Filtrer selon la saisie avec normalisation stricte
-    const matchingNames = Array.from(debtNames.entries())
-        .filter(([key, data]) => key.includes(queryNormalized))
-        .sort((a, b) => a[0].localeCompare(b[0]));
-
-    // 4. Construire la liste des suggestions
-    if (matchingNames.length === 0) {
-        suggestionsBox.innerHTML = `<div style="padding:10px; color:#94a3b8; text-align:center; font-size:13px;">Aucun nom trouvé pour "${query}"</div>`;
-        suggestionsBox.style.display = "block";
-        return;
-    }
-
-    let html = '';
-    matchingNames.forEach(([normalizedKey, debts]) => {
-        const originalName = debts.original;
-        const clientDebt = debts.client || { USD: 0, CDF: 0 };
-        const moiDebt = debts.moi || { USD: 0, CDF: 0 };
-        
-        const hasClientDebt = clientDebt.USD > 0.01 || clientDebt.CDF > 50;
-        const hasMoiDebt = moiDebt.USD > 0.01 || moiDebt.CDF > 50;
-
-        let debtDisplay = '';
-        let badgeHtml = '';
-
-        if (hasClientDebt && hasMoiDebt) {
-            badgeHtml = `<span class="badge badge-both">🔁 Client & Moi</span>`;
-            debtDisplay = `
-                <span class="client-debt">${fmt(clientDebt.USD)}$ / ${fmt(clientDebt.CDF)}FC</span>
-                <span style="color:#94a3b8;">|</span>
-                <span class="moi-debt">${fmt(moiDebt.USD)}$ / ${fmt(moiDebt.CDF)}FC</span>
-            `;
-        } else if (hasClientDebt) {
-            badgeHtml = `<span class="badge badge-client">Client doit</span>`;
-            debtDisplay = `<span class="client-debt">${fmt(clientDebt.USD)}$ / ${fmt(clientDebt.CDF)}FC</span>`;
-        } else if (hasMoiDebt) {
-            badgeHtml = `<span class="badge badge-moi">Vous devez</span>`;
-            debtDisplay = `<span class="moi-debt">${fmt(moiDebt.USD)}$ / ${fmt(moiDebt.CDF)}FC</span>`;
-        } else {
-            debtDisplay = `<span style="color:#94a3b8; font-size:11px;">Aucune dette</span>`;
-        }
-
-        // Mettre en évidence la correspondance
-        const displayName = originalName;
-
-        html += `
-            <div class="suggestion-item" onclick="selectDebtName('${originalName.replace(/'/g, "\\'")}')">
-                <span style="font-weight:500;">${displayName}</span>
-                <div class="debt-detail">
-                    ${badgeHtml}
-                    ${debtDisplay}
-                </div>
-            </div>
-        `;
-    });
-
-    suggestionsBox.innerHTML = html;
-    suggestionsBox.style.display = "block";
-};
-
-window.selectDebtName = function(name) {
-    document.getElementById("debtPersonName").value = name;
-    document.getElementById("debtSuggestions").style.display = "none";
-    checkDebtBalance();
-};
-
-// Clic en dehors de la liste pour la fermer
-document.addEventListener('click', function(e) {
-    const wrapper = document.querySelector('.debt-search-wrapper');
-    if (wrapper && !wrapper.contains(e.target)) {
-        const suggestions = document.getElementById('debtSuggestions');
-        if (suggestions) suggestions.style.display = 'none';
-    }
-});
-
-// =============================================
-
     function render() {
       const fmt = (n) => parseFloat(n || 0).toLocaleString('fr-FR', { 
     minimumFractionDigits: 0, 
     maximumFractionDigits: 2 
 }).replace(/,/g, '.');
 
-
-    // 🔥 NETTOYAGE CORRIGÉ
     data.transactions.forEach(t => {
-
         if (!t.mode) return;
-
         const m = normalize(t.mode);
-
         if (m.includes("credit")) {
             t.mode = "dette_client";
         }
@@ -2108,29 +2280,24 @@ document.addEventListener('click', function(e) {
         else if (m.includes("virtuel") || m.includes("sim")) {
             t.mode = "virtuel";
         }
-
     });
-
-    // 👇 ton reste de code render ici
    
     const t = parseFloat(data.taux) || 1;    
     document.getElementById("caisseUSD").innerText = fmt(data.caisse.USD);    
     document.getElementById("caisseCDF").innerText = fmt(data.caisse.CDF);    
     document.getElementById("rateM").innerText = t;    
 
-    // 1. Valeur du Tiroir (Cash réel)
     let totalCaisse = (parseFloat(data.caisse.USD) || 0) + ((parseFloat(data.caisse.CDF) || 0) / t);    
     
-    let totalSims = 0;        // Capital dans les SIM + Valeur de leur stock
-    let totalDetteClient = 0; // Ce que les clients vous doivent (Actif)
-    let totalDetteMoi = 0;    // Ce que vous devez (Passif)
-    let totalS = 0;           // Nombre total de SIM en stock
+    let totalSims = 0;
+    let totalDetteClient = 0;
+    let totalDetteMoi = 0;
+    let totalS = 0;
 
-    // 2. Calcul et Affichage des Balances Opérateurs
     document.getElementById("operatorBalances").innerHTML = data.operators.map((o, i) => {    
         const usd = parseFloat(o.USD) || 0;
         const cdf = parseFloat(o.CDF) || 0;
-        const stk = parseFloat(o.stock) || 0; // Acceptation des décimales pour le stock
+        const stk = parseFloat(o.stock) || 0;
         const px = parseFloat(o.prixAchat) || 0;    
         const n = normalize(o.name);
         const valEquivUSD = usd + (cdf / t);    
@@ -2147,12 +2314,8 @@ document.addEventListener('click', function(e) {
         }     
         else if(n.includes("depense")) {
             cardClass = "negative";
-            // IMPORTANT : On ne l'ajoute nulle part dans la VNC. 
-            // C'est de l'argent déjà "perdu" ou consommé.
         }
         else { 
-            // Compte actif standard (Airtel, Orange, etc.)
-            // On ajoute le solde cash de la SIM + la valeur marchande du stock de cartes
             totalSims += (valEquivUSD + (stk * px)); 
         }    
         
@@ -2160,14 +2323,11 @@ document.addEventListener('click', function(e) {
         return `<div class="card ${cardClass}"><b>${o.name}</b>: ${fmt(o.USD)}$ | ${fmt(o.CDF)}FC<br><small>Stock: ${fmt(o.stock)} SIM</small></div>`;    
     }).join("");    
 
-    // 3. LA FORMULE DE LA VALEUR NETTE COMPTABLE (VNC)
-    // VNC = (Cash Tiroir) + (Capital SIM & Stock) + (Dettes Clients) - (Dettes à payer)
     const vncFinale = totalCaisse + totalSims + totalDetteClient - totalDetteMoi;
 
     document.getElementById("totalVNC").innerText = fmt(vncFinale) + " $";    
     document.getElementById("totalStock").innerText = fmt(totalS);    
 
-    // 4. Mise à jour des listes déroulantes (Menus Select)
     const opOps = data.operators.map((o, i) => `<option value="${i}">${o.name}</option>`).join("");    
     document.getElementById("operatorSelect").innerHTML = opOps;    
     document.getElementById("srcWallet").innerHTML = '<option value="caisse">Caisse</option>' + opOps;    
@@ -2176,7 +2336,6 @@ document.addEventListener('click', function(e) {
     document.getElementById("settleOpIdx").innerHTML = opOps;    
     document.getElementById("settleDest").innerHTML = '<option value="caisse">🏠 CAISSE (CASH)</option>' + opOps;  
     
-    // 5. Interface Administration
     document.getElementById("adminOpEditList").innerHTML = data.operators.map((o,i) => `
         <div class="card">
             ${o.name}
@@ -2202,9 +2361,9 @@ const runAutoCleanup = () => {
 
     const now = Date.now();
 
-    const H240 = 240 * 60 * 60 * 1000; // 10 jours
-    const H120 = 120 * 60 * 60 * 1000; // 5 jours
-    const H72  = 72  * 60 * 60 * 1000; // 3 jours
+    const H240 = 240 * 60 * 60 * 1000;
+    const H120 = 120 * 60 * 60 * 1000;
+    const H72  = 72  * 60 * 60 * 1000;
 
     let hasOldData = false;
 
@@ -2212,15 +2371,9 @@ const runAutoCleanup = () => {
 
         let tTime = t.timestamp;
 
-        // 🔥 CORRECTION AUTOMATIQUE DES ANCIENNES DONNÉES
         if (!tTime) {
-
             if (t.date) {
-
-                // 🔁 tentative normale
                 let parsed = new Date(t.date).getTime();
-
-                // 🔥 fallback spécial pour formats bizarres (ex: 26/04/2026 12:30)
                 if (isNaN(parsed)) {
                     const parts = t.date.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
                     if (parts) {
@@ -2228,8 +2381,6 @@ const runAutoCleanup = () => {
                         parsed = new Date(`${y}-${m}-${d}`).getTime();
                     }
                 }
-
-                // ✅ si récupéré → on sauvegarde définitivement
                 if (!isNaN(parsed)) {
                     tTime = parsed;
                     t.timestamp = parsed;
@@ -2237,7 +2388,6 @@ const runAutoCleanup = () => {
             }
         }
 
-        // ❌ toujours illisible → on garde
         if (!tTime || isNaN(tTime)) return true;
 
         const age = now - tTime;
@@ -2254,9 +2404,6 @@ const runAutoCleanup = () => {
             t.isReglement ||
             mode.includes("dette");
 
-        // =====================
-        // 🔴 DEPENSE (10 jours)
-        // =====================
         if (isDepense) {
             if (age >= H240) {
                 hasOldData = true;
@@ -2265,9 +2412,6 @@ const runAutoCleanup = () => {
             return true;
         }
 
-        // =====================
-        // 🟡 DETTE SOLDÉE (3 jours)
-        // =====================
         if (isDette) {
             const isSolded =
                 t.snapshotDette &&
@@ -2281,9 +2425,6 @@ const runAutoCleanup = () => {
             return true;
         }
 
-        // =====================
-        // 🔵 NORMAL (5 jours)
-        // =====================
         if (age >= H120) {
             hasOldData = true;
             return false;
@@ -2299,9 +2440,6 @@ const runAutoCleanup = () => {
     } else {
         document.getElementById("cleanupNotify").classList.add("hidden");
     }
-
-    // 🛑 CORRECTION SÉCURITÉ : On NE met PLUS "save();" ici !
-    // La sauvegarde se fera UNIQUEMENT quand l'admin cliquera sur "NETTOYER MAINTENANT"
 }; 
 
     
@@ -2309,16 +2447,13 @@ const runAutoCleanup = () => {
     if (confirm("As-tu bien téléchargé ton PDF ? Les vieilles transactions affichées comme 'à nettoyer' seront définitivement supprimées.")) {
         
         try {
-            // 1. On applique le nettoyage localement
             data.transactions = pendingCleanup;
             
-            // 2. On reconstruit l'objet propre pour Firebase
             const transObj = {};
             data.transactions.forEach(t => {
                 if (t.timestamp) transObj[t.timestamp] = t;
             });
             
-            // 3. On force le remplacement propre du nœud transactions sur Firebase
             const updates = {};
             updates['mka_data/transactions'] = transObj;
             
@@ -2334,9 +2469,6 @@ const runAutoCleanup = () => {
     }
 };
 
-// =========================
-// AUTO CLEANUP LOOP
-// =========================
 setInterval(runAutoCleanup, 30000);
 
 window.onload = () => {
@@ -2345,18 +2477,14 @@ window.onload = () => {
 
 window.deleteOperator = function(index){
     if(!confirm("Supprimer cet opérateur ?")) return;
-
     data.operators.splice(index, 1);
-
     save();
     render();
 };
 
 window.deleteType = function(index){
     if(!confirm("Supprimer ce type ?")) return;
-
     data.types.splice(index, 1);
-
     save();
     render();
 };
@@ -2364,40 +2492,27 @@ window.deleteType = function(index){
   let deferredPrompt;
 const installBtn = document.getElementById('installBtn');
 
-// 1. Écouter l'événement d'installation de Chrome
 window.addEventListener('beforeinstallprompt', (e) => {
-  // Empêche l'affichage automatique
   e.preventDefault();
-  // Stocke l'événement
   deferredPrompt = e;
-  
-  // Affiche le bouton d'installation maintenant qu'on sait que c'est possible
   if (installBtn) {
     installBtn.style.display = 'block';
   }
-  
   console.log("MKA Shop : Prêt pour l'installation manuelle.");
 });
 
-// 2. Action quand on clique sur le bouton
 if (installBtn) {
   installBtn.addEventListener('click', async () => {
     if (deferredPrompt) {
-      // Affiche la fenêtre système d'installation
       deferredPrompt.prompt();
-      
-      // Attend la réponse de l'utilisateur
       const { outcome } = await deferredPrompt.userChoice;
       console.log(`Réponse de l'utilisateur : ${outcome}`);
-      
-      // On cache le bouton car l'invitation a été traitée
       deferredPrompt = null;
       installBtn.style.display = 'none';
     }
   });
 }
 
-// 3. Cacher le bouton si l'app est déjà installée
 window.addEventListener('appinstalled', () => {
   console.log('MKA Shop : Installation réussie !');
   if (installBtn) {
@@ -2407,5 +2522,5 @@ window.addEventListener('appinstalled', () => {
 });
 
   
-</script>  </body>    
+</script>  </body>  
 </html>
