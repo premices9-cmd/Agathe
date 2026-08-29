@@ -1,2526 +1,1580 @@
-<!DOCTYPE html>  
-<html lang="fr">  
-<head>  
-   <meta charset="UTF-8">  
-   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">  
-   <link rel="manifest" href="manifest.json">
-   <meta name="apple-mobile-web-app-capable" content="yes">  
-   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-   <meta name="apple-mobile-web-app-title" content="MKA Shop">
-   <link rel="apple-touch-icon" href="icon.png">
-   <link rel="icon" href="icon.png"> 
-   <title>MKA Pro Business V5.3.0 - Full Logic</title>  
-   <meta name="theme-color" content="#0f172a">  
-   <meta name="mobile-web-app-capable" content="yes">
-   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>Notebook · Agathe my wife</title>
 
-<style>  
-   body { font-family: 'Segoe UI', sans-serif; background: #0f172a; margin: 0; color: white; padding-bottom: 50px; }  
-   .container { background: white; color: black; margin: 10px; padding: 15px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }  
-   input, select, button { padding: 12px; margin: 5px 0; border-radius: 8px; border: 1px solid #cbd5e1; width: 100%; box-sizing: border-box; font-size: 15px; }  
-   button { cursor: pointer; background: #0f172a; color: white; font-weight: bold; border: none; transition: 0.2s; }  
-   button:active { transform: scale(0.96); opacity: 0.8; }  
-   .card { background: #f1f5f9; padding: 10px; margin: 8px 0; border-radius: 8px; border-left: 5px solid #0f172a; font-size: 13px; position: relative; }  
-   .card.negative { border-left: 5px solid #ef4444; color: #b91c1c; background: #fef2f2; }  
-   .hidden { display: none !important; }  
-   .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }  
-   .vnc-box { background: linear-gradient(135deg, #1e293b, #0f172a); color: white; padding: 18px; border-radius: 15px; text-align: center; margin-bottom: 15px; border: 2px solid #facc15; }  
-   .vnc-val { font-size: 28px; font-weight: bold; color: #facc15; }  
-   .mixed-box { background: #f8fafc; border: 2px solid #1e293b; padding: 10px; border-radius: 10px; margin: 10px 0; }  
-   .change-box { background: #f0f9ff; border: 2px solid #0ea5e9; padding: 12px; border-radius: 12px; margin: 15px 0; }  
-   .admin-box { border: 2px solid #ef4444; padding: 15px; border-radius: 12px; margin-top: 20px; background: #fff1f2; color: #991b1b; }  
-   .label-sm { font-size: 11px; font-weight: bold; color: #64748b; margin-top: 5px; display: block; text-transform: uppercase; }  
-   .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; z-index: 9999; }  
-   .modal-content { background: white; color: black; padding: 20px; border-radius: 15px; width: 95%; max-height: 90vh; overflow-y: auto; }  
-   .btn-del { background: #ef4444; padding: 4px 8px; font-size: 10px; width: auto; position: absolute; right: 10px; top: 10px; color: white; border-radius: 5px; cursor: pointer; }  
-   .nav-hist { display: flex; overflow-x: auto; gap: 5px; margin-bottom: 15px; padding-bottom: 5px; }  
-   .nav-hist button { width: auto; font-size: 11px; white-space: nowrap; background: #64748b; padding: 8px 12px; }  
-   .nav-hist button.active { background: #0ea5e9; }  
-   .debt-alert { background: #fff7ed; border: 1px solid #ea580c; color: #9a3412; padding: 8px; border-radius: 8px; font-size: 12px; margin-bottom: 5px; }  
+    <!-- PWA META -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Agathe Notebook">
+    <meta name="theme-color" content="#7c3aed">
+    <meta name="mobile-web-app-capable" content="yes">
 
-   /* Styles pour la liste déroulante améliorée du règlement dette */
-   .debt-search-wrapper { position: relative; width: 100%; }
-   .debt-search-wrapper input { width: 100%; padding: 10px; font-size: 15px; border-radius: 8px; border: 1px solid #cbd5e1; box-sizing: border-box; }
-   .debt-suggestions {
-       position: absolute;
-       top: 100%;
-       left: 0;
-       right: 0;
-       background: white;
-       border: 1px solid #cbd5e1;
-       border-top: none;
-       border-radius: 0 0 8px 8px;
-       max-height: 250px;
-       overflow-y: auto;
-       z-index: 1000;
-       box-shadow: 0 8px 16px rgba(0,0,0,0.1);
-       display: none;
-   }
-   .debt-suggestions .suggestion-item {
-       padding: 10px 12px;
-       cursor: pointer;
-       border-bottom: 1px solid #f1f5f9;
-       font-size: 14px;
-       color: #0f172a;
-       display: flex;
-       justify-content: space-between;
-       align-items: center;
-       transition: background 0.15s;
-   }
-   .debt-suggestions .suggestion-item:hover {
-       background: #f1f5f9;
-   }
-   .debt-suggestions .suggestion-item .debt-detail {
-       font-size: 12px;
-       font-weight: bold;
-       display: flex;
-       gap: 10px;
-       align-items: center;
-       flex-wrap: wrap;
-   }
-   .debt-suggestions .suggestion-item .debt-detail .client-debt {
-       color: #dc2626;
-   }
-   .debt-suggestions .suggestion-item .debt-detail .moi-debt {
-       color: #16a34a;
-   }
-   .debt-suggestions .suggestion-item .debt-detail .badge {
-       font-size: 9px;
-       padding: 2px 6px;
-       border-radius: 4px;
-       font-weight: bold;
-   }
-   .badge-client { background: #fee2e2; color: #991b1b; }
-   .badge-moi { background: #dcfce7; color: #166534; }
-   .badge-both { background: #fef3c7; color: #92400e; }
+    <!-- ICÔNES -->
+    <link rel="icon" href="logo.png" type="image/png">
+    <link rel="apple-touch-icon" href="logo.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="logo.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="logo.png">
 
-   /* Styles pour la recherche de noms dans les opérations clients */
-   .client-name-search-wrapper { position: relative; width: 100%; }
-   .client-name-search-wrapper input { width: 100%; padding: 10px; font-size: 15px; border-radius: 8px; border: 1px solid #cbd5e1; box-sizing: border-box; }
-   .client-name-suggestions {
-       position: absolute;
-       top: 100%;
-       left: 0;
-       right: 0;
-       background: white;
-       border: 1px solid #cbd5e1;
-       border-top: none;
-       border-radius: 0 0 8px 8px;
-       max-height: 200px;
-       overflow-y: auto;
-       z-index: 1000;
-       box-shadow: 0 8px 16px rgba(0,0,0,0.1);
-       display: none;
-   }
-   .client-name-suggestions .suggestion-item {
-       padding: 8px 12px;
-       cursor: pointer;
-       border-bottom: 1px solid #f1f5f9;
-       font-size: 13px;
-       color: #0f172a;
-       display: flex;
-       justify-content: space-between;
-       align-items: center;
-       transition: background 0.15s;
-   }
-   .client-name-suggestions .suggestion-item:hover {
-       background: #f1f5f9;
-   }
-   .client-name-suggestions .suggestion-item .delete-name-btn {
-       background: #ef4444;
-       color: white;
-       border: none;
-       border-radius: 50%;
-       width: 22px;
-       height: 22px;
-       font-size: 12px;
-       font-weight: bold;
-       cursor: pointer;
-       display: flex;
-       align-items: center;
-       justify-content: center;
-       transition: 0.2s;
-   }
-   .client-name-suggestions .suggestion-item .delete-name-btn:hover {
-       transform: scale(1.1);
-       background: #dc2626;
-   }
-   .client-name-suggestions .suggestion-item .name-info {
-       display: flex;
-       flex-direction: column;
-       gap: 2px;
-   }
-   .client-name-suggestions .suggestion-item .name-info .name-status {
-       font-size: 10px;
-       color: #64748b;
-   }
-   .client-name-suggestions .suggestion-item .name-info .name-status .badge-client-small {
-       background: #fee2e2;
-       color: #991b1b;
-       padding: 1px 6px;
-       border-radius: 4px;
-       font-weight: bold;
-   }
-   .client-name-suggestions .suggestion-item .name-info .name-status .badge-moi-small {
-       background: #dcfce7;
-       color: #166534;
-       padding: 1px 6px;
-       border-radius: 4px;
-       font-weight: bold;
-   }
-   .client-name-suggestions .suggestion-item .name-info .name-status .badge-both-small {
-       background: #fef3c7;
-       color: #92400e;
-       padding: 1px 6px;
-       border-radius: 4px;
-       font-weight: bold;
-   }
-</style>
-
-</head>  
-<body style="margin:0; padding:0;">
-    <div style="text-align:center; padding: 20px 10px; background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%); border-bottom: 3px solid #facc15;">
-        <img src="logo.png" 
-             alt="MKA SHOP" 
-             style="width: 85px; height: 85px; border-radius: 20px; border: 2px solid #facc15; box-shadow: 0 8px 15px rgba(0,0,0,0.5);">
-        <h1 style="margin: 12px 0 0 0; font-size: 22px; color: #facc15; text-transform: uppercase; letter-spacing: 1px; font-weight: 800;">
-            MKA SHOP V5.3.0
-        </h1>
-    </div>
-    
-    <div style="text-align: center; margin: 15px auto;">
-    <button id="installBtn" style="display: none; background: #3b82f6; color: white; border: none; padding: 12px 20px; border-radius: 25px; font-size: 14px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">
-      📲 Installer MKA Shop V5.3.0
-     </button>
-    </div>
-
-    <div class="container">  
-    <div id="loginSection">  
-        <h2 style="text-align:center">Connexion</h2>  
-        <input type="password" id="pinInput" placeholder="Code PIN Accès">  
-        <button onclick="login()">OUVRIR SESSION</button>  
-    </div>    <div id="appSection" class="hidden"> 
-    <div id="cleanupNotify" class="hidden" style="background: #fff7ed; border: 2px solid #ea580c; padding: 15px; border-radius: 12px; margin-bottom: 15px; text-align: center;">
-    <strong style="color: #9a3412;">🧹 Nettoyage disponible</strong><br>
-    <span style="font-size: 12px; color: #7c2d12;">Certaines vieilles opérations peuvent être archivées pour alléger l'application.</span>
-    <div class="grid-2" style="margin-top: 10px;">
-        <button onclick="showFullHistory('general')" style="background: #64748b; font-size: 11px;">1. VOIR / EXPORT PDF</button>
-        <button onclick="confirmCleanup()" style="background: #ea580c; font-size: 11px;">2. NETTOYER MAINTENANT</button>
-    </div>
-</div>
-
-    <div class="vnc-box">  
-        <span style="font-size: 11px; opacity: 0.8;">VALEUR NETTE COMPTABLE (VNC)</span><br>  
-        <div class="vnc-val" id="totalVNC">0.00 $</div>  
-        <div style="font-size: 10px;">Taux: <span id="rateM"></span> | Stock: <span id="totalStock">0</span></div>  
-    </div>  
-
-    <div style="display:flex; justify-content:space-between; margin-bottom:15px;">  
-        <button onclick="logout()" style="background:#ef4444; width:auto; padding:8px 15px;">QUITTER</button>  
-        <div style="text-align:right; font-size: 13px;">  
-            <strong>Tiroir :</strong> <span id="caisseUSD" style="color:#16a34a">0</span>$ | <span id="caisseCDF" style="color:#16a34a">0</span>FC  
-        </div>  
-    </div>  
-
-    <div id="operatorBalances"></div>  
-
-    <div class="change-box">  
-        <h4 style="margin:0 0 10px 0; color:#0369a1;">🔄 Change & Transfert</h4>  
-        <select id="srcWallet" onchange="calcDest()"></select>  
-        <div class="grid-2">  
-            <input type="number" id="srcAmt" placeholder="Montant" oninput="calcDest()">  
-            <select id="srcCurr" onchange="calcDest()"><option value="USD">USD</option><option value="CDF">CDF</option></select>  
-        </div>   
-        <div style="margin: 5px 0;">
-    <label class="label-sm" style="color:#0ea5e9;">Taux de l'opération :</label>
-    <div style="display:flex; gap:2px;">
-        <input type="number" id="transferRate" placeholder="Taux spécifique" oninput="calcDest()">
-        <button type="button" onclick="document.getElementById('transferRate').value = data.taux; calcDest();" style="width:70px; background:#64748b; font-size:10px;">DÉFAUT</button>
-    </div>
-</div>
-
-        <label class="label-sm">Vers :</label>  
-        <select id="destWallet"></select>  
-        <div class="grid-2">  
-            <input type="number" id="destAmt" readonly style="background:#e2e8f0; font-weight:bold">  
-            <select id="destCurr" onchange="calcDest()"><option value="CDF">CDF</option><option value="USD">USD</option></select>  
-        </div>  
-        <input type="text" id="transferMotif" placeholder="Motif Transfert">  
-        <button onclick="executeGlobalChange()" style="background:#0ea5e9; width:100%;">VALIDER TRANSFERT</button>  
-    </div>  
-
-    <hr>  
-    <div id="debtSettlementBox" style="background:#fefce8; border:2px solid #eab308; padding:15px; border-radius:12px; margin-bottom:15px;">  
-    <h4 style="margin:0 0 5px 0; color:#854d0e;">💰 Règlement Précis des Dettes</h4>  
-    <div id="debtStatus" class="debt-alert hidden"></div>  
-    
-    <div class="grid-2">
-        <select id="settleOpIdx" onchange="checkDebtBalance()"></select>    
-        <div class="debt-search-wrapper">
-            <input type="text" id="debtPersonName" placeholder="NOM DU CLIENT" autocomplete="off" oninput="filterDebtSuggestions()">
-            <div id="debtSuggestions" class="debt-suggestions"></div>
-        </div>
-    </div>
-    
-    <div class="grid-2" style="margin: 8px 0;">
-        <div>
-            <label class="label-sm" style="color:#854d0e;">Taux du Règlement :</label>
-            <div style="display:flex; gap:2px;">
-                <input type="number" id="settleRate" placeholder="Taux" oninput="checkDebtBalance()">
-                <button type="button" onclick="document.getElementById('settleRate').value = data.taux; checkDebtBalance();" style="width:45px; background:#64748b; font-size:10px; color:white;">DEF</button>
-            </div>
-        </div>
-                <div>
-            <label class="label-sm" style="color:#b91c1c; font-weight: bold;">🎁 Réduction / Commission :</label>
-            <div class="grid-2" style="gap:2px;">
-                <input type="number" id="settleRemiseUSD" placeholder="Frais/Com $">
-                <input type="number" id="settleRemiseCDF" placeholder="Frais/Com FC">
-            </div>
-        </div>
-    </div>
-
-    <div style="margin: 8px 0; background: #f0fdf4; border: 1px dashed #16a34a; padding: 10px; border-radius: 8px;">
-        <label class="label-sm" style="color:#15803d; font-weight: bold;">💖 Pourboire (Ajout direct Caisse) :</label>
-        <div class="grid-2" style="gap:2px;">
-            <input type="number" id="settlePourboireUSD" placeholder="Pourboire $">
-            <input type="number" id="settlePourboireCDF" placeholder="Pourboire FC">
-        </div>
-    </div>
-
-
-    <div style="background:#fef9c3; border:1px dashed #eab308; padding:10px; border-radius:8px; margin-top:10px;">
-        <span class="label-sm" style="color:#a16207;">Paiement sur Dette USD ($)</span>
-        <div class="grid-2">
-            <input type="number" id="payOnUsd_USD" placeholder="Payé en $">
-            <input type="number" id="payOnUsd_CDF" placeholder="Payé en FC">
-        </div>
-    </div>
-
-    <div style="background:#fef9c3; border:1px dashed #eab308; padding:10px; border-radius:8px; margin-top:8px;">
-        <span class="label-sm" style="color:#a16207;">Paiement sur Dette CDF (FC)</span>
-        <div class="grid-2">
-            <input type="number" id="payOnCdf_USD" placeholder="Payé en $">
-            <input type="number" id="payOnCdf_CDF" placeholder="Payé en FC">
-        </div>
-    </div>
-
-    <label class="label-sm" style="color:#16a34a; margin-top:10px;">Destination des fonds :</label>  
-    <select id="settleDest" style="border: 1px solid #16a34a;"></select>  
-    
-    <button onclick="settleAccountV2()" style="background:#eab308; color:black; font-weight:bold; margin-top:10px;">VALIDER LE RÈGLEMENT DÉTAILLÉ</button>    
-</div>
-
-
-    <hr>  
-    <h2>Opérations Clients</h2>  
-    <div class="grid-2">  
-        <select id="operatorSelect" onchange="togglePaySim()"></select>  
-        <select id="typeSelect" onchange="updateDefaultStockMove()"></select>  
-    </div>  
-    <div class="grid-2">  
-    <input type="number" id="amount" placeholder="Montant Opération">  
-    <div style="display:flex; gap:2px;">
-        <input type="number" id="opTaux" placeholder="Taux (ex: 2850)">
-        <button type="button" onclick="document.getElementById('opTaux').value = data.taux" style="width:45px; background:#64748b; font-size:10px;">DEFAUT</button>
-        </div>
-    </div>
-    <input type="number" id="stkMove" step="any" inputmode="decimal" placeholder="Stock (+/-)">
-
-    <select id="currency" style="margin-bottom: 10px;"><option value="USD">USD</option><option value="CDF">CDF</option></select>  
-
-    <div id="mixedFields" class="mixed-box">  
-        <label class="label-sm" style="color:#1e293b">Détail Cash (Tiroir) :</label>  
-        <div class="grid-2">  
-            <input type="number" id="mixUSD" placeholder="Cash $">  
-            <div style="display:flex; gap:2px;">  
-                <input type="number" id="mixCDF" placeholder="Cash FC">  
-                <button onclick="autoCalcMix()" style="width:45px; background:#1e293b; font-size:10px;">CALC</button>  
-            </div>  
-        </div>  
-        <div class="grid-2" style="margin-top:5px;">  
-            <input type="number" id="commUSD" placeholder="+ Frais $">  
-            <input type="number" id="commCDF" placeholder="+ Frais FC">  
-        </div>  
-    </div>  
-
-    <label class="label-sm">Mode de Règlement :</label>  
-    <select id="payMode" onchange="togglePaySim()">  
-        <option value="cash">Paiement Cash (Tiroir)</option>  
-        <option value="virtuel">Via une autre SIM (Inter-SIM)</option>  
-        <option value="depense">Dépense (Sortie SIM)</option>  
-        <option value="dette_client">Dette Client (Sortie non payée)</option>  
-        <option value="dette_moi">Dette Moi (Entrée non payée)</option>  
-    </select>  
-        
-    <div id="paySimBox" class="hidden" style="margin-top:5px;">  
-        <label class="label-sm" style="color:#8b5cf6;">Choisir la SIM source :</label>  
-        <select id="paySimSelect" style="border: 2px solid #8b5cf6;"></select>  
-    </div>  
-
-    <div id="debtNameBox" class="hidden">  
-        <label class="label-sm" style="color:#ef4444;">Nom de la personne (Dette) :</label>  
-        <div class="client-name-search-wrapper">
-            <input type="text" id="personName" placeholder="Ex: Maman Rose, Agent Airtel..." autocomplete="off" oninput="filterClientNames()">
-            <div id="clientNameSuggestions" class="client-name-suggestions"></div>
-        </div>
-    </div>  
-        
-    <input type="text" id="motif" placeholder="Référence / Client" oninput="togglePaySim()">  
-    <button onclick="addTransaction()" style="background:#16a34a; margin-top:10px;">ENREGISTRER L'OPÉRATION</button>  
-    <button onclick="showFullHistory('general')" style="background:#64748b; margin-top:10px;">HISTORIQUES DÉTAILLÉS</button>  
-
-    <div id="adminSection" class="hidden">  
-        <div class="admin-box">  
-            <h3>🔧 Configuration Admin</h3>  
-            <div style="background:#fee2e2; padding:10px; border-radius:8px; margin-bottom:10px; color:black; border:1px solid #ef4444;">  
-                <h4>🔐 Sécurité & Codes PIN</h4>  
-                <div class="grid-2">  
-                    <div><label class="label-sm">PIN Admin</label><input type="text" id="newPinAdmin" placeholder="Code Admin"></div>  
-                    <div><label class="label-sm">PIN Employé</label><input type="text" id="newPinUser" placeholder="Code Employé"></div>  
-                </div>  
-                <button onclick="updatePins()" style="background:#b91c1c">CHANGER LES CODES</button>  
-            </div>  
-
-            <div style="background:white; padding:10px; border-radius:8px; margin-bottom:10px; color:black;">  
-                <h4>Créer Type d'Action</h4>  
-                <input type="text" id="newTypeName" placeholder="Nom (ex: Vente SIM)">  
-                <div class="grid-2">  
-                    <label class="label-sm">SIM (-/+)</label>  
-                    <select id="impO"><option value="-1">SIM (-)</option><option value="1">SIM (+)</option><option value="0">SIM (0)</option></select>  
-                </div>  
-                <div class="grid-2">  
-                    <label class="label-sm">Caisse (-/+)</label>  
-                    <select id="impC"><option value="1">Caisse (+)</option><option value="-1">Caisse (-)</option><option value="0">Caisse (0)</option></select>  
-                </div>  
-                <div class="grid-2">  
-                    <label class="label-sm">Impact Stock</label>  
-                    <select id="impS"><option value="0">Aucun (0)</option><option value="-1">Vente (-1)</option><option value="1">Achat (+1)</option></select>  
-                </div>  
-                <button onclick="addType()" style="background:#0f172a; margin-top:5px;">CRÉER TYPE</button>  
-                <div id="adminTypeList" style="margin-top:10px; font-size:11px;"></div>  
-            </div>  
-
-            <div style="background:white; padding:10px; border-radius:8px; margin-bottom:10px; color:black;">  
-                <h4>Paramètres Généraux</h4>  
-                <input type="number" id="newTaux" placeholder="Taux">  
-                <div class="grid-2">  
-                    <input type="number" id="editCashUSD" placeholder="Caisse $">  
-                    <input type="number" id="editCashCDF" placeholder="Caisse FC">  
-                </div>  
-                <button onclick="updateAdminBasics()" style="background:#0f172a">APPLIQUER</button>  
-                </div>  
-
-            <div style="background:white; padding:10px; border-radius:8px; margin-bottom:10px; color:black; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">  
-                <h4 style="margin-top:0; margin-bottom:10px; color:#b91c1c;">Nouveau Compte</h4>  
-                <input type="text" id="newOpName" placeholder="Nom du compte (ex: Airtel 01)" style="width:100%; margin-bottom:8px; padding:8px; border:1px solid #ccc; border-radius:4px;">  
-                <div class="grid-2" style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:8px;">  
-                    <input type="number" id="initUSD" placeholder="Solde Initial $" step="any" style="padding:8px; border:1px solid #ccc; border-radius:4px;">  
-                    <input type="number" id="initCDF" placeholder="Solde Initial FC" step="any" style="padding:8px; border:1px solid #ccc; border-radius:4px;">  
-               </div>  
-               <div class="grid-2" style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:10px;">  
-                  <input type="number" id="initStock" placeholder="Stock SIM initial" step="any" inputmode="decimal" style="padding:8px; border:1px solid #ccc; border-radius:4px;">
-                  <input type="number" id="initPrice" placeholder="Prix Achat SIM $" step="any" style="padding:8px; border:1px solid #ccc; border-radius:4px;">  
-               </div>  
-               <button onclick="addOperator()" style="background:#b91c1c; color:white; width:100%; padding:10px; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">
-        🚀 CRÉER LE COMPTE
-                </button>  
-               </div>
-    
-               <div id="adminOpEditList" style="margin-top:10px; color:black;"></div>  
-        </div>  
-    </div>  
-</div>
-
-</div>    <div id="historyModal" class="modal hidden">  
-    <div class="modal-content">  
-        <button onclick="closeHistory()" style="background:#ef4444; float:right;">X</button>  
-        <button onclick="exportHistory()" style="background:#16a34a; float:left; width:auto; padding:8px 15px;">📥 EXPORT PDF</button>
-        <div style="clear:both;"></div>  
-        <h2 id="histTitle" style="text-align:center; margin:10px 0;">Historique</h2>  
-        <div class="nav-hist">  
-            <button id="btn-h-general" onclick="showFullHistory('general')">GÉNÉRAL</button>
-            <button id="btn-h-money" onclick="showFullHistory('money')" style="background: #16a34a; font-weight: bold;">📊 MONEY SERVICE</button>  
-            <button id="btn-h-ventes" onclick="showFullHistory('ventes')">VENTES</button>  
-            <button id="btn-h-dette_client" onclick="showFullHistory('dette_client')">DETTES CLIENTS</button>  
-            <button id="btn-h-dette_moi" onclick="showFullHistory('dette_moi')">DETTES MOI</button> 
-            <button id="btn-h-depenses" onclick="showFullHistory('depenses')">DÉPENSES</button>
-            <button id="btn-h-suppressions" onclick="showFullHistory('suppressions')" style="background: #ef4444; color:white;">🗑️ SUPPRESSIONS</button>
-        </div>  
-        <div id="fullHistoryList"></div>  
-    </div>  
-</div>    <script type="module">  
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";  
-    import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-database.js";  
-
-// --- 1. ENREGISTREMENT DU SERVICE WORKER ---
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-            .then(reg => console.log('MKA Shop : Interface prête !'))
-            .catch(err => console.log('Erreur SW :', err));
-    });
-}
-
-// --- 2. CONFIGURATION FIREBASE ---
-const firebaseConfig = {  
-    apiKey: "AIzaSyDSK9sIPu8fvGebZQG9EdHBhlf7nl8Dmzs",  
-    authDomain: "mka-mobile-money.firebaseapp.com",  
-    databaseURL: "https://mka-mobile-money-default-rtdb.firebaseio.com",  
-    projectId: "mka-mobile-money"  
-};  
-
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
-
-// --- 3. ÉTAT INITIAL (Source de vérité unique) ---
-let data = {
-    caisse: { USD: 0, CDF: 0 },
-    operators: [],
-    types: [],
-    transactions: [],
-    taux: 2800,
-    config: { pinAdmin: "1234", pinUser: "0000" },
-    debts: {},
-    deletedNames: [] // Nouveau tableau pour garder la trace des noms supprimés
-};
-
-let isDataLoaded = false;
-
-// ==========================================
-// 📥 LECTURE EN TEMPS RÉEL (SYNCHRO SÉCURISÉE)
-// ==========================================
-onValue(ref(db, 'mka_data'), (snap) => {
-    const incoming = snap.val();
-    
-    if (!incoming) {
-        console.warn("MKA Shop : Base de données vide.");
-        return;
-    }
-
-    data.operators = incoming.operators || [];
-    data.types = incoming.types || [];
-    data.config = incoming.config || data.config;
-    data.debts = incoming.debts || {};
-    data.caisse = incoming.caisse || { USD: 0, CDF: 0 };
-    data.taux = incoming.taux || 2800;
-    data.deletedNames = incoming.deletedNames || [];
-
-    const obj = incoming.transactions || {};
-    data.transactions = Object.values(obj).sort((a, b) => b.timestamp - a.timestamp);
-
-    isDataLoaded = true;
-    console.log("MKA Shop : Données Firebase synchronisées avec succès.");
-
-    try {
-        render(); 
-    } catch(e) {
-        console.error("Erreur de rendu :", e);
-    }
-});
-
-// ==========================================
-// 📤 ÉCRITURE ATOMIQUE SÉCURISÉE
-// ==========================================
-window.save = async function() {
-    if (!isDataLoaded) {
-        console.warn("Sauvegarde bloquée : Les données initiales ne sont pas encore chargées.");
-        return;
-    }
-
-    try {
-        const updates = {};
-        updates['mka_data/caisse'] = data.caisse;
-        updates['mka_data/operators'] = data.operators;
-        updates['mka_data/taux'] = data.taux;
-        updates['mka_data/config'] = data.config;
-        updates['mka_data/debts'] = data.debts;
-        updates['mka_data/types'] = data.types;
-        updates['mka_data/deletedNames'] = data.deletedNames;
-
-        await update(ref(db), updates);
-        console.log("Synchronisation réussie ✅");
-    } catch (error) {
-        console.error("Erreur de sauvegarde Firebase ❌ :", error);
-        alert("⚠️ Problème de connexion. Les soldes ne sont pas synchronisés.");
-    }
-};
-const save = window.save;
-
-const fmt = (n) => parseFloat(n || 0).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).replace(/,/g, '.');  
-const normalize = (str) => str ? str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : "";
-
-// ============================================
-// 🔥 NORMALISATION ULTRA-PERMISSIVE
-// ============================================
-const normalizeStrict = (str) => {
-    if (!str) return "";
-    return str
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/[.,;:!?'"()\[\]{}]/g, "")
-        .replace(/\s+/g, " ")
-        .trim();
-};
-
-// ============================================
-// 🔥 RÉCUPÉRATION DE TOUS LES NOMS UNIQUES AVEC LEUR SITUATION
-// ============================================
-function getAllClientNames() {
-    const nameMap = new Map();
-
-    // 1. Depuis les dettes
-    Object.keys(data.debts).forEach(key => {
-        const underscoreIndex = key.indexOf('_');
-        if (underscoreIndex === -1) return;
-        const type = key.substring(0, underscoreIndex);
-        const name = key.substring(underscoreIndex + 1);
-        if (!name || name.trim().length === 0) return;
-        const normalizedName = name.trim();
-        const normalizedKey = normalizeStrict(normalizedName);
-        if (!nameMap.has(normalizedKey)) {
-            nameMap.set(normalizedKey, { 
-                original: normalizedName,
-                client: { USD: 0, CDF: 0 }, 
-                moi: { USD: 0, CDF: 0 },
-                hasDebtClient: false,
-                hasDebtMoi: false
-            });
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-        const debtData = data.debts[key] || { USD: 0, CDF: 0 };
-        if (type === 'dette client') {
-            nameMap.get(normalizedKey).client = { USD: debtData.USD, CDF: debtData.CDF };
-            nameMap.get(normalizedKey).hasDebtClient = debtData.USD > 0.01 || debtData.CDF > 50;
-        } else if (type === 'dette moi') {
-            nameMap.get(normalizedKey).moi = { USD: debtData.USD, CDF: debtData.CDF };
-            nameMap.get(normalizedKey).hasDebtMoi = debtData.USD > 0.01 || debtData.CDF > 50;
-        }
-    });
 
-    // 2. Depuis les transactions
-    data.transactions.forEach(t => {
-        if (t.person && t.person.trim().length > 0) {
-            const name = t.person.trim();
-            const normalizedKey = normalizeStrict(name);
-            if (!nameMap.has(normalizedKey)) {
-                nameMap.set(normalizedKey, { 
-                    original: name,
-                    client: { USD: 0, CDF: 0 }, 
-                    moi: { USD: 0, CDF: 0 },
-                    hasDebtClient: false,
-                    hasDebtMoi: false
-                });
+        :root {
+            --primary: #7c3aed;
+            --primary-light: #a78bfa;
+            --primary-dark: #5b21b6;
+            --secondary: #f472b6;
+            --success: #34d399;
+            --warning: #fbbf24;
+            --danger: #f87171;
+            --bg-light: #faf5ff;
+            --card-bg: #ffffff;
+            --text-primary: #1e1b4b;
+            --text-secondary: #6b7280;
+            --border-color: #e5e7eb;
+            --shadow-xl: 0 20px 30px -5px rgba(0, 0, 0, 0.1);
+            --radius: 20px;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(145deg, #f0e6ff 0%, #e9d5ff 100%);
+            min-height: 100vh;
+            padding: 16px 14px;
+            color: var(--text-primary);
+        }
+
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 24px;
+            animation: fadeInDown 0.6s ease;
+            background: rgba(255, 255, 255, 0.4);
+            backdrop-filter: blur(10px);
+            padding: 16px 20px;
+            border-radius: 60px;
+            box-shadow: var(--shadow-xl);
+            border: 1px solid rgba(255, 255, 255, 0.7);
+            display: inline-block;
+            width: auto;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #4c1d95;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .header h1 i {
+            color: var(--secondary);
+            font-size: 1.8rem;
+        }
+
+        .header .sub {
+            font-size: 0.95rem;
+            color: #5b21b6;
+            opacity: 0.85;
+            font-weight: 400;
+            margin-top: 2px;
+            letter-spacing: 0.5px;
+        }
+
+        .header .sub i {
+            margin: 0 4px;
+            color: var(--secondary);
+        }
+
+        /* BOUTON D'INSTALLATION */
+        #installContainer {
+            text-align: center;
+            margin: 10px auto 15px auto;
+            display: none;
+        }
+
+        #installBtn {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            border: none;
+            padding: 14px 32px;
+            border-radius: 60px;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 25px rgba(124, 58, 237, 0.3);
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        #installBtn:hover {
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 12px 35px rgba(124, 58, 237, 0.4);
+        }
+
+        #installBtn i {
+            font-size: 1.2rem;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1.2fr;
+            gap: 24px;
+            animation: fadeInUp 0.7s ease;
+        }
+
+        .calendar-section,
+        .tasks-section {
+            background: var(--card-bg);
+            border-radius: var(--radius);
+            padding: 22px 18px;
+            box-shadow: var(--shadow-xl);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            backdrop-filter: blur(2px);
+            transition: all 0.25s ease;
+        }
+
+        .calendar-section:hover,
+        .tasks-section:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 25px 35px -8px rgba(0, 0, 0, 0.12);
+        }
+
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #f3e8ff;
+        }
+
+        .calendar-header h2 {
+            font-size: 1.3rem;
+            color: var(--primary-dark);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .calendar-header h2 i {
+            color: var(--secondary);
+        }
+
+        .btn-nav {
+            background: var(--primary);
+            color: white;
+            border: none;
+            width: 36px;
+            height: 36px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(124, 58, 237, 0.2);
+        }
+
+        .btn-nav:hover {
+            background: var(--primary-dark);
+            transform: scale(1.05);
+        }
+
+        .calendar-month {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 1.1rem;
+            text-align: center;
+            padding: 6px 0;
+            background: #faf5ff;
+            border-radius: 40px;
+            margin-bottom: 12px;
+        }
+
+        .weekdays {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 4px;
+            margin-bottom: 8px;
+        }
+
+        .weekday {
+            text-align: center;
+            font-weight: 600;
+            color: var(--primary);
+            font-size: 0.75rem;
+            padding: 6px 0;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .days {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 4px;
+        }
+
+        .day {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 14px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            border: 2px solid transparent;
+            background: #faf5ff;
+            color: var(--text-secondary);
+            position: relative;
+            font-size: 0.9rem;
+        }
+
+        .day:hover:not(.other-month) {
+            background: var(--primary-light);
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .day.other-month {
+            color: #d4c4e8;
+            cursor: default;
+            background: transparent;
+        }
+
+        .day.selected {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary-dark);
+            box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2);
+            transform: scale(1.04);
+        }
+
+        .day.today {
+            background: var(--secondary);
+            color: white;
+            font-weight: 700;
+            border-color: #ec4899;
+        }
+
+        .day.has-tasks::after {
+            content: '';
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            background: var(--success);
+            border-radius: 50%;
+            bottom: 4px;
+            right: 4px;
+            box-shadow: 0 0 4px rgba(52, 211, 153, 0.5);
+        }
+
+        .tasks-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #f3e8ff;
+            flex-wrap: wrap;
+        }
+
+        .tasks-header h2 {
+            font-size: 1.3rem;
+            color: var(--primary-dark);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tasks-header h2 i {
+            color: var(--secondary);
+        }
+
+        .selected-date {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+            background: #f3e8ff;
+            padding: 4px 14px;
+            border-radius: 30px;
+        }
+
+        .task-input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 18px;
+            padding: 16px 14px;
+            background: #faf5ff;
+            border-radius: 18px;
+            border: 2px solid #ede9fe;
+            transition: all 0.25s ease;
+        }
+
+        .task-input-group:focus-within {
+            border-color: var(--primary);
+            background: #f5f0ff;
+        }
+
+        .input-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .task-input-group input,
+        .task-input-group textarea {
+            flex: 1;
+            min-width: 120px;
+            padding: 10px 12px;
+            border: 1px solid #e5e7eb;
+            border-radius: 14px;
+            font-family: inherit;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+            background: white;
+        }
+
+        .task-input-group input:focus,
+        .task-input-group textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.08);
+        }
+
+        .task-input-group textarea {
+            resize: vertical;
+            min-height: 44px;
+            flex-basis: 100%;
+        }
+
+        .time-inputs {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .time-input-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: white;
+            padding: 2px 10px 2px 6px;
+            border-radius: 40px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .time-input-wrapper label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .time-input-wrapper input {
+            width: 90px;
+            border: none;
+            padding: 6px 2px;
+            font-size: 0.85rem;
+            background: transparent;
+        }
+
+        .time-input-wrapper input:focus {
+            outline: none;
+        }
+
+        .btn-add-task {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            border: none;
+            padding: 12px 16px;
+            border-radius: 40px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.25s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+            box-shadow: 0 4px 12px rgba(124, 58, 237, 0.25);
+        }
+
+        .btn-add-task:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(124, 58, 237, 0.3);
+        }
+
+        .tasks-list {
+            flex: 1;
+            overflow-y: auto;
+            max-height: 380px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding-right: 2px;
+        }
+
+        /* === AMÉLIORATION DE L'AFFICHAGE DES TÂCHES === */
+        .task-item {
+            background: #faf5ff;
+            border: 2px solid #ede9fe;
+            border-radius: 18px;
+            padding: 12px 14px;
+            transition: all 0.25s ease;
+            animation: slideIn 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+
+        .task-item::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: var(--primary);
+            border-radius: 0 4px 4px 0;
+        }
+
+        .task-item:hover {
+            border-color: var(--primary-light);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+            transform: translateX(3px);
+        }
+
+        .task-item.completed {
+            opacity: 0.7;
+            background: #f0fdf4;
+            border-color: var(--success);
+        }
+
+        .task-item.completed::before {
+            background: var(--success);
+        }
+
+        .task-item.completed .task-title {
+            text-decoration: line-through;
+            color: var(--text-secondary);
+        }
+
+        .task-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+        }
+
+        .task-info {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+        }
+
+        .task-title {
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 2px;
+            word-break: break-word;
+            font-size: 0.95rem;
+        }
+
+        .task-description {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+            word-break: break-word;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+        }
+
+        .task-time {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.75rem;
+            color: var(--primary);
+            font-weight: 500;
+            background: #ede9fe;
+            padding: 2px 12px;
+            border-radius: 30px;
+            width: fit-content;
+        }
+
+        .task-time i {
+            font-size: 0.65rem;
+        }
+
+        .task-actions {
+            display: flex;
+            gap: 4px;
+            flex-shrink: 0;
+            align-items: center;
+        }
+
+        .btn-task {
+            background: none;
+            border: none;
+            cursor: pointer;
+            width: 32px;
+            height: 32px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            font-size: 0.85rem;
+            flex-shrink: 0;
+        }
+
+        .btn-edit {
+            color: var(--primary);
+            background: rgba(124, 58, 237, 0.08);
+        }
+        .btn-edit:hover {
+            background: rgba(124, 58, 237, 0.18);
+            transform: scale(1.08);
+        }
+        .btn-delete {
+            color: var(--danger);
+            background: rgba(248, 113, 113, 0.08);
+        }
+        .btn-delete:hover {
+            background: rgba(248, 113, 113, 0.18);
+            transform: scale(1.08);
+        }
+        .btn-complete {
+            color: var(--success);
+            background: rgba(52, 211, 153, 0.08);
+        }
+        .btn-complete:hover {
+            background: rgba(52, 211, 153, 0.18);
+            transform: scale(1.08);
+        }
+        .btn-alarm {
+            color: var(--warning);
+            background: rgba(251, 191, 36, 0.10);
+        }
+        .btn-alarm:hover {
+            background: rgba(251, 191, 36, 0.25);
+            transform: scale(1.08);
+        }
+        .btn-alarm.active {
+            color: #d97706;
+            background: rgba(251, 191, 36, 0.25);
+        }
+
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 32px 16px;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+
+        .empty-state i {
+            font-size: 2.4rem;
+            margin-bottom: 8px;
+            opacity: 0.4;
+            color: var(--primary-light);
+        }
+
+        .download-section {
+            margin-top: 28px;
+            text-align: center;
+        }
+
+        .btn-download {
+            background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+            color: white;
+            border: none;
+            padding: 14px 32px;
+            border-radius: 60px;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 20px rgba(30, 27, 75, 0.25);
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .btn-download:hover {
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 12px 28px rgba(30, 27, 75, 0.35);
+            background: linear-gradient(135deg, #312e81 0%, #4c1d95 100%);
+        }
+
+        .btn-download i {
+            font-size: 1.2rem;
+        }
+
+        /* MODAL */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(30, 27, 75, 0.4);
+            backdrop-filter: blur(6px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.25s ease;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--card-bg);
+            border-radius: 28px;
+            padding: 28px 24px;
+            max-width: 480px;
+            width: 92%;
+            box-shadow: var(--shadow-xl);
+            animation: slideUp 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 18px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #f3e8ff;
+        }
+
+        .modal-header h3 {
+            color: var(--primary-dark);
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .modal-header h3 i {
+            color: var(--secondary);
+        }
+
+        .btn-close-modal {
+            background: none;
+            border: none;
+            font-size: 1.4rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: all 0.2s ease;
+        }
+
+        .btn-close-modal:hover {
+            color: var(--text-primary);
+            transform: rotate(90deg);
+        }
+
+        .modal-form {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .form-group label {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 0.85rem;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            padding: 10px 12px;
+            border: 1px solid #e5e7eb;
+            border-radius: 14px;
+            font-family: inherit;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 60px;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.06);
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 8px;
+        }
+
+        .btn-modal {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 40px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+
+        .btn-save {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 4px 12px rgba(124, 58, 237, 0.2);
+        }
+
+        .btn-save:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+
+        .btn-cancel {
+            background: #f3e8ff;
+            color: var(--text-primary);
+        }
+
+        .btn-cancel:hover {
+            background: #e5d5f5;
+        }
+
+        @media (max-width: 820px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            .header h1 {
+                font-size: 1.6rem;
+            }
+            .header {
+                padding: 12px 16px;
+            }
+            .calendar-section,
+            .tasks-section {
+                padding: 16px 14px;
+            }
+            .day {
+                font-size: 0.8rem;
+            }
+            .task-content {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .task-actions {
+                width: 100%;
+                justify-content: flex-end;
+                margin-top: 4px;
             }
         }
-    });
 
-    // 3. Exclure les noms supprimés
-    const deletedKeys = data.deletedNames.map(n => normalizeStrict(n));
-    const result = Array.from(nameMap.entries())
-        .filter(([key]) => !deletedKeys.includes(key))
-        .map(([key, value]) => ({
-            key: key,
-            original: value.original,
-            client: value.client,
-            moi: value.moi,
-            hasDebtClient: value.hasDebtClient,
-            hasDebtMoi: value.hasDebtMoi
-        }))
-        .sort((a, b) => a.original.localeCompare(b.original));
-
-    return result;
-}
-
-// ============================================
-// 🔥 FILTRAGE DES NOMS POUR LE CHAMP CLIENT (Opérations)
-// ============================================
-window.filterClientNames = function() {
-    const input = document.getElementById("personName");
-    const suggestionsBox = document.getElementById("clientNameSuggestions");
-    const query = input.value.trim();
-    
-    const allNames = getAllClientNames();
-    
-    if (query.length === 0 || allNames.length === 0) {
-        suggestionsBox.style.display = "none";
-        return;
-    }
-
-    const queryNormalized = normalizeStrict(query);
-    const matchingNames = allNames
-        .filter(item => item.key.includes(queryNormalized) || normalizeStrict(item.original).includes(queryNormalized))
-        .slice(0, 15); // Limite pour éviter trop de résultats
-
-    if (matchingNames.length === 0) {
-        suggestionsBox.innerHTML = `<div style="padding:10px; color:#94a3b8; text-align:center; font-size:13px;">Aucun nom trouvé pour "${query}"</div>`;
-        suggestionsBox.style.display = "block";
-        return;
-    }
-
-    let html = '';
-    matchingNames.forEach(item => {
-        // Déterminer le statut
-        let statusHtml = '';
-        if (item.hasDebtClient && item.hasDebtMoi) {
-            statusHtml = `<span class="badge-both-small">🔁 Client doit ${fmt(item.client.USD)}$ / ${fmt(item.client.CDF)}FC & Vous devez ${fmt(item.moi.USD)}$ / ${fmt(item.moi.CDF)}FC</span>`;
-        } else if (item.hasDebtClient) {
-            statusHtml = `<span class="badge-client-small">📝 Client doit ${fmt(item.client.USD)}$ / ${fmt(item.client.CDF)}FC</span>`;
-        } else if (item.hasDebtMoi) {
-            statusHtml = `<span class="badge-moi-small">📝 Vous devez ${fmt(item.moi.USD)}$ / ${fmt(item.moi.CDF)}FC</span>`;
-        } else {
-            statusHtml = `<span style="color:#94a3b8; font-size:10px;">✅ Aucune dette active</span>`;
+        @media (max-width: 480px) {
+            body {
+                padding: 10px 8px;
+            }
+            .header h1 {
+                font-size: 1.3rem;
+            }
+            .time-inputs {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .time-input-wrapper {
+                width: 100%;
+            }
+            .time-input-wrapper input {
+                width: 100%;
+            }
+            .modal-content {
+                padding: 20px 16px;
+            }
+            .task-actions {
+                gap: 2px;
+            }
+            .btn-task {
+                width: 28px;
+                height: 28px;
+                font-size: 0.75rem;
+            }
         }
 
-        html += `
-            <div class="suggestion-item">
-                <div class="name-info" onclick="selectClientName('${item.original.replace(/'/g, "\\'")}')">
-                    <span style="font-weight:500;">${item.original}</span>
-                    <span class="name-status">${statusHtml}</span>
-                </div>
-                <button class="delete-name-btn" onclick="deleteClientName('${item.original.replace(/'/g, "\\'")}')" title="Supprimer ce nom du système">✕</button>
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-16px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(16px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-12px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(16px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .tasks-list::-webkit-scrollbar {
+            width: 5px;
+        }
+        .tasks-list::-webkit-scrollbar-track {
+            background: #f3e8ff;
+            border-radius: 10px;
+        }
+        .tasks-list::-webkit-scrollbar-thumb {
+            background: var(--primary-light);
+            border-radius: 10px;
+        }
+        .tasks-list::-webkit-scrollbar-thumb:hover {
+            background: var(--primary);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- HEADER personnalisé "Agathe my wife" -->
+        <div class="header">
+            <h1>
+                <img src="logo.png" alt="Logo" style="width:40px;height:40px;border-radius:12px;vertical-align:middle;" onerror="this.style.display='none'">
+                Notebook · Agathe my wife
+                <i class="fas fa-star" style="color: #fbbf24;"></i>
+            </h1>
+            <div class="sub">
+                <i class="fas fa-calendar-check"></i> organise tes journées avec élégance
             </div>
-        `;
-    });
-
-    suggestionsBox.innerHTML = html;
-    suggestionsBox.style.display = "block";
-};
-
-window.selectClientName = function(name) {
-    document.getElementById("personName").value = name;
-    document.getElementById("clientNameSuggestions").style.display = "none";
-    // Vérifier automatiquement le mode de paiement
-    togglePaySim();
-};
-
-// ============================================
-// 🔥 SUPPRESSION D'UN NOM DU SYSTÈME
-// ============================================
-window.deleteClientName = async function(name) {
-    if (!name || name.trim().length === 0) return;
-    const confirmMsg = `⚠️ Voulez-vous vraiment supprimer le nom "${name}" du système ?\n\nCette action :\n- Supprime ce nom des suggestions\n- Les transactions restent dans l'historique\n- Une trace sera enregistrée dans l'historique des suppressions`;
-    
-    if (!confirm(confirmMsg)) return;
-
-    try {
-        const normalizedName = normalizeStrict(name);
-        
-        // Ajouter à la liste des noms supprimés
-        if (!data.deletedNames.includes(name.trim())) {
-            data.deletedNames.push(name.trim());
-        }
-
-        // Enregistrer dans l'historique des suppressions
-        const uniqueTimestamp = Date.now();
-        const deleteEntry = {
-            timestamp: uniqueTimestamp,
-            date: new Date().toLocaleString("fr-FR", { timeZone: "Africa/Kinshasa" }),
-            typeNom: "SUPPRESSION_NOM",
-            desc: `🗑️ Suppression du nom "${name}" du système`,
-            person: name,
-            mode: 'suppression',
-            isDeletion: true
-        };
-
-        data.transactions.unshift(deleteEntry);
-
-        // Sauvegarder sur Firebase
-        const updates = {};
-        updates[`mka_data/transactions/${uniqueTimestamp}`] = deleteEntry;
-        updates['mka_data/deletedNames'] = data.deletedNames;
-
-        await update(ref(db), updates);
-
-        // Cacher les suggestions et vider le champ
-        document.getElementById("clientNameSuggestions").style.display = "none";
-        document.getElementById("personName").value = "";
-
-        alert(`✅ Le nom "${name}" a été supprimé du système. Une trace est enregistrée dans l'historique des suppressions.`);
-        render();
-
-    } catch (error) {
-        console.error("Erreur lors de la suppression du nom :", error);
-        alert("❌ Erreur réseau : Impossible de supprimer ce nom.");
-    }
-};
-
-// ============================================
-// 🔥 FILTRAGE DES SUGGESTIONS POUR LE RÈGLEMENT DES DETTES
-// ============================================
-window.filterDebtSuggestions = function() {
-    const input = document.getElementById("debtPersonName");
-    const suggestionsBox = document.getElementById("debtSuggestions");
-    const query = input.value.trim();
-    
-    if (query.length === 0) {
-        suggestionsBox.style.display = "none";
-        return;
-    }
-
-    const queryNormalized = normalizeStrict(query);
-    const debtNames = new Map();
-
-    Object.keys(data.debts).forEach(key => {
-        const underscoreIndex = key.indexOf('_');
-        if (underscoreIndex === -1) return;
-        const type = key.substring(0, underscoreIndex);
-        const name = key.substring(underscoreIndex + 1);
-        if (!name || name.trim().length === 0) return;
-        const normalizedName = name.trim();
-        const normalizedKey = normalizeStrict(normalizedName);
-        
-        // Vérifier si le nom n'a pas été supprimé
-        if (data.deletedNames.includes(normalizedName)) return;
-        
-        if (!debtNames.has(normalizedKey)) {
-            debtNames.set(normalizedKey, { 
-                original: normalizedName,
-                client: { USD: 0, CDF: 0 }, 
-                moi: { USD: 0, CDF: 0 } 
-            });
-        }
-        const debtData = data.debts[key] || { USD: 0, CDF: 0 };
-        if (type === 'dette client') {
-            debtNames.get(normalizedKey).client = { USD: debtData.USD, CDF: debtData.CDF };
-        } else if (type === 'dette moi') {
-            debtNames.get(normalizedKey).moi = { USD: debtData.USD, CDF: debtData.CDF };
-        }
-    });
-
-    const matchingNames = Array.from(debtNames.entries())
-        .filter(([key, data]) => key.includes(queryNormalized))
-        .sort((a, b) => a[0].localeCompare(b[0]));
-
-    if (matchingNames.length === 0) {
-        suggestionsBox.innerHTML = `<div style="padding:10px; color:#94a3b8; text-align:center; font-size:13px;">Aucun nom trouvé pour "${query}"</div>`;
-        suggestionsBox.style.display = "block";
-        return;
-    }
-
-    let html = '';
-    matchingNames.forEach(([normalizedKey, debts]) => {
-        const originalName = debts.original;
-        const clientDebt = debts.client || { USD: 0, CDF: 0 };
-        const moiDebt = debts.moi || { USD: 0, CDF: 0 };
-        
-        const hasClientDebt = clientDebt.USD > 0.01 || clientDebt.CDF > 50;
-        const hasMoiDebt = moiDebt.USD > 0.01 || moiDebt.CDF > 50;
-
-        let debtDisplay = '';
-        let badgeHtml = '';
-
-        if (hasClientDebt && hasMoiDebt) {
-            badgeHtml = `<span class="badge badge-both">🔁 Client & Moi</span>`;
-            debtDisplay = `
-                <span class="client-debt">${fmt(clientDebt.USD)}$ / ${fmt(clientDebt.CDF)}FC</span>
-                <span style="color:#94a3b8;">|</span>
-                <span class="moi-debt">${fmt(moiDebt.USD)}$ / ${fmt(moiDebt.CDF)}FC</span>
-            `;
-        } else if (hasClientDebt) {
-            badgeHtml = `<span class="badge badge-client">Client doit</span>`;
-            debtDisplay = `<span class="client-debt">${fmt(clientDebt.USD)}$ / ${fmt(clientDebt.CDF)}FC</span>`;
-        } else if (hasMoiDebt) {
-            badgeHtml = `<span class="badge badge-moi">Vous devez</span>`;
-            debtDisplay = `<span class="moi-debt">${fmt(moiDebt.USD)}$ / ${fmt(moiDebt.CDF)}FC</span>`;
-        } else {
-            debtDisplay = `<span style="color:#94a3b8; font-size:11px;">Aucune dette</span>`;
-        }
-
-        html += `
-            <div class="suggestion-item" onclick="selectDebtName('${originalName.replace(/'/g, "\\'")}')">
-                <span style="font-weight:500;">${originalName}</span>
-                <div class="debt-detail">
-                    ${badgeHtml}
-                    ${debtDisplay}
-                </div>
-            </div>
-        `;
-    });
-
-    suggestionsBox.innerHTML = html;
-    suggestionsBox.style.display = "block";
-};
-
-window.selectDebtName = function(name) {
-    document.getElementById("debtPersonName").value = name;
-    document.getElementById("debtSuggestions").style.display = "none";
-    checkDebtBalance();
-};
-
-// Clic en dehors des listes pour les fermer
-document.addEventListener('click', function(e) {
-    const debtWrapper = document.querySelector('.debt-search-wrapper');
-    if (debtWrapper && !debtWrapper.contains(e.target)) {
-        const debtSuggestions = document.getElementById('debtSuggestions');
-        if (debtSuggestions) debtSuggestions.style.display = 'none';
-    }
-    const clientWrapper = document.querySelector('.client-name-search-wrapper');
-    if (clientWrapper && !clientWrapper.contains(e.target)) {
-        const clientSuggestions = document.getElementById('clientNameSuggestions');
-        if (clientSuggestions) clientSuggestions.style.display = 'none';
-    }
-});
-
-    window.login = () => {  
-        const p = document.getElementById("pinInput").value;  
-        if(p === data.config.pinAdmin) {  
-            document.getElementById("loginSection").classList.add("hidden");  
-            document.getElementById("appSection").classList.remove("hidden");  
-            document.getElementById("adminSection").classList.remove("hidden");  
-            document.getElementById("newPinAdmin").value = data.config.pinAdmin;  
-            document.getElementById("newPinUser").value = data.config.pinUser;  
-        } else if(p === data.config.pinUser) {  
-            document.getElementById("loginSection").classList.add("hidden");  
-            document.getElementById("appSection").classList.remove("hidden");  
-            document.getElementById("adminSection").classList.add("hidden");  
-        } else { alert("Code PIN Incorrect"); }  
-    };  
-  
-    window.logout = () => location.reload();  
-  
-    window.updatePins = () => {  
-        const pa = document.getElementById("newPinAdmin").value, pu = document.getElementById("newPinUser").value;  
-        if(pa && pu) { data.config.pinAdmin = pa; data.config.pinUser = pu; save(); alert("PIN mis à jour !"); }  
-    };  
-
-    window.togglePaySim = () => {  
-        const mode = document.getElementById("payMode").value;  
-        const motif = normalize(document.getElementById("motif").value);  
-        const opIdx = document.getElementById("operatorSelect").value;  
-        const opName = data.operators[opIdx] ? normalize(data.operators[opIdx].name) : "";  
-        document.getElementById("paySimBox").classList.toggle("hidden", mode !== "virtuel");  
-        const isDebt = mode.includes("dette") || mode === "depense" || motif.includes("dette") || opName.includes("dette client") || opName.includes("dette moi");  
-        document.getElementById("debtNameBox").classList.toggle("hidden", !isDebt);  
-        // Rafraîchir les suggestions si le champ est visible
-        if (isDebt) {
-            const personName = document.getElementById("personName");
-            if (personName && personName.value.trim().length > 0) {
-                filterClientNames();
-            }
-        }
-    };  
-  
-    window.checkDebtBalance = () => {  
-    const opIdx = document.getElementById("settleOpIdx").value;  
-    const op = data.operators[opIdx];  
-    const personRaw = document.getElementById("debtPersonName").value.trim();  
-    const statusEl = document.getElementById("debtStatus");  
-    
-    if(!personRaw || !op) { 
-        statusEl.classList.add("hidden"); 
-        return; 
-    }  
-
-    const person = normalize(personRaw);
-    
-    let typeDette = "dette client"; 
-    if(normalize(op.name).includes("moi") || normalize(op.name).includes("fournisseur")) {
-        typeDette = "dette moi";
-    }
-
-    const debtKey = `${normalize(typeDette)}_${person}`;  
-    const debt = data.debts[debtKey] || { USD: 0, CDF: 0 };  
-    
-    const aDette = (Math.abs(debt.USD) > 0.01 || Math.abs(debt.CDF) > 50);
-
-    if(aDette) {
-        statusEl.innerHTML = `
-            <div style="text-align:center; padding:10px;">
-                <div style="font-size:11px; color:#991b1b; text-transform:uppercase; font-weight:bold;">${typeDette}</div>
-                <div style="margin:5px 0;">⚠️ <b>${personRaw.toUpperCase()}</b> doit :</div>
-                <div style="font-size:22px; color:#b91c1c; font-weight:900;">${fmt(debt.USD)} $</div>
-                <div style="font-size:18px; color:#b91c1c; font-weight:bold;">${fmt(debt.CDF)} FC</div>
-            </div>`;  
-        statusEl.style.background = "#fee2e2"; 
-        statusEl.style.border = "2px solid #ef4444";
-        statusEl.style.borderRadius = "12px";
-        statusEl.style.color = "#991b1b";
-        statusEl.classList.remove("hidden");
-    } else {
-        statusEl.innerHTML = `
-            <div style="text-align:center; padding:10px;">
-                ✅ <b>${personRaw.toUpperCase()}</b><br>
-                <span style="font-size:12px;">Aucune dette enregistrée ici.</span>
-            </div>`;
-        statusEl.style.background = "#dcfce7"; 
-        statusEl.style.border = "2px solid #22c55e";
-        statusEl.style.borderRadius = "12px";
-        statusEl.style.color = "#166534";
-        statusEl.classList.remove("hidden");
-    }
-};
-
-    window.autoCalcMix = () => {  
-        const total = parseFloat(document.getElementById("amount").value) || 0;  
-        const usd = parseFloat(document.getElementById("mixUSD").value) || 0;  
-        const t = parseFloat(data.taux) || 1;  
-        const reste = total - usd;  
-        if(reste > 0) document.getElementById("mixCDF").value = Math.round(reste * t);  
-    };  
-  
- function createTransaction({  
-    typeNom, operator, mode, amt, cur, person, stk, mix
-}){  
-
-    let safeMode = normalize(mode || "");
-
-    if (safeMode.includes("credit")) mode = "dette_client";
-    else if (safeMode.includes("dette moi")) mode = "dette_moi";
-    else if (safeMode.includes("cash")) mode = "cash";
-    else if (safeMode.includes("virtuel") || safeMode.includes("sim")) mode = "virtuel";
-
-    const impacts = {  
-        caisse: { USD:0, CDF:0 },  
-        operator: { USD:0, CDF:0 },  
-        dette: { USD:0, CDF:0 },  
-        stock: stk || 0  
-    };  
-
-    let typeDette = "";
-    const opNorm = normalize(operator);
-    const modeNorm = normalize(mode);
-
-    if (modeNorm === "dette_client") typeDette = "dette client";
-    else if (modeNorm === "dette_moi") typeDette = "dette moi";
-    else {
-        if (opNorm.includes("dette client")) typeDette = "dette client";
-        else if (opNorm.includes("dette moi")) typeDette = "dette moi";
-    }
-
-    const finalUSD = (mix && mix.USD) ? mix.USD : (cur === "USD" ? amt : 0);
-    const finalCDF = (mix && mix.CDF) ? mix.CDF : (cur === "CDF" ? amt : 0);
-
-    const isReglement = normalize(typeNom).includes("reglement");
-
-    return {  
-        id: Date.now(),  
-        typeNom, operator, mode,
-        amt: (cur === "USD" ? finalUSD : finalCDF), 
-        cur, person, typeDette,
-        isReglement,
-        impacts,
-        realUSD: finalUSD,
-        realCDF: finalCDF
-    };  
-}
-
- function applyImpacts(t, reverse = false) {
-
-    if (!t) return;
-    const factor = reverse ? -1 : 1;
-
-    // =========================
-    // 1. CAISSE
-    // =========================
-    if (t.impacts?.caisse) {
-        data.caisse.USD += (t.impacts.caisse.USD || 0) * factor;
-        data.caisse.CDF += (t.impacts.caisse.CDF || 0) * factor;
-    }
-
-        // =========================
-    // 2. OPÉRATEUR
-    // =========================
-    let op = data.operators.find(o => o.name === t.operator);
-    const isDettePrincipal = normalize(t.operator).includes("dette");
-
-    if (op && t.impacts?.operator && !isDettePrincipal) {
-        op.USD += (t.impacts.operator.USD || 0) * factor;
-        op.CDF += (t.impacts.operator.CDF || 0) * factor;
-
-        if (t.stk) {
-            op.stock = (parseFloat(op.stock) || 0) + (parseFloat(t.stk) * factor);
-            op.stock = Math.round(op.stock * 100) / 100;
-        }
-    }
-
-// =========================
-// 🔵 INTER-SIM
-// =========================
-if (t.impacts?.virtuel) {
-
-    const v = t.impacts.virtuel;
-    const sourceSim = data.operators[v.opIdx];
-
-    if (sourceSim) {
-        sourceSim.USD += (v.USD || 0) * factor;
-        sourceSim.CDF += (v.CDF || 0) * factor;
-    }
-}
-    // =========================
-    // 3. DETTES
-    // =========================
-    if (t.person && t.typeDette) {
-
-        const key = `${normalize(t.typeDette)}_${normalize(t.person)}`;
-
-        if (!data.debts[key]) {
-            data.debts[key] = { USD: 0, CDF: 0 };
-        }
-
-        const oldUSD = data.debts[key].USD;
-        const oldCDF = data.debts[key].CDF;
-
-        let impUSD = 0;
-        let impCDF = 0;
-
-    if (t.isReglement) {
-
-    impUSD = (t.impacts?.dette?.USD || 0);
-    impCDF = (t.impacts?.dette?.CDF || 0);
-}
-
-        // =========================
-        // 📈 CRÉATION DETTE
-        // =========================
-        else {
-            impUSD = (t.detteUSD || 0);
-            impCDF = (t.detteCDF || 0);
-        }
-
-        impUSD *= factor;
-        impCDF *= factor;
-
-        if (impUSD !== 0 || impCDF !== 0) {
-
-            data.debts[key].USD += impUSD;
-            data.debts[key].CDF += impCDF;
-
-            data.debts[key].USD = Math.max(0, Math.round(data.debts[key].USD * 100) / 100);
-            data.debts[key].CDF = Math.max(0, Math.round(data.debts[key].CDF));
-
-            t.ancienneDette = { USD: oldUSD, CDF: oldCDF };
-            t.nouvelleDette = {
-                USD: data.debts[key].USD,
-                CDF: data.debts[key].CDF
-            };
-
-            let opG = data.operators.find(o =>
-                normalize(o.name).includes(normalize(t.typeDette))
-            );
-
-            if (opG) {
-                opG.USD += impUSD;
-                opG.CDF += impCDF;
-            }
-        }
-    }
-}
-
-  window.addTransaction = async () => { 
-    if (!isDataLoaded || !data.config) { 
-        alert("⚠️ Application non connectée ou configuration indisponible. Veuillez patienter."); 
-        return; 
-    }
-
-    const opI = document.getElementById("operatorSelect").value;
-    const tyI = document.getElementById("typeSelect").value;
-    const amtSIM = parseFloat(document.getElementById("amount").value) || 0;
-    const cur = document.getElementById("currency").value;
-    const opTauxSaisi = parseFloat(document.getElementById("opTaux").value) || parseFloat(data.taux);
-
-    const mixUSD = parseFloat(document.getElementById("mixUSD").value) || 0;
-    const mixCDF = parseFloat(document.getElementById("mixCDF").value) || 0;
-    const commUSD = parseFloat(document.getElementById("commUSD").value) || 0;
-    const commCDF = parseFloat(document.getElementById("commCDF").value) || 0;
-
-    let mode = document.getElementById("payMode").value;
-    const modeNorm = normalize(mode || "");
-    const motif = document.getElementById("motif").value;
-    const person = document.getElementById("personName").value.trim();
-    const stkM = parseFloat(String(document.getElementById("stkMove").value || "0").replace(",", ".")) || 0;
-
-    const ty = data.types[tyI];
-    const op = data.operators[opI];
-    if (!ty || !op) return;
-
-    const opNorm = normalize(op.name);
-    const isDettePrincipal = opNorm.includes("dette");
-    const isDepensePrincipal = opNorm.includes("depense");
-    const isInterSim = (modeNorm.includes("inter") || modeNorm.includes("sim") || modeNorm.includes("virtuel"));
-
-    const uniqueTimestamp = Date.now();
-
-    const t = createTransaction({
-        typeNom: ty.name,
-        operator: op.name,
-        mode,
-        amt: amtSIM,
-        cur,
-        person,
-        stk: stkM,
-        mix: { USD: mixUSD, CDF: mixCDF }
-    });
-
-    t.id = uniqueTimestamp;
-    t.timestamp = uniqueTimestamp;
-    t.stk = stkM;
-    t.impacts = t.impacts || {};
-    t.impacts.operator = t.impacts.operator || { USD:0, CDF:0 };
-    t.impacts.caisse = t.impacts.caisse || { USD:0, CDF:0 };
-
-    // ==========================================
-    // VOS CALCULS ET CONDITIONS CONSERVÉS À 100%
-    // ==========================================
-    if (!isDettePrincipal && !isInterSim) {
-        t.impacts.operator.USD = (cur === "USD" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
-        t.impacts.operator.CDF = (cur === "CDF" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
-    }
-
-    if (isDettePrincipal) {
-        t.detteUSD = (cur === "USD") ? amtSIM : 0;
-        t.detteCDF = (cur === "CDF") ? amtSIM : 0;
-        const dirCaisse = parseInt(ty.impC) || 0;
-        t.impacts.caisse.USD = (mixUSD * dirCaisse) + commUSD;
-        t.impacts.caisse.CDF = (mixCDF * dirCaisse) + commCDF;
-    }
-    else if (isDepensePrincipal) {
-        t.isDepense = true;
-        t.realUSD = (cur === "USD") ? amtSIM : 0;
-        t.realCDF = (cur === "CDF") ? amtSIM : 0;
-        t.impacts.caisse.USD = (-mixUSD) + commUSD;
-        t.impacts.caisse.CDF = (-mixCDF) + commCDF;
-    }
-    else if (isInterSim) {
-        const taux = parseFloat(data.taux) || 1;
-        const paySimIdx = parseInt(document.getElementById("paySimSelect").value);
-        let diffUSD = 0, diffCDF = 0;
-        if (cur === "USD") {
-            const totalCash = mixUSD + (mixCDF / taux);
-            diffUSD = Math.max(0, amtSIM - totalCash);
-        } else {
-            const totalCash = mixCDF + (mixUSD * taux);
-            diffCDF = Math.max(0, amtSIM - totalCash);
-        }
-        t.virtualUSD = diffUSD; t.virtualCDF = diffCDF; t.virtualOpIdx = paySimIdx;
-        t.impacts.virtuel = { opIdx: paySimIdx, USD: -diffUSD, CDF: -diffCDF };
-        const dirCaisse = parseInt(ty.impC) || 0;
-        t.impacts.caisse.USD = (mixUSD * dirCaisse) + commUSD;
-        t.impacts.caisse.CDF = (mixCDF * dirCaisse) + commCDF;
-    }
-    else {
-        const taux = parseFloat(data.taux) || 1;
-        const totalCashUSD = mixUSD + (mixCDF / taux);
-        const totalCashCDF = mixCDF + (mixUSD * taux);
-        if (cur === "USD") { t.detteUSD = Math.max(0, amtSIM - totalCashUSD); } 
-        else { t.detteCDF = Math.max(0, amtSIM - totalCashCDF); }
-        const dirCaisse = parseInt(ty.impC) || 0;
-        t.impacts.caisse.USD = (mixUSD * dirCaisse) + commUSD;
-        t.impacts.caisse.CDF = (mixCDF * dirCaisse) + commCDF;
-    }
-
-    const backupData = JSON.parse(JSON.stringify(data));
-
-    try {
-        applyImpacts(t);
-
-        if (person && t.typeDette) {
-            const key = `${normalize(t.typeDette)}_${normalize(person)}`;
-            const d = data.debts[key] || { USD: 0, CDF: 0 };
-            t.snapshotDette = { USD: d.USD, CDF: d.CDF };
-        }
-
-        let simSourceName = "";
-        if (t.impacts?.virtuel) {
-            const sourceOp = data.operators[t.impacts.virtuel.opIdx];
-            simSourceName = sourceOp ? ` [via ${sourceOp.name}]` : "";
-        }
-
-        const newEntry = {
-            ...t,
-            person,
-            date: new Date().toLocaleString("fr-FR", {
-                timeZone: "Africa/Kinshasa",
-                year: "numeric", month: "2-digit", day: "2-digit",
-                hour: "2-digit", minute: "2-digit", second: "2-digit"
-            }),
-            desc: `${ty.name} - ${op.name}${simSourceName} (${person ? `NOM: ${person} | ` : ''})${motif}`,
-
-            amtSIM,
-            curSIM: cur,
-            usdCash: mixUSD,
-            cdfCash: mixCDF,
-            commission: { usd: commUSD, cdf: commCDF },
-            opTaux: opTauxSaisi,
-
-        };
-
-        data.transactions.unshift(newEntry);
-
-        const updates = {};
-        updates[`mka_data/transactions/${uniqueTimestamp}`] = newEntry;
-        updates['mka_data/caisse'] = data.caisse;
-        updates['mka_data/operators'] = data.operators;
-        updates['mka_data/debts'] = data.debts;
-
-        await update(ref(db), updates);
-
-        render();
-        console.log(`MKA Shop : Transaction ${uniqueTimestamp} synchronisée.`);
-        alert("✅ Opération enregistrée et synchronisée !");
-
-        ["amount","mixUSD","mixCDF","commUSD","commCDF","motif","personName","stkMove"].forEach(id => {
-            const el = document.getElementById(id); if (el) el.value = "";
-        });
-        ["operatorSelect","typeSelect","currency","payMode"].forEach(id => {
-            const el = document.getElementById(id); if (el) el.selectedIndex = 0;
-        });
-
-    } catch (error) {
-        data = backupData; 
-        console.error("Erreur critique Firebase ❌ :", error);
-        alert("⚠️ ERREUR RÉSEAU : Impossible d'atteindre Firebase. L'opération a été ANNULÉE localement pour protéger vos soldes.");
-        render();
-    }
-};
-
-
-  window.settleAccountV2 = async () => {
-    const opIdx = document.getElementById("settleOpIdx").value;
-    const person = document.getElementById("debtPersonName").value.trim();
-    const destIdx = document.getElementById("settleDest").value;
-    
-    const settleRateInput = parseFloat(document.getElementById("settleRate").value);
-    const taux = (!isNaN(settleRateInput) && settleRateInput > 0) ? settleRateInput : (parseFloat(data.taux) || 1); 
-
-    const opDette = data.operators[opIdx];
-    if (!opDette || !person) {
-        alert("Sélectionnez un opérateur et entrez le nom de la personne.");
-        return;
-    }
-
-    const pOnUsd_USD = parseFloat(document.getElementById("payOnUsd_USD").value) || 0;
-    const pOnUsd_CDF = parseFloat(document.getElementById("payOnUsd_CDF").value) || 0;
-    const pOnCdf_USD = parseFloat(document.getElementById("payOnCdf_USD").value) || 0;
-    const pOnCdf_CDF = parseFloat(document.getElementById("payOnCdf_CDF").value) || 0;
-
-    const remiseUSD = parseFloat(document.getElementById("settleRemiseUSD").value) || 0;
-    const remiseCDF = parseFloat(document.getElementById("settleRemiseCDF").value) || 0;
-
-    const pourboireUSD = parseFloat(document.getElementById("settlePourboireUSD").value) || 0;
-    const pourboireCDF = parseFloat(document.getElementById("settlePourboireCDF").value) || 0;
-
-    const totalPaidUSD = pOnUsd_USD + pOnCdf_USD;
-    const totalPaidCDF = pOnUsd_CDF + pOnCdf_CDF;
-
-    if (totalPaidUSD === 0 && totalPaidCDF === 0 && remiseUSD === 0 && remiseCDF === 0 && pourboireUSD === 0 && pourboireCDF === 0) {
-        alert("Veuillez saisir au moins un montant (paiement, commission ou pourboire).");
-        return;
-    }
-
-    const backupData = JSON.parse(JSON.stringify(data));
-
-    try {
-        const uniqueTimestamp = Date.now();
-        
-        const isMoi = normalize(opDette.name).includes("moi");
-        const typeDette = isMoi ? "dette moi" : "dette client";
-        const key = `${normalize(typeDette)}_${normalize(person)}`;
-        const oldDebt = JSON.parse(JSON.stringify(data.debts[key] || { USD: 0, CDF: 0 }));
-
-        const reductionTotaleUSD = pOnUsd_USD + (pOnUsd_CDF / taux) + remiseUSD + (remiseCDF / taux);
-        const reductionTotaleCDF = pOnCdf_CDF + (pOnCdf_USD * taux) + remiseCDF + (remiseUSD * taux);
-
-        let redUSD = reductionTotaleUSD;
-        let surplusUSD = 0;
-        if (reductionTotaleUSD > oldDebt.USD) {
-            surplusUSD = reductionTotaleUSD - oldDebt.USD;
-            redUSD = oldDebt.USD;
-        }
-
-        let redCDF = reductionTotaleCDF;
-        let surplusCDF = 0;
-        if (reductionTotaleCDF > oldDebt.CDF) {
-            surplusCDF = reductionTotaleCDF - oldDebt.CDF;
-            redCDF = oldDebt.CDF;
-        }
-
-        const operatorName = destIdx === "caisse" ? "CAISSE" : (data.operators[destIdx]?.name || "INCONNU");
-        const direction = isMoi ? -1 : 1;
-
-        const t = createTransaction({
-            typeNom: "REGLEMENT",
-            operator: operatorName,
-            mode: isMoi ? "dette_moi" : "dette_client",
-            amt: totalPaidUSD, 
-            cur: "USD",
-            person,
-            mix: { USD: totalPaidUSD, CDF: totalPaidCDF }
-        });
-
-        t.isReglement = true;
-        t.surplusUSD = surplusUSD; 
-        t.surplusCDF = surplusCDF; 
-        t.isMoi = isMoi;
-        t.remise = { usd: remiseUSD, cdf: remiseCDF };
-        t.pourboire = { usd: pourboireUSD, cdf: pourboireCDF };
-        t.payDetail = { 
-            onUsd: { usd: pOnUsd_USD, cdf: pOnUsd_CDF },
-            onCdf: { usd: pOnCdf_USD, cdf: pOnCdf_CDF }
-        };
-        t.debtBefore = oldDebt; 
-
-        t.impacts.dette = { USD: -redUSD, CDF: -redCDF };
-
-        if (destIdx === "caisse") {
-            t.impacts.caisse = { USD: totalPaidUSD * direction, CDF: totalPaidCDF * direction };
-        } else {
-            t.impacts.operator = { USD: totalPaidUSD * direction, CDF: totalPaidCDF * direction };
-            t.impacts.caisse = { USD: 0, CDF: 0 };
-        }
-
-        t.impacts.caisse.USD += pourboireUSD;
-        t.impacts.caisse.CDF += pourboireCDF;
-
-        applyImpacts(t);
-
-        const newDebt = data.debts[key] || { USD: 0, CDF: 0 };
-        t.snapshotDette = { USD: newDebt.USD, CDF: newDebt.CDF }; 
-
-        let bonusDesc = "";
-        if (remiseUSD > 0 || remiseCDF > 0) bonusDesc += ` [Com/Réduction: ${remiseUSD}$ / ${remiseCDF}FC]`;
-        if (pourboireUSD > 0 || pourboireCDF > 0) bonusDesc += ` [Pourboire Caisse: ${pourboireUSD}$ / ${pourboireCDF}FC]`;
-
-        const finalEntry = {
-            ...t,
-            timestamp: uniqueTimestamp,
-            date: new Date().toLocaleString("fr-FR", { timeZone: "Africa/Kinshasa" }),
-            desc: `RÈGLEMENT: ${person.toUpperCase()} (${typeDette})${bonusDesc} vers ${operatorName}`,
-            usdCash: totalPaidUSD,
-            cdfCash: totalPaidCDF,
-            typeNom: "REGLEMENT",
-            tauxApplique: taux
-        };
-
-        data.transactions.unshift(finalEntry);
-
-        const updates = {};
-        updates[`mka_data/transactions/${uniqueTimestamp}`] = finalEntry;
-        updates['mka_data/caisse'] = data.caisse;
-        updates['mka_data/operators'] = data.operators;
-        updates['mka_data/debts'] = data.debts;
-
-        await update(ref(db), updates);
-
-        render();
-        alert("✅ Règlement et pourboire enregistrés avec succès !");
-
-        ["payOnUsd_USD", "payOnUsd_CDF", "payOnCdf_USD", "payOnCdf_CDF", "debtPersonName", "settleRate", "settleRemiseUSD", "settleRemiseCDF", "settlePourboireUSD", "settlePourboireCDF"].forEach(id => {
-            const el = document.getElementById(id);
-            if(el) el.value = "";
-        });
-
-    } catch (error) {
-        data = backupData; 
-        console.error("Erreur Sync:", error);
-        alert("❌ ERREUR RÉSEAU : Impossible de valider le règlement.");
-        render();
-    }
-};
-
-    // RESTAURATION DE LA LOGIQUE D'HISTORIQUE PAR MOTS-CLÉS 
-window.showFullHistory = (filter) => {     
-    const isAdmin = !document.getElementById("adminSection").classList.contains("hidden");    
-    const list = document.getElementById("fullHistoryList");  
-  
-    document.querySelectorAll(".nav-hist button").forEach(b => b.classList.remove("active"));    
-    if(document.getElementById("btn-h-" + filter)) {
-        document.getElementById("btn-h-" + filter).classList.add("active");    
-    }
-  
-    let filtered = data.transactions;    
-  
-    // --- FILTRES ---
-    if(filter === 'general') {
-        filtered = data.transactions; 
-    } 
-    else if(filter === 'ventes') {  
-        filtered = data.transactions.filter(t =>   
-            normalize(t.typeNom || "").includes("vente") ||   
-            normalize(t.desc || "").includes("vente")  
-        );  
-    }   
-    else if(filter === 'dette_client') {  
-        filtered = data.transactions.filter(t =>   
-            t.mode === "dette_client" ||   
-            normalize(t.desc || "").includes("dette client")  
-        );  
-    }   
-    else if(filter === 'dette_moi') {  
-        filtered = data.transactions.filter(t =>   
-            t.mode === "dette_moi" ||   
-            normalize(t.desc || "").includes("dette moi")  
-        );  
-    }
-    else if(filter === 'depenses') {
-        filtered = data.transactions.filter(t => 
-            t.mode === "depense" || 
-            t.isDepense === true ||
-            normalize(t.operator || "").includes("depense") ||
-            normalize(t.desc || "").includes("depense")
-        );
-    }
-    else if(filter === 'money') {
-        filtered = data.transactions.filter(t => {
-            const type = normalize(t.typeNom || "");
-            const desc = normalize(t.desc || "");
-            const op = normalize(t.operator || "");
-            const mode = normalize(t.mode || "");
-
-            const isFinancial = type.includes("retrait") || type.includes("depot");
-            const isMoneyKeyword = desc.includes("money") || desc.includes("pesa") || op.includes("money") || op.includes("pesa");
-
-            let isVirtualMoney = false;
-            if(t.mode === "virtuel" && t.impacts && t.impacts.virtuel && t.impacts.virtuel.opIdx !== null) {
-                const sourceSim = data.operators[t.impacts.virtuel.opIdx];
-                if(sourceSim) {
-                    const simName = normalize(sourceSim.name);
-                    isVirtualMoney = simName.includes("money") || simName.includes("pesa");
-                }
-            }
-
-            return isFinancial || isMoneyKeyword || isVirtualMoney;
-        });
-    }
-    else if(filter === 'suppressions') {
-        filtered = data.transactions.filter(t => 
-            t.isDeletion === true || 
-            normalize(t.typeNom || "").includes("suppression") ||
-            normalize(t.desc || "").includes("suppression")
-        );
-    }
-
-    let html = `<div style="display:flex; flex-direction:column; gap:12px;">`;  
-  
-    html += filtered.map((t) => {  
-        const realIdx = data.transactions.indexOf(t);
-        const desc = t.desc || "";  
-
-        // --- 1. DESIGN SPÉCIAL POUR LES SUPPRESSIONS DE NOMS ---
-        if (t.isDeletion || normalize(t.typeNom || "").includes("suppression")) {
-            return `
-            <div style="background:#fef2f2; border-radius:16px; padding:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); border-left:5px solid #ef4444;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                    <span style="font-size:11px; color:#64748b;">${t.date}</span>
-                    <span style="font-weight:bold; color:#991b1b; font-size:12px;">🗑️ SUPPRESSION DE NOM</span>
-                    ${isAdmin ? `
-                    <div style="display:flex; gap:5px;">
-                        <button onclick="cancelTransaction(${realIdx})" style="background:#f59e0b;color:#fff;border:none;padding:4px 8px;border-radius:6px;font-size:10px;cursor:pointer;">↩ Annuler</button>
-                        <button onclick="deleteTransaction(${realIdx})" style="background:#ef4444;color:#fff;border:none;padding:4px 8px;border-radius:6px;font-size:10px;cursor:pointer;">Suppr</button>
-                    </div>` : ""}
-                </div>
-                <div style="background:white; padding:12px; border-radius:8px;">
-                    <div style="font-weight:bold; color:#dc2626; font-size:14px;">✕ Nom supprimé : ${t.person}</div>
-                    <div style="font-size:11px; color:#64748b; margin-top:4px;">${t.desc}</div>
-                </div>
-            </div>`;
-        }
-
-        // --- 2. DESIGN SPÉCIAL POUR LES TRANSFERTS ---
-        if (t.mode === 'transfert' && t.transferDetails) {
-            const d = t.transferDetails;
-            return `
-            <div style="background:#f0f9ff; border-radius:16px; padding:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); border-left:5px solid #0ea5e9;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                    <span style="font-size:11px; color:#64748b;">${t.date}</span>
-                    ${isAdmin ? `
-                    <div style="display:flex; gap:5px;">
-                        <button onclick="cancelTransaction(${realIdx})" style="background:#f59e0b;color:#fff;border:none;padding:4px 8px;border-radius:6px;font-size:10px;cursor:pointer;">↩ Annuler</button>
-                        <button onclick="deleteTransaction(${realIdx})" style="background:#ef4444;color:#fff;border:none;padding:4px 8px;border-radius:6px;font-size:10px;cursor:pointer;">Suppr</button>
-                    </div>` : ""}
-                </div>
-                <div style="display:flex; justify-content:space-around; align-items:center; background:white; padding:10px; border-radius:10px;">
-                    <div style="text-align:center;">
-                        <div style="font-size:9px; color:#64748b;">SOURCE</div>
-                        <div style="font-weight:bold; font-size:13px;">${d.sourceName}</div>
-                        <div style="color:#ef4444; font-weight:bold;">-${fmt(d.sAmt)} ${d.sc}</div>
-                    </div>
-                    <div style="font-size:20px; color:#0ea5e9;">➔</div>
-                    <div style="text-align:center;">
-                        <div style="font-size:9px; color:#64748b;">DESTINATION</div>
-                        <div style="font-weight:bold; font-size:13px;">${d.destName}</div>
-                        <div style="color:#16a34a; font-weight:bold;">+${fmt(d.dAmt)} ${d.dc}</div>
+        </div>
+
+        <!-- BOUTON D'INSTALLATION PWA -->
+        <div id="installContainer">
+            <button id="installBtn">
+                <i class="fas fa-download"></i> Installer l'application
+            </button>
+            <p style="margin-top: 6px; font-size: 0.75rem; color: #6b7280; opacity: 0.7;">
+                <i class="fas fa-mobile-alt"></i> Disponible hors ligne
+            </p>
+        </div>
+
+        <div class="main-content">
+            <!-- CALENDRIER -->
+            <div class="calendar-section">
+                <div class="calendar-header">
+                    <h2><i class="fas fa-calendar-alt"></i> Calendrier</h2>
+                    <div class="calendar-nav">
+                        <button class="btn-nav" id="prevMonth"><i class="fas fa-chevron-left"></i></button>
+                        <button class="btn-nav" id="nextMonth"><i class="fas fa-chevron-right"></i></button>
                     </div>
                 </div>
-                <div style="font-size:10px; margin-top:5px; color:#0369a1; text-align:center; font-style:italic;">${desc}</div>
-            </div>`;
-        }
-
-if (t.isReglement) {
-    const b = t.debtBefore || { USD: 0, CDF: 0 };
-    const a = t.snapshotDette || { USD: 0, CDF: 0 };
-    const p = t.payDetail || { onUsd: { usd: 0, cdf: 0 }, onCdf: { usd: 0, cdf: 0 } };
-    const rem = t.remise || { usd: 0, cdf: 0 };
-    
-    const estSolde = (a.USD <= 0.1 && a.CDF <= 100);
-    
-    const sUSD = parseFloat(t.surplusUSD || 0);
-    const sCDF = parseFloat(t.surplusCDF || 0);
-    const labelSurplus = t.isMoi ? "PERTE" : "INTÉRÊT";
-
-    const pUSD = t.usdCash || 0;
-    const pCDF = t.cdfCash || 0;
-    const rUSD = a.USD;
-    const rCDF = a.CDF;
-
-    const receiptButton = `<button onclick="sendWhatsAppReceipt('${t.person.replace(/'/g, "\\'")}', ${pUSD}, ${pCDF}, ${rUSD}, ${rCDF}, '${t.operator ? t.operator.replace(/'/g, "\\'") : ''}')" 
-                        style="background:#25D366; color:white; border:none; padding:4px 8px; border-radius:6px; font-size:9px; margin-top:5px; cursor:pointer; width:100%; font-weight:bold;">
-                        ✉️ Envoyer Reçu
-                       </button>`;
-
-    return `
-    <div style="background:#fff7ed; border-radius:16px; padding:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); border-left:5px solid #eab308; margin-bottom:12px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-            <span style="font-size:11px; color:#64748b;">${t.date}</span>
-            <span style="font-weight:bold; color:#854d0e; font-size:12px;">💰 RÈGLEMENT ${t.person.toUpperCase()}</span>
-            
-            ${isAdmin ? `
-            <div style="display:flex; gap:6px;">
-                <button onclick="cancelTransaction(${realIdx})" style="background:#f59e0b; color:#fff; border:none; padding:4px 8px; border-radius:6px; font-size:10px; cursor:pointer; font-weight:bold;">↩ Annuler</button>
-                <button onclick="deleteTransaction(${realIdx})" style="background:#ef4444; color:#fff; border:none; padding:4px 8px; border-radius:6px; font-size:10px; cursor:pointer; font-weight:bold;">🗑️ Suppr</button>
-            </div>` : ""}
-        </div>
-
-        <div style="display:grid; grid-template-columns: 1fr 1.6fr 1fr; gap:8px; align-items:center; background:white; padding:10px; border-radius:10px;">
-            
-            <div style="text-align:center;">
-                <div style="font-size:9px; color:#9a3412; font-weight:bold; text-transform:uppercase;">Était Dû</div>
-                <div style="font-weight:bold; font-size:13px; color:#0f172a;">${fmt(b.USD)}$</div>
-                <div style="font-size:11px; color:#475569;">${fmt(b.CDF)} FC</div>
+                <div class="calendar-month" id="currentMonth"></div>
+                <div class="weekdays">
+                    <div class="weekday">Lun</div><div class="weekday">Mar</div><div class="weekday">Mer</div>
+                    <div class="weekday">Jeu</div><div class="weekday">Ven</div><div class="weekday">Sam</div>
+                    <div class="weekday">Dim</div>
+                </div>
+                <div class="days" id="calendarDays"></div>
             </div>
 
-            <div style="font-size:10px; border-left:1px solid #fed7aa; border-right:1px solid #fed7aa; padding:0 8px;">
-                <div style="font-weight:bold; color:#166534; font-size:9px; margin-bottom:4px; text-align:center; text-decoration:underline;">DÉTAIL DU VERSEMENT</div>
-                
-                <div style="display:flex; justify-content:space-between; margin-bottom:2px;">
-                    <span style="color:#64748b;">Sur Dette $:</span> 
-                    <b style="color:#166534;">${fmt(p.onUsd.usd)}$+${fmt(p.onUsd.cdf)}F</b>
-                </div>
-                
-                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                    <span style="color:#64748b;">Sur Dette FC:</span> 
-                    <b style="color:#166534;">${fmt(p.onCdf.usd)}$+${fmt(p.onCdf.cdf)}F</b>
+            <!-- TÂCHES avec sonnerie -->
+            <div class="tasks-section">
+                <div class="tasks-header">
+                    <div>
+                        <h2><i class="fas fa-clock"></i> Planning</h2>
+                        <div class="selected-date" id="selectedDate">Sélectionne une date</div>
+                    </div>
                 </div>
 
-                ${(rem.usd > 0 || rem.cdf > 0) ? `
-                <div style="display:flex; justify-content:space-between; margin-bottom:4px; background:#fee2e2; padding:2px 4px; border-radius:4px;">
-                    <span style="color:#991b1b; font-weight:bold;">🎁 Com/Réduction:</span> 
-                    <b style="color:#b91c1c;">${fmt(rem.usd)}$+${fmt(rem.cdf)}F</b>
-                </div>` : ''}
+                <div class="task-input-group" id="taskInputGroup">
+                    <div class="input-row">
+                        <input type="text" id="taskTitle" placeholder="Objectif" maxlength="100">
+                    </div>
+                    <textarea id="taskDescription" placeholder="Description (optionnel)" maxlength="500"></textarea>
+                    <div class="time-inputs">
+                        <div class="time-input-wrapper">
+                            <label><i class="far fa-clock"></i> De</label>
+                            <input type="time" id="taskStartTime">
+                        </div>
+                        <div class="time-input-wrapper">
+                            <label><i class="fas fa-arrow-right"></i> À</label>
+                            <input type="time" id="taskEndTime">
+                        </div>
+                    </div>
+                    <button class="btn-add-task" id="btnAddTask">
+                        <i class="fas fa-plus-circle"></i> Ajouter une plage
+                    </button>
+                </div>
 
-                ${(t.pourboire && (t.pourboire.usd > 0 || t.pourboire.cdf > 0)) ? `
-                <div style="display:flex; justify-content:space-between; margin-bottom:4px; background:#dcfce7; padding:2px 4px; border-radius:4px;">
-                    <span style="color:#166534; font-weight:bold;">💖 Pourboire (Caisse):</span> 
-                    <b style="color:#15803d;">${fmt(t.pourboire.usd)}$+${fmt(t.pourboire.cdf)}F</b>
-                </div>` : ''}
-
-                <div style="text-align:center; font-size:9px; color:#9a3412; border-top:1px dashed #fed7aa; padding-top:4px;">
-                    Dest: <b>${t.operator}</b>
+                <div class="tasks-list" id="tasksList">
+                    <div class="empty-state">
+                        <i class="fas fa-hourglass-half"></i>
+                        <p>Choisis une date pour programmer</p>
+                    </div>
                 </div>
             </div>
-
-            <div style="text-align:center;">
-                ${estSolde ? 
-                    `<div style="background:#16a34a; color:white; padding:6px; border-radius:10px; font-weight:bold; font-size:12px; border:2px solid #bcf0da;">
-                        SOLDÉ
-                        ${(sUSD > 0 || sCDF > 0) ? `
-                            <div style="font-size:8px; background:rgba(0,0,0,0.15); margin-top:4px; padding:2px; border-radius:4px; line-height:1;">
-                                <span style="text-decoration:underline;">${labelSurplus}:</span><br>
-                                ${sUSD > 0 ? `+${fmt(sUSD)}$` : ''}
-                                ${sCDF > 0 ? (sUSD > 0 ? ' | ' : '') + `+${fmt(sCDF)}FC` : ''}
-                            </div>` : ''
-                        }
-                    </div>` : 
-                    `<div>
-                        <div style="font-size:9px; color:#64748b; font-weight:bold;">RESTE</div>
-                        <div style="font-weight:bold; font-size:13px; color:#dc2626;">${fmt(a.USD)}$</div>
-                        <div style="font-size:11px; color:#dc2626;">${fmt(a.CDF)} FC</div>
-                    </div>`
-                }
-                ${receiptButton}
-            </div>
         </div>
 
-        ${t.desc ? `<div style="font-size:10px; margin-top:6px; color:#9a3412; text-align:center; font-style:italic; opacity:0.8;">${t.desc}</div>` : ""}
-    </div>`;
-}
-
-// --- 3. DESIGN SPÉCIAL POUR LES DÉPENSES ---
-if (t.mode === 'depense' || t.isDepense || normalize(desc).includes("depense")) {
-    let stockDisplay = "";
-    const qteStock = parseFloat(t.stk || (t.impacts && t.impacts.stock) || 0);
-    if(qteStock !== 0) {
-        const sColor = qteStock > 0 ? "#16a34a" : "#ef4444";
-        const sSign = qteStock > 0 ? "+" : "";
-        stockDisplay = `<div style="color:${sColor}; font-weight:bold; font-size:10px; margin-top:2px;">Stock: ${sSign}${fmt(qteStock)}</div>`;
-    }
-
-    return `
-    <div style="background:#fef2f2; border-radius:16px; padding:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); border-left:5px solid #ef4444;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-            <span style="font-size:11px; color:#64748b;">${t.date}</span>
-            <span style="font-weight:bold; color:#b91c1c; font-size:12px;">🚫 SORTIE / DÉPENSE</span>
-            ${isAdmin ? `
-            <div style="display:flex; gap:5px;">
-                <button onclick="cancelTransaction(${realIdx})" style="background:#f59e0b;color:#fff;border:none;padding:4px 8px;border-radius:6px;font-size:10px;cursor:pointer;">↩ Annuler</button>
-                <button onclick="deleteTransaction(${realIdx})" style="background:#ef4444;color:#fff;border:none;padding:4px 8px;border-radius:6px;font-size:10px;cursor:pointer;">Suppr</button>
-            </div>` : ""}
+        <!-- Bouton Télécharger le fichier HTML -->
+        <div class="download-section">
+            <button class="btn-download" id="btnDownloadApp">
+                <i class="fas fa-download"></i> Télécharger l'application
+            </button>
+            <p style="margin-top: 8px; font-size: 0.8rem; color: #6b7280; opacity: 0.7;">
+                <i class="fas fa-file-code"></i> Version HTML portable
+            </p>
         </div>
-        <div style="display:flex; justify-content:space-between; align-items:center; background:white; padding:10px; border-radius:10px;">
-            <div>
-                <div style="font-weight:bold; font-size:13px; color:#1e293b;">${t.operator || "-"}</div>
-                <div style="font-size:11px; color:#64748b;">${desc}</div>
-                ${stockDisplay}
-            </div>
-            <div style="text-align:right;">
-                <div style="font-size:16px; font-weight:bold; color:#ef4444;">-${fmt(t.amtSIM || t.amt)} ${t.curSIM || t.cur}</div>
-                <div style="font-size:10px; color:#94a3b8;">Cash: ${fmt(t.usdCash || 0)}$ | ${fmt(t.cdfCash || 0)}FC</div>
-            </div>
-        </div>
-    </div>`;
-}
-
-
-        // --- 4. DESIGN CLASSIQUE (VENTES, DEPOTS, RETRAITS, DETTES) ---
-        const parts = desc.split("-");  
-        const type = parts[0] ? parts[0].trim() : "";  
-        const rest = parts[1] ? parts[1].trim() : "";  
-        let opNameFromDesc = "";  
-        let motif = rest;  
-        
-        if(rest.includes("(")) {  
-            opNameFromDesc = rest.split("(")[0].trim();  
-            motif = rest.split("(")[1].replace(")", "").trim();  
-        } else { opNameFromDesc = rest; }  
-  
-        let finalPerson = t.person || "";
-
-        if (!finalPerson && t.desc && t.desc.includes("NOM:")) {
-            finalPerson = t.desc.split("NOM:")[1].split("|")[0].trim();
-        }
-
-        if (!finalPerson && t.payDetail && t.person) {
-            finalPerson = t.person;
-        }
-  
-        let isOpDette = normalize(t.operator || "").includes("dette");
-
-        let isModeDette = (
-             t.mode === "dette_client" || 
-             t.mode === "dette_moi" || 
-             t.isDette === true || 
-             t.isReglement === true ||
-             isOpDette ||
-             normalize(desc || "").includes("creance") ||
-             normalize(type || "").includes("dette")
-        );
-
-        let resteTxt = "✔ Cash"; 
-        let resteColor = "#16a34a";  
-        let waButtonsHtml = "";
-
-        if (t.snapshotDette) {
-            const duUSD = t.snapshotDette.USD;
-            const duCDF = t.snapshotDette.CDF;
-            const isCleared = Math.abs(duUSD) < 0.1 && Math.abs(duCDF) < 100;
-
-            if (isCleared) {
-                resteTxt = "✔ SOLDÉ"; 
-                resteColor = "#16a34a";
-            } else {
-                resteTxt = `Reste: ${fmt(duUSD)}$ | ${fmt(duCDF)}FC`;
-                resteColor = "#dc2626"; 
-                
-                if (isModeDette && finalPerson) {
-                    waButtonsHtml += `<button onclick="sendWhatsAppReminder('${finalPerson.replace(/'/g, "\\'")}', ${duUSD}, ${duCDF})" 
-                                    style="background:#25D366; color:white; border:none; padding:4px 8px; border-radius:6px; font-size:10px; margin-top:5px; cursor:pointer; font-weight:bold; display:block; width:100%;">
-                                    📱 Rappel WhatsApp
-                                    </button>`;
-                }
-            }
-        } 
-        else if (t.person && (t.mode?.includes("dette") || t.typeDette)) {
-            resteTxt = "Ancienne dette";
-            resteColor = "#6b7280";
-        }
-        else if (finalPerson && isModeDette) {  
-            const typeDette = (t.mode === "dette_moi" || (t.typeDette && t.typeDette.includes("moi"))) ? "dette moi" : "dette client";
-            const debtKey = `${normalize(typeDette)}_${normalize(finalPerson)}`;  
-            const currentDebt = data.debts[debtKey] || { USD: 0, CDF: 0 };
-            
-            resteTxt = `Reste: ${fmt(currentDebt.USD)}$ | ${fmt(currentDebt.CDF)}FC`;
-            resteColor = "#dc2626"; 
-
-            if (currentDebt.USD > 0.1 || currentDebt.CDF > 100) {
-                waButtonsHtml += `<button onclick="sendWhatsAppReminder('${finalPerson.replace(/'/g, "\\'")}', ${currentDebt.USD}, ${currentDebt.CDF})" 
-                                style="background:#25D366; color:white; border:none; padding:4px 8px; border-radius:6px; font-size:10px; margin-top:5px; cursor:pointer; font-weight:bold; display:block; width:100%;">
-                                📱 Rappel WhatsApp
-                                </button>`;
-            }
-        }
-
-        if (isModeDette && finalPerson && !t.isReglement) {
-            const typeDette = (t.mode === "dette_moi" || (t.typeDette && t.typeDette.includes("moi"))) ? "dette moi" : "dette client";
-            const debtKey = `${normalize(typeDette)}_${normalize(finalPerson)}`;  
-            const currentDebt = data.debts[debtKey] || { USD: 0, CDF: 0 };
-
-            const addedUsd = t.detteUSD || (t.curSIM === "USD" ? (t.amtSIM || t.amt) : 0);
-            const addedCdf = t.detteCDF || (t.curSIM === "CDF" ? (t.amtSIM || t.amt) : 0);
-
-            waButtonsHtml += `<button onclick="sendWhatsAppTrustMessage('${finalPerson.replace(/'/g, "\\'")}', ${addedUsd}, ${addedCdf}, ${currentDebt.USD}, ${currentDebt.CDF})" 
-                            style="background:#0ea5e9; color:white; border:none; padding:4px 8px; border-radius:6px; font-size:10px; margin-top:4px; cursor:pointer; font-weight:bold; display:block; width:100%;">
-                            🤝 Reçu de Confiance
-                            </button>`;
-        }
-
-        let stockDisplay = "";
-        const qteStock = parseFloat(t.stk || (t.impacts && t.impacts.stock) || 0);
-        if(qteStock !== 0) {
-            const sColor = qteStock > 0 ? "#16a34a" : "#ef4444";
-            const sSign = qteStock > 0 ? "+" : "";
-            stockDisplay = `<div style="color:${sColor}; font-weight:bold; font-size:10px; margin-top:2px;">Stock: ${sSign}${fmt(qteStock)}</div>`;
-        }
-
-        let icon = "📄"; 
-        if(normalize(type).includes("retrait")) icon = "💸";  
-        else if(normalize(type).includes("depot")) icon = "💰";  
-        else if(normalize(type).includes("vente")) icon = "🛒";  
-        else if(isModeDette) icon = "📝";
-
-        const cUSD = (t.commission && t.commission.usd) ? t.commission.usd : 0;
-        const cCDF = (t.commission && t.commission.cdf) ? t.commission.cdf : 0;
-
-        let simSourceName = "";
-        if (t.impacts && t.impacts.virtuel && t.impacts.virtuel.opIdx !== null) {
-            const sourceOp = data.operators[t.impacts.virtuel.opIdx];
-            simSourceName = sourceOp ? ` (via ${sourceOp.name})` : " (SIM inconnue)";
-        }
-
-        let rawMode = normalize(t.mode || "");
-        if (rawMode.includes("credit")) rawMode = "dette_client";
-        if (!rawMode || rawMode === "-") {
-            if ((t.usdCash || 0) > 0 || (t.cdfCash || 0) > 0) rawMode = "cash";
-            else if (t.impacts && t.impacts.virtuel) rawMode = "virtuel";
-            else if (isModeDette) rawMode = "dette_client";
-            else rawMode = "cash";
-        }
-
-        const modeLabel = {
-            "cash": "💵 CASH",
-            "virtuel": `📱 INTER-SIM${simSourceName}`,
-            "depense": "🚫 DÉPENSE",
-            "dette_client": "📝 DETTE CLIENT",
-            "dette_moi": "📝 DETTE MOI",
-            "transfert": "🔄 TRANSFERT"
-        };
-
-        let displayMode = modeLabel[rawMode] || "❓ MODE INCONNU";
-        const badgeColor = isModeDette ? "#ef4444" : "#475569"; 
-
-        let finalCashDisplay = `<div style="color:${badgeColor}; font-size:10px; font-weight:bold; background:#f1f5f9; padding:4px 8px; border-radius:6px; display:inline-block; border:1px solid ${badgeColor}44; text-transform: uppercase;">${displayMode}</div>`;
-
-        if (t.usdCash > 0 || t.cdfCash > 0) {
-            finalCashDisplay += `<div style="color:#16a34a; font-size:10px; font-weight:700;">CASH: ${fmt(t.usdCash || 0)}$ | ${fmt(t.cdfCash || 0)}FC</div>`;
-        }
-        if (t.mode === "virtuel") {
-            finalCashDisplay += `<div style="color:#64748b; font-size:9px; font-style:italic;">Via SIM</div>`;
-        }
-
-        return `  
-        <div style="background:#ffffff; border-radius:16px; padding:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); border-left:5px solid ${isModeDette ? '#f59e0b' : '#0ea5e9'};">  
-
-            ${isAdmin ? `  
-            <div style="display:flex; gap:6px; justify-content:flex-end; margin-bottom: 5px;">  
-                <button onclick="cancelTransaction(${realIdx})" style="background:#f59e0b;color:#fff;border:none;padding:5px 10px;border-radius:8px;font-size:10px;cursor:pointer;">↩ Annuler</button>  
-                <button onclick="deleteTransaction(${realIdx})" style="background:#ef4444;color:#fff;border:none;padding:5px 10px;border-radius:8px;font-size:10px;cursor:pointer;">Suppr</button>  
-            </div>` : ""}  
-
-            <div style="display:grid; grid-template-columns: 1.2fr 1fr 1fr 1.6fr 1.5fr 1fr; gap:6px; align-items:center; font-size:12px;">  
-
-                <div style="color:#64748b;">${t.date}</div>  
-
-                <div style="font-weight:bold; color:#1e293b;">
-                    ${t.operator || opNameFromDesc}
-                </div>  
-
-                <div style="background:#f1f5f9; padding:3px 6px; border-radius:6px; text-align:center; font-size:10px; border:1px solid #e2e8f0;">  
-                    ${icon} ${type || "-"} ${stockDisplay} 
-                </div>  
-
-                <div style="color:#475569; font-weight:500;">
-                    ${motif || "-"}
-                </div>  
-                
-
-                <div style="line-height:1.3;">  
-                <div style="font-weight:bold; color:#0f172a;">
-        SIM: ${fmt(t.amtSIM || t.amt)} ${t.curSIM || t.cur}
     </div>
 
-                <div style="font-size:9px; color:#64748b; font-style:italic;">
-        Taux: ${t.tauxApplique || t.opTaux || (t.transferDetails && t.transferDetails.appliedRate) || data.taux} FC
+    <!-- MODAL ÉDITION -->
+    <div class="modal" id="editModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-pen-fancy"></i> Modifier la plage</h3>
+                <button class="btn-close-modal" id="btnCloseModal"><i class="fas fa-times"></i></button>
+            </div>
+            <form class="modal-form" id="editForm">
+                <div class="form-group">
+                    <label>Objectif</label>
+                    <input type="text" id="editTaskTitle" required maxlength="100">
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea id="editTaskDescription" maxlength="500"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Date</label>
+                    <input type="date" id="editTaskDate">
+                </div>
+                <div class="form-group">
+                    <label>Début</label>
+                    <input type="time" id="editTaskStartTime">
+                </div>
+                <div class="form-group">
+                    <label>Fin</label>
+                    <input type="time" id="editTaskEndTime">
+                </div>
+                <div class="modal-actions">
+                    <button type="submit" class="btn-modal btn-save"><i class="fas fa-save"></i> Enregistrer</button>
+                    <button type="button" class="btn-modal btn-cancel" id="btnCancelEdit">Annuler</button>
+                </div>
+            </form>
+        </div>
     </div>
 
-    ${finalCashDisplay}
+    <script>
+        // ========== GLOBAL ==========
+        let currentDate = new Date();
+        let selectedDate = null;
+        let tasks = {};
+        let editingTaskId = null;
+        let alarmTimeouts = {}; // Gère plusieurs alarmes
+        let deferredPrompt = null;
 
-    ${(cUSD > 0 || cCDF > 0) ? 
-                `<div style="color:#0ea5e9; font-size:10px; font-weight:bold; background:#f0f9ff; border-radius:4px; padding:1px 3px;">
-            + COM: ${fmt(cUSD)}$ | ${fmt(cCDF)}FC
-        </div>` 
-        : ""
-    }
-</div>
-  
-
-                <div style="font-weight:800; color:${resteColor}; text-align:right; font-size:11px;">
-                    ${resteTxt}
-                    <div style="margin-top: 5px;">${waButtonsHtml}</div>
-                </div>  
-
-            </div>  
-        </div>`;
-
-
-    }).join("");  
-  
-    html += `</div>`;  
-    list.innerHTML = html;  
-    document.getElementById("historyModal").classList.remove("hidden");     
-};
-
-window.cancelTransaction = async function(index) {  
-    if(!confirm("Annuler cette opération ?")) return;  
-  
-    const t = data.transactions[index];  
-    if(!t || !t.timestamp) {
-        alert("Impossible de trouver l'identifiant de cette opération.");
-        return;
-    }
-
-    try {
-        if(t.mode === 'transfert' && t.impacts && t.impacts.isTransfer) {
-            const { source, dest } = t.impacts;
-            if(source.idx === "caisse") data.caisse[source.cur] += source.amt;
-            else if(data.operators[source.idx]) data.operators[source.idx][source.cur] += source.amt;
-            if(dest.idx === "caisse") data.caisse[dest.cur] -= dest.amt;
-            else if(data.operators[dest.idx]) data.operators[dest.idx][dest.cur] -= dest.amt;
-            alert("Transfert/Change inversé avec succès ✅");
-        } 
-        else {
-            applyImpacts(t, true);
-        }
-
-        const updates = {};
-        updates['mka_data/caisse'] = data.caisse;
-        updates['mka_data/operators'] = data.operators;
-        if(data.debts) updates['mka_data/debts'] = data.debts;
-        updates[`mka_data/transactions/${t.timestamp}`] = null;
-
-        await update(ref(db), updates);
-
-        data.transactions.splice(index, 1);  
-        
-        render();  
-        if (typeof showFullHistory === "function") {
-            showFullHistory(window.currentHistoryType || "general");  
-        }
-        alert("🔄 Opération annulée et soldes mis à jour partout !");
-
-    } catch (error) {
-        console.error("Erreur lors de l'annulation Firebase :", error);
-        alert("❌ Erreur réseau : Impossible d'annuler sur Firebase. Réessaye.");
-    }
-};
-
-    window.quickEditOp = (i) => {  
-        const op = data.operators[i];  
-        const nName = prompt("Nom :", op.name), nUSD = prompt("USD :", op.USD), nCDF = prompt("CDF :", op.CDF), nStk = prompt("SIM :", op.stock);  
-        if(nName !== null) { data.operators[i] = { ...op, name: nName, USD: parseFloat(nUSD)||0, CDF: parseFloat(nCDF)||0, stock: parseInt(nStk)||0 }; save(); }  
-    };  
-  
-    window.calcDest = () => {  
-    const amt = parseFloat(document.getElementById("srcAmt").value) || 0;
-    const t = parseFloat(document.getElementById("transferRate").value) || parseFloat(data.taux) || 1;    
-    const sc = document.getElementById("srcCurr").value;
-    const dc = document.getElementById("destCurr").value;    
-    
-    let result = 0;
-    if (sc === "USD" && dc === "CDF") {
-        result = amt * t;
-    } else if (sc === "CDF" && dc === "USD") {
-        result = amt / t;
-    } else {
-        result = amt;
-    }
-    
-    document.getElementById("destAmt").value = result.toFixed(2);    
-};
-
-  window.executeGlobalChange = async () => {
-    const sIdx = document.getElementById("srcWallet").value;
-    const dIdx = document.getElementById("destWallet").value;    
-    const sAmt = parseFloat(document.getElementById("srcAmt").value) || 0;
-    const dAmt = parseFloat(document.getElementById("destAmt").value) || 0;    
-    const sc = document.getElementById("srcCurr").value;
-    const dc = document.getElementById("destCurr").value;
-    const motif = document.getElementById("transferMotif").value || "Change/Transfert";
-    const tUsed = parseFloat(document.getElementById("transferRate").value) || parseFloat(data.taux);
-
-    if (!sAmt || (sIdx === dIdx && sc === dc)) {
-        alert("Action impossible : vérifiez le montant ou les devises.");
-        return;
-    }
-
-    const backupData = JSON.parse(JSON.stringify(data));
-
-    try {
-        const uniqueTimestamp = Date.now();
-        
-        const sourceName = sIdx === "caisse" ? "Caisse" : data.operators[sIdx].name;
-        const destName = dIdx === "caisse" ? "Caisse" : data.operators[dIdx].name;
-
-        if(sIdx === "caisse") data.caisse[sc] -= sAmt; 
-        else data.operators[sIdx][sc] -= sAmt;
-
-        if(dIdx === "caisse") data.caisse[dc] += dAmt; 
-        else data.operators[dIdx][dc] += dAmt;
-
-        const t = { 
-            id: Date.now(),
-            timestamp: Date.now(),
-            date: new Date().toLocaleString("fr-FR", { timeZone: "Africa/Kinshasa" }), 
-            typeNom: "TRANSFERT",
-            operator: sourceName, 
-            desc: sIdx === dIdx ? `CHANGE: ${sourceName} (${sc} ➔ ${dc})` : `TRANSFERT: ${sourceName} ➔ ${destName} (${motif})`, 
-            amt: sAmt, 
-            cur: sc, 
-            mode: 'transfert',
-            tauxApplique: tUsed,
-            transferDetails: { sIdx, dIdx, sAmt, dAmt, sc, dc, sourceName, destName, appliedRate: tUsed },
-            impacts: { isTransfer: true, source: { idx: sIdx, amt: sAmt, cur: sc }, dest: { idx: dIdx, amt: dAmt, cur: dc } }
-        };
-
-        data.transactions.unshift(t);
-
-        const updates = {};
-        updates[`mka_data/transactions/${uniqueTimestamp}`] = t;
-        updates['mka_data/caisse'] = data.caisse;
-        updates['mka_data/operators'] = data.operators;
-
-        await update(ref(db), updates);
-
-        render();
-        alert("✅ Transfert/Change synchronisé !");
-
-        document.getElementById("srcAmt").value = "";
-        document.getElementById("destAmt").value = "";
-        document.getElementById("transferRate").value = "";
-        document.getElementById("transferMotif").value = "";
-
-    } catch (error) {
-        data = backupData;
-        alert("❌ ÉCHEC FIREBASE : Le transfert a été annulé car la connexion est instable.");
-        render();
-    }
-};
-
-  
-    window.updateAdminBasics = () => {  
-        const tX = document.getElementById("newTaux").value, uX = document.getElementById("editCashUSD").value, cX = document.getElementById("editCashCDF").value;  
-        if(tX) data.taux = parseFloat(tX); if(uX) data.caisse.USD = parseFloat(uX); if(cX) data.caisse.CDF = parseFloat(cX);  
-        save(); alert("Mis à jour !");  
-    };  
-  
-    window.addOperator = () => {  
-    const op = { 
-        name: document.getElementById("newOpName").value.trim(), 
-        USD: parseFloat(document.getElementById("initUSD").value) || 0, 
-        CDF: parseFloat(document.getElementById("initCDF").value) || 0, 
-        stock: parseFloat(document.getElementById("initStock").value) || 0, 
-        prixAchat: parseFloat(document.getElementById("initPrice").value) || 0 
-    };    
-
-    if(op.name) { 
-        data.operators.push(op); 
-        save(); 
-        alert(`Compte "${op.name}" créé avec succès`); 
-        
-        ["newOpName", "initUSD", "initCDF", "initStock", "initPrice"].forEach(id => {
-            if(document.getElementById(id)) document.getElementById(id).value = "";
+        document.addEventListener('DOMContentLoaded', () => {
+            loadTasks();
+            renderCalendar();
+            setupEventListeners();
+            selectToday();
+            requestNotificationPermission();
+            setupDownloadButton();
+            setupPWAInstall();
         });
 
-        render();
-    } else {
-        alert("Veuillez entrer au moins un nom pour le compte.");
-    }
-};
-    
-    window.addType = () => {  
-        const name = document.getElementById("newTypeName").value, impO = parseInt(document.getElementById("impO").value), impC = parseInt(document.getElementById("impC").value), impS = parseInt(document.getElementById("impS").value);  
-        if(name) { data.types.push({ name, impO, impC, impS }); save(); alert("Type créé"); }  
-    };  
-  
-    window.deleteTransaction = async function(idx) {
-    if (!confirm("Supprimer définitivement cette opération ?")) return;
-    
-    const t = data.transactions[idx];
-    if (!t || !t.timestamp) {
-        alert("Impossible de trouver l'identifiant de la transaction.");
-        return;
-    }
+        // ========== INSTALLATION PWA ==========
+        function setupPWAInstall() {
+            const installContainer = document.getElementById('installContainer');
+            const installBtn = document.getElementById('installBtn');
 
-    try {
-        const updates = {};
-        updates[`mka_data/transactions/${t.timestamp}`] = null;
-        
-        await update(ref(db), updates);
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                deferredPrompt = e;
+                installContainer.style.display = 'block';
+                console.log('✅ PWA prête à être installée');
+            });
 
-        data.transactions.splice(idx, 1);
-        
-        render();
-        
-        if (typeof showFullHistory === "function") {
-            showFullHistory(window.currentHistoryType || 'general');
-        }
-        
-        alert("🗑️ Supprimé définitivement de la base de données !");
-    } catch (error) {
-        console.error("Erreur lors de la suppression :", error);
-        alert("❌ Erreur réseau : Impossible de supprimer sur Firebase.");
-    }
-};
-
-
-    window.closeHistory = () => document.getElementById("historyModal").classList.add("hidden");    
-    window.updateDefaultStockMove = () => { const ty = data.types[document.getElementById("typeSelect").value]; if(ty) document.getElementById("stkMove").value = ty.impS || 0; };  
-    window.exportHistory = async () => {
-    const { jsPDF } = window.jspdf;
-    const element = document.getElementById("fullHistoryList");
-    
-    if (!element || element.children.length === 0) {
-        alert("L'historique est vide.");
-        return;
-    }
-
-    alert("Génération du rapport MKA SHOP (Multi-pages)...");
-
-    try {
-        const canvas = await html2canvas(element, {
-            scale: 2,
-            useCORS: true,
-            backgroundColor: "#f8fafc",
-            windowHeight: element.scrollHeight
-        });
-
-        const imgData = canvas.toDataURL('image/png');
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = pdf.internal.pageSize.getHeight();
-        
-        const imgWidth = pdfWidth;
-        const imgHeight = (canvas.height * pdfWidth) / canvas.width;
-        
-        const firstPageContentHeight = pdfHeight - 40; 
-        const otherPageContentHeight = pdfHeight - 20;
-
-        let heightLeft = imgHeight;
-        let position = 0;
-        let pageNumber = 1;
-
-        pdf.setFillColor(15, 23, 42);
-        pdf.rect(0, 0, pdfWidth, 25, 'F');
-        pdf.setTextColor(255, 255, 255);
-        pdf.setFontSize(16);
-        pdf.text("MKA SHOP - HISTORIQUE COMPLET", 10, 16);
-        
-        pdf.setTextColor(100, 116, 139);
-        pdf.setFontSize(8);
-        pdf.text(`Document généré le ${new Date().toLocaleString()}`, 10, 32);
-
-        pdf.addImage(imgData, 'PNG', 0, 35, imgWidth, imgHeight);
-        heightLeft -= firstPageContentHeight;
-
-        while (heightLeft > 0) {
-            pageNumber++;
-            position = heightLeft - imgHeight; 
-            pdf.addPage();
-            
-            pdf.setFontSize(7);
-            pdf.setTextColor(150);
-            pdf.text(`MKA SHOP - Page ${pageNumber}`, 10, 10);
-            
-            pdf.addImage(imgData, 'PNG', 0, position + 15, imgWidth, imgHeight);
-            heightLeft -= otherPageContentHeight;
-        }
-
-        pdf.save(`MKA_Rapport_Design_${Date.now()}.pdf`);
-        alert("PDF généré avec ton design original ! ✅");
-
-    } catch (error) {
-        console.error("Erreur:", error);
-        alert("Erreur lors de la génération visuelle.");
-    }
-};
-    
-    window.sendWhatsAppTrustMessage = (person, montantAjouteUsd, montantAjouteCdf, ancienTotalUsd, ancienTotalCdf) => {
-    const filter = document.querySelector(".nav-hist button.active")?.id;
-    const estDetteMoi = (filter === "btn-h-dette_moi");
-
-    const nouveauTotalUsd = (parseFloat(ancienTotalUsd) || 0) + (parseFloat(montantAjouteUsd) || 0);
-    const nouveauTotalCdf = (parseFloat(ancienTotalCdf) || 0) + (parseFloat(montantAjouteCdf) || 0);
-
-    let message = "";
-
-    if (estDetteMoi) {
-        message = `*MKA SHOP — RECONNAISSANCE DE DETTE*\n\n` +
-                  `Bonjour,\n\n` +
-                  `Notre établissement *MKA SHOP* enregistre officiellement et reconnaît qu'il vous doit ce jour un montant complémentaire de *${fmt(montantAjouteUsd)}$ / ${fmt(montantAjouteCdf)} FC*.\n\n` +
-                  `Cela porte notre dette totale envers vous à *${fmt(nouveauTotalUsd)}$* et *${fmt(nouveauTotalCdf)} FC*.\n` +
-                  `Nous vous rassurons que nous mettons tout en œuvre pour vous payer à votre demande, à tout moment. Merci beaucoup pour votre confiance auprès de notre établissement.`;
-    } else {
-        message = `*MKA SHOP — ACCORD DE CRÉDIT*\n\n` +
-                  `Cher(e) client(e) *${person.toUpperCase()}*,\n\n` +
-                  `Nous vous informons qu'un crédit complémentaire de *${fmt(montantAjouteUsd)}$ / ${fmt(montantAjouteCdf)} FC* a été accordé sur votre compte.\n\n` +
-                  `Votre solde débiteur total est désormais de *${fmt(nouveauTotalUsd)}$* et *${fmt(nouveauTotalCdf)} FC*.\n` +
-                  `Nous vous remercions pour votre fidélité et votre honnêteté habituelle.`;
-    }
-
-    const encodedMsg = encodeURIComponent(message);
-    window.open(`https://wa.me/?text=${encodedMsg}`, '_blank');
-};
-
-window.sendWhatsAppReminder = (person, usd, cdf) => {
-    const filter = document.querySelector(".nav-hist button.active")?.id;
-    const estDetteMoi = (filter === "btn-h-dette_moi");
-
-    let message = "";
-
-    if (estDetteMoi) {
-        message = `*MKA SHOP — ENGAGEMENT DE PAIEMENT*\n\n` +
-                  `Bonjour,\n\n` +
-                  `Notre établissement *MKA SHOP* enregistre et reconnaît qu'il vous doit actuellement les montants de : *${fmt(usd)}$* et *${fmt(cdf)} FC*.\n\n` +
-                  `Nous tenons à vous rassurer que nous sommes prêts à vous payer à votre demande, à tout moment. Merci beaucoup pour votre confiance continue auprès de notre établissement.`;
-    } else {
-        message = `*MKA SHOP — RAPPEL DE RÉGULARISATION*\n\n` +
-                  `Bonjour cher(e) client(e) *${person.toUpperCase()}*,\n\n` +
-                  `Nous prenons contact pour vous informer que vous avez contracté une dette au sein de notre établissement.\n\n` +
-                  `Le montant à payer est de : *${fmt(usd)}$* et *${fmt(cdf)} FC*.\n\n` +
-                  `Nous vous invitons à bien vouloir régulariser cette situation au plus tôt, idéalement lors de vos prochains passages habituels. Merci pour votre confiance auprès de notre établissement.`;
-    }
-
-    const encodedMsg = encodeURIComponent(message);
-    window.open(`https://wa.me/?text=${encodedMsg}`, '_blank');
-};
-
-window.sendWhatsAppReceipt = (person, usdPaye, cdfPaye, resteUsd, resteCdf, canalPaiementArg = null) => {
-    const estSolde = (resteUsd <= 0.1 && resteCdf <= 100);
-    const filter = document.querySelector(".nav-hist button.active")?.id;
-    const estDetteMoi = (filter === "btn-h-dette_moi");
-    
-    let canalPaiement = "en espèces (Cash)";
-
-    if (canalPaiementArg && canalPaiementArg.trim() !== "") {
-        if (canalPaiementArg.toLowerCase().includes("caisse") || canalPaiementArg.toLowerCase().includes("cash")) {
-            canalPaiement = "en espèces (Cash)";
-        } else {
-            canalPaiement = `via le compte SIM *${canalPaiementArg}*`;
-        }
-    } else {
-        const destSelect = document.getElementById("settleDest") || document.getElementById("settleSource");
-        if (destSelect && destSelect.value && destSelect.value.toLowerCase() !== "caisse") {
-            const nomCompte = destSelect.options[destSelect.selectedIndex].text;
-            canalPaiement = `via le compte SIM *${nomCompte}*`;
-        }
-    }
-
-    let message = `*MKA SHOP — REÇU DE PAIEMENT*\n\n`;
-
-    if (estDetteMoi) {
-        message += `Bonjour,\n\n` +
-                   `Nous vous confirmons que notre établissement vous a versé la somme de *${fmt(usdPaye)}$* et *${fmt(cdfPaye)} FC* ${canalPaiement}.\n\n`;
-        if (estSolde) {
-            message += `✅ Cette dette est désormais *TOTALEMENT SOLDÉE*. Merci infiniment pour votre confiance !`;
-        } else {
-            message += `📉 Le solde restant que notre établissement vous doit est de : *${fmt(resteUsd)}$* et *${fmt(resteCdf)} FC*.`;
-        }
-    } else {
-        message += `Cher(e) client(e) *${person.toUpperCase()}*,\n\n` +
-                   `Nous vous confirmons la bonne réception de votre versement de *${fmt(usdPaye)}$* et *${fmt(cdfPaye)} FC* effectué ${canalPaiement}.\n\n`;
-        if (estSolde) {
-            message += `✅ Votre compte est désormais *ENTIÈREMENT SOLDÉ*. Merci pour votre confiance et votre fidélité !`;
-        } else {
-            message += `📉 Votre solde restant à payer est de : *${fmt(resteUsd)}$* et *${fmt(resteCdf)} FC*.\n\n` +
-                       `Au plaisir de vous revoir lors de vos passages habituels.`;
-        }
-    }
-    
-    const encodedMsg = encodeURIComponent(message);
-    window.open(`https://wa.me/?text=${encodedMsg}`, '_blank');
-};
-
-    function render() {
-      const fmt = (n) => parseFloat(n || 0).toLocaleString('fr-FR', { 
-    minimumFractionDigits: 0, 
-    maximumFractionDigits: 2 
-}).replace(/,/g, '.');
-
-    data.transactions.forEach(t => {
-        if (!t.mode) return;
-        const m = normalize(t.mode);
-        if (m.includes("credit")) {
-            t.mode = "dette_client";
-        }
-        else if (m.includes("dette moi")) {
-            t.mode = "dette_moi";
-        }
-        else if (m.includes("cash")) {
-            t.mode = "cash";
-        }
-        else if (m.includes("virtuel") || m.includes("sim")) {
-            t.mode = "virtuel";
-        }
-    });
-   
-    const t = parseFloat(data.taux) || 1;    
-    document.getElementById("caisseUSD").innerText = fmt(data.caisse.USD);    
-    document.getElementById("caisseCDF").innerText = fmt(data.caisse.CDF);    
-    document.getElementById("rateM").innerText = t;    
-
-    let totalCaisse = (parseFloat(data.caisse.USD) || 0) + ((parseFloat(data.caisse.CDF) || 0) / t);    
-    
-    let totalSims = 0;
-    let totalDetteClient = 0;
-    let totalDetteMoi = 0;
-    let totalS = 0;
-
-    document.getElementById("operatorBalances").innerHTML = data.operators.map((o, i) => {    
-        const usd = parseFloat(o.USD) || 0;
-        const cdf = parseFloat(o.CDF) || 0;
-        const stk = parseFloat(o.stock) || 0;
-        const px = parseFloat(o.prixAchat) || 0;    
-        const n = normalize(o.name);
-        const valEquivUSD = usd + (cdf / t);    
-        
-        let cardClass = "";
-
-        if(n.includes("dette moi")) { 
-            cardClass = "negative";
-            totalDetteMoi += valEquivUSD; 
-        }     
-        else if(n.includes("dette client")) { 
-            cardClass = "negative"; 
-            totalDetteClient += valEquivUSD; 
-        }     
-        else if(n.includes("depense")) {
-            cardClass = "negative";
-        }
-        else { 
-            totalSims += (valEquivUSD + (stk * px)); 
-        }    
-        
-        totalS += stk;    
-        return `<div class="card ${cardClass}"><b>${o.name}</b>: ${fmt(o.USD)}$ | ${fmt(o.CDF)}FC<br><small>Stock: ${fmt(o.stock)} SIM</small></div>`;    
-    }).join("");    
-
-    const vncFinale = totalCaisse + totalSims + totalDetteClient - totalDetteMoi;
-
-    document.getElementById("totalVNC").innerText = fmt(vncFinale) + " $";    
-    document.getElementById("totalStock").innerText = fmt(totalS);    
-
-    const opOps = data.operators.map((o, i) => `<option value="${i}">${o.name}</option>`).join("");    
-    document.getElementById("operatorSelect").innerHTML = opOps;    
-    document.getElementById("srcWallet").innerHTML = '<option value="caisse">Caisse</option>' + opOps;    
-    document.getElementById("destWallet").innerHTML = '<option value="caisse">Caisse</option>' + opOps;    
-    document.getElementById("paySimSelect").innerHTML = opOps;    
-    document.getElementById("settleOpIdx").innerHTML = opOps;    
-    document.getElementById("settleDest").innerHTML = '<option value="caisse">🏠 CAISSE (CASH)</option>' + opOps;  
-    
-    document.getElementById("adminOpEditList").innerHTML = data.operators.map((o,i) => `
-        <div class="card">
-            ${o.name}
-            <button class="btn-del" onclick="deleteOperator(${i})">X</button>
-            <button onclick="quickEditOp(${i})" style="width:auto; padding:2px 8px; font-size:10px; background:#0ea5e9; border-radius:5px;">EDIT</button>
-        </div>`
-    ).join("");    
-
-    document.getElementById("typeSelect").innerHTML = data.types.map((t,i) => `<option value="${i}">${t.name}</option>`).join("");    
-    document.getElementById("adminTypeList").innerHTML = data.types.map((t,i) => `
-        <div class="card">
-            ${t.name}
-            <button class="btn-del" onclick="deleteType(${i})">X</button>
-        </div>`
-).join("");
-
-runAutoCleanup();
-}
-    let pendingCleanup = [];
-
-const runAutoCleanup = () => {
-    if (!data.transactions || data.transactions.length === 0) return;
-
-    const now = Date.now();
-
-    const H240 = 240 * 60 * 60 * 1000;
-    const H120 = 120 * 60 * 60 * 1000;
-    const H72  = 72  * 60 * 60 * 1000;
-
-    let hasOldData = false;
-
-    const filtered = data.transactions.filter(t => {
-
-        let tTime = t.timestamp;
-
-        if (!tTime) {
-            if (t.date) {
-                let parsed = new Date(t.date).getTime();
-                if (isNaN(parsed)) {
-                    const parts = t.date.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-                    if (parts) {
-                        const [_, d, m, y] = parts;
-                        parsed = new Date(`${y}-${m}-${d}`).getTime();
+            installBtn.addEventListener('click', async () => {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    const result = await deferredPrompt.userChoice;
+                    console.log('Installation:', result.outcome);
+                    deferredPrompt = null;
+                    installContainer.style.display = 'none';
+                } else {
+                    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+                    if (isMobile) {
+                        alert('📱 Utilisez Chrome ou Safari :\n\n1. Ouvrez ce site\n2. Tapez sur "Partager" \n3. Choisissez "Ajouter à l\'écran d\'accueil"');
+                    } else {
+                        alert('💻 Sur desktop :\n\n1. Ouvrez Chrome\n2. Cliquez sur les 3 points en haut à droite\n3. Choisissez "Installer Notebook"');
                     }
                 }
-                if (!isNaN(parsed)) {
-                    tTime = parsed;
-                    t.timestamp = parsed;
+            });
+
+            if (window.matchMedia('(display-mode: standalone)').matches) {
+                installContainer.style.display = 'none';
+                console.log('✅ Application déjà installée');
+            }
+
+            window.addEventListener('appinstalled', () => {
+                installContainer.style.display = 'none';
+                deferredPrompt = null;
+                console.log('✅ Application installée avec succès !');
+            });
+        }
+
+        // ========== NOTIFICATIONS ==========
+        function requestNotificationPermission() {
+            if ('Notification' in window) {
+                Notification.requestPermission();
+            }
+        }
+
+        // Fonction améliorée pour gérer les alarmes
+        function scheduleAlarm(task, dateStr) {
+            // Nettoyer l'alarme existante pour cette tâche
+            if (alarmTimeouts[task.id]) {
+                clearTimeout(alarmTimeouts[task.id]);
+                delete alarmTimeouts[task.id];
+            }
+
+            if (!task.startTime || !task.alarm) return;
+
+            const [hour, minute] = task.startTime.split(':').map(Number);
+            const now = new Date();
+            const target = new Date(dateStr);
+            target.setHours(hour, minute, 0, 0);
+
+            if (target <= now) {
+                return;
+            }
+
+            const delay = target.getTime() - now.getTime();
+            if (delay > 0 && delay < 86400000) { // Max 24h
+                alarmTimeouts[task.id] = setTimeout(() => {
+                    if ('Notification' in window && Notification.permission === 'granted') {
+                        new Notification('🔔 Rappel · Agathe', {
+                            body: `⏰ ${task.title} à ${task.startTime}`,
+                            icon: 'logo.png'
+                        });
+                    }
+                    try {
+                        const audioCtx = new(window.AudioContext || window.webkitAudioContext)();
+                        const oscillator = audioCtx.createOscillator();
+                        const gainNode = audioCtx.createGain();
+                        oscillator.connect(gainNode);
+                        gainNode.connect(audioCtx.destination);
+                        oscillator.frequency.value = 800;
+                        oscillator.type = 'square';
+                        gainNode.gain.value = 0.3;
+                        oscillator.start();
+                        setTimeout(() => {
+                            oscillator.stop();
+                        }, 600);
+                    } catch (e) { /* fallback */ }
+                    alert(`🔔 Rappel : ${task.title} à ${task.startTime}`);
+                    // Réinitialiser l'alarme après déclenchement
+                    task.alarm = false;
+                    saveTasks();
+                    renderTasks();
+                }, delay);
+            }
+        }
+
+        // ========== EVENTS ==========
+        function setupEventListeners() {
+            document.getElementById('prevMonth').addEventListener('click', () => {
+                currentDate.setMonth(currentDate.getMonth() - 1);
+                renderCalendar();
+            });
+            document.getElementById('nextMonth').addEventListener('click', () => {
+                currentDate.setMonth(currentDate.getMonth() + 1);
+                renderCalendar();
+            });
+
+            document.getElementById('btnAddTask').addEventListener('click', addTask);
+            document.getElementById('taskTitle').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') addTask();
+            });
+
+            document.getElementById('btnCloseModal').addEventListener('click', closeEditModal);
+            document.getElementById('btnCancelEdit').addEventListener('click', closeEditModal);
+            document.getElementById('editForm').addEventListener('submit', saveEditedTask);
+            document.getElementById('editModal').addEventListener('click', (e) => {
+                if (e.target === document.getElementById('editModal')) closeEditModal();
+            });
+        }
+
+        // ========== CALENDRIER ==========
+        function renderCalendar() {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            const monthNames = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+                'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+            ];
+            document.getElementById('currentMonth').textContent = `${monthNames[month]} ${year}`;
+
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+            const container = document.getElementById('calendarDays');
+            container.innerHTML = '';
+
+            for (let i = firstDay === 0 ? 6 : firstDay - 1; i > 0; i--) {
+                const d = daysInPrevMonth - i + 1;
+                const el = createDayElement(d, true);
+                container.appendChild(el);
+            }
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const el = createDayElement(day, false, year, month);
+                container.appendChild(el);
+            }
+
+            const total = container.children.length;
+            const remaining = 42 - total;
+            for (let day = 1; day <= remaining; day++) {
+                const el = createDayElement(day, true);
+                container.appendChild(el);
+            }
+        }
+
+        function createDayElement(day, isOther, year, month) {
+            const el = document.createElement('div');
+            el.className = 'day';
+            el.textContent = day;
+            if (isOther) {
+                el.classList.add('other-month');
+                return el;
+            }
+
+            const date = new Date(year, month, day);
+            const dateStr = formatDate(date);
+
+            if (dateStr === formatDate(new Date())) el.classList.add('today');
+            if (tasks[dateStr] && tasks[dateStr].length > 0) el.classList.add('has-tasks');
+            if (selectedDate && dateStr === formatDate(selectedDate)) el.classList.add('selected');
+
+            el.addEventListener('click', () => selectDate(date));
+            return el;
+        }
+
+        function selectDate(date) {
+            selectedDate = date;
+            renderCalendar();
+            renderTasks();
+            updateSelectedDateDisplay();
+        }
+
+        function selectToday() {
+            selectDate(new Date());
+        }
+
+        function updateSelectedDateDisplay() {
+            if (!selectedDate) return;
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            document.getElementById('selectedDate').textContent = selectedDate.toLocaleDateString('fr-FR', options);
+        }
+
+        // ========== TÂCHES ==========
+        function renderTasks() {
+            if (!selectedDate) return;
+            const dateStr = formatDate(selectedDate);
+            const dayTasks = tasks[dateStr] || [];
+            const list = document.getElementById('tasksList');
+
+            document.getElementById('taskTitle').value = '';
+            document.getElementById('taskDescription').value = '';
+            document.getElementById('taskStartTime').value = '';
+            document.getElementById('taskEndTime').value = '';
+
+            if (dayTasks.length === 0) {
+                list.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-calendar-plus"></i>
+                        <p>Ajoute une plage horaire pour cette journée</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // Tri par heure de début (plus récent en premier)
+            dayTasks.sort((a, b) => (a.startTime || '00:00').localeCompare(b.startTime || '00:00'));
+
+            list.innerHTML = '';
+            dayTasks.forEach(task => {
+                const el = document.createElement('div');
+                el.className = `task-item ${task.completed ? 'completed' : ''}`;
+                el.dataset.taskId = task.id;
+
+                let timeHtml = '';
+                if (task.startTime) {
+                    timeHtml = `<div class="task-time"><i class="fas fa-clock"></i> ${task.startTime}`;
+                    if (task.endTime) timeHtml += ` → ${task.endTime}`;
+                    timeHtml += '</div>';
+                }
+
+                const alarmActive = task.alarm === true;
+
+                el.innerHTML = `
+                    <div class="task-content">
+                        <div class="task-info">
+                            <div class="task-title">${escapeHtml(task.title)}</div>
+                            ${task.description ? `<div class="task-description" title="${escapeHtml(task.description)}">${escapeHtml(task.description)}</div>` : ''}
+                            ${timeHtml}
+                        </div>
+                        <div class="task-actions">
+                            <button class="btn-task btn-alarm ${alarmActive ? 'active' : ''}" data-task-id="${task.id}" title="Sonnerie rappel"><i class="fas fa-bell"></i></button>
+                            <button class="btn-task btn-complete" data-task-id="${task.id}" title="Compléter"><i class="fas fa-check"></i></button>
+                            <button class="btn-task btn-edit" data-task-id="${task.id}" title="Modifier"><i class="fas fa-edit"></i></button>
+                            <button class="btn-task btn-delete" data-task-id="${task.id}" title="Supprimer"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </div>
+                `;
+
+                // Attacher les événements directement sur les boutons via des écouteurs dédiés
+                const alarmBtn = el.querySelector('.btn-alarm');
+                const completeBtn = el.querySelector('.btn-complete');
+                const editBtn = el.querySelector('.btn-edit');
+                const deleteBtn = el.querySelector('.btn-delete');
+
+                alarmBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    toggleAlarm(task.id);
+                });
+
+                completeBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    toggleTaskComplete(task.id);
+                });
+
+                editBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openEditModal(task);
+                });
+
+                deleteBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    deleteTask(task.id);
+                });
+
+                list.appendChild(el);
+            });
+        }
+
+        function toggleAlarm(taskId) {
+            const dateStr = formatDate(selectedDate);
+            if (!tasks[dateStr]) return;
+            const task = tasks[dateStr].find(t => t.id === taskId);
+            if (!task) return;
+
+            task.alarm = !task.alarm;
+
+            if (task.alarm) {
+                scheduleAlarm(task, dateStr);
+                alert(`⏰ Rappel activé pour "${task.title}" à ${task.startTime || 'l\'heure indiquée'}`);
+            } else {
+                // Nettoyer l'alarme
+                if (alarmTimeouts[taskId]) {
+                    clearTimeout(alarmTimeouts[taskId]);
+                    delete alarmTimeouts[taskId];
+                }
+                alert(`🔕 Rappel désactivé pour "${task.title}"`);
+            }
+
+            saveTasks();
+            renderTasks();
+        }
+
+        function addTask() {
+            const title = document.getElementById('taskTitle').value.trim();
+            const description = document.getElementById('taskDescription').value.trim();
+            const startTime = document.getElementById('taskStartTime').value;
+            const endTime = document.getElementById('taskEndTime').value;
+
+            if (!title) { alert('Veuillez entrer un objectif.'); return; }
+            if (!selectedDate) { alert('Sélectionne une date.'); return; }
+
+            const dateStr = formatDate(selectedDate);
+            if (!tasks[dateStr]) tasks[dateStr] = [];
+
+            const task = {
+                id: Date.now(),
+                title,
+                description,
+                startTime,
+                endTime,
+                completed: false,
+                alarm: false,
+                createdAt: new Date().toISOString()
+            };
+            tasks[dateStr].push(task);
+            saveTasks();
+            renderTasks();
+            renderCalendar();
+        }
+
+        function deleteTask(taskId) {
+            if (!confirm('Supprimer cette plage horaire ?')) return;
+            const dateStr = formatDate(selectedDate);
+            if (tasks[dateStr]) {
+                tasks[dateStr] = tasks[dateStr].filter(t => t.id !== taskId);
+                if (tasks[dateStr].length === 0) delete tasks[dateStr];
+                // Nettoyer l'alarme si elle existe
+                if (alarmTimeouts[taskId]) {
+                    clearTimeout(alarmTimeouts[taskId]);
+                    delete alarmTimeouts[taskId];
+                }
+            }
+            saveTasks();
+            renderTasks();
+            renderCalendar();
+        }
+
+        function toggleTaskComplete(taskId) {
+            const dateStr = formatDate(selectedDate);
+            if (tasks[dateStr]) {
+                const task = tasks[dateStr].find(t => t.id === taskId);
+                if (task) {
+                    task.completed = !task.completed;
+                    saveTasks();
+                    renderTasks();
                 }
             }
         }
 
-        if (!tTime || isNaN(tTime)) return true;
-
-        const age = now - tTime;
-
-        const mode = (t.mode || "").toLowerCase();
-        const opName = (t.operator || "").toLowerCase();
-
-        const isDepense =
-            t.isDepense === true ||
-            mode.includes("depense") ||
-            opName.includes("depense");
-
-        const isDette =
-            t.isReglement ||
-            mode.includes("dette");
-
-        if (isDepense) {
-            if (age >= H240) {
-                hasOldData = true;
-                return false;
-            }
-            return true;
+        function openEditModal(task) {
+            editingTaskId = task.id;
+            document.getElementById('editTaskTitle').value = task.title;
+            document.getElementById('editTaskDescription').value = task.description || '';
+            // Récupérer la date de la tâche (stockée ou la date actuelle)
+            const taskDate = task.date || formatDate(selectedDate);
+            document.getElementById('editTaskDate').value = taskDate;
+            document.getElementById('editTaskStartTime').value = task.startTime || '';
+            document.getElementById('editTaskEndTime').value = task.endTime || '';
+            document.getElementById('editModal').classList.add('active');
         }
 
-        if (isDette) {
-            const isSolded =
-                t.snapshotDette &&
-                Math.abs(t.snapshotDette.USD) < 0.1 &&
-                Math.abs(t.snapshotDette.CDF) < 100;
-
-            if (isSolded && age >= H72) {
-                hasOldData = true;
-                return false;
-            }
-            return true;
+        function closeEditModal() {
+            document.getElementById('editModal').classList.remove('active');
+            editingTaskId = null;
         }
 
-        if (age >= H120) {
-            hasOldData = true;
-            return false;
-        }
-
-        return true;
-    });
-
-        if (hasOldData) {
-        pendingCleanup = filtered;
-        document.getElementById("cleanupNotify").classList.remove("hidden");
-        console.log("🔥 Nettoyage disponible (En attente de l'admin) !");
-    } else {
-        document.getElementById("cleanupNotify").classList.add("hidden");
-    }
-}; 
-
-    
-    window.confirmCleanup = async () => {
-    if (confirm("As-tu bien téléchargé ton PDF ? Les vieilles transactions affichées comme 'à nettoyer' seront définitivement supprimées.")) {
-        
-        try {
-            data.transactions = pendingCleanup;
+        function saveEditedTask(e) {
+            e.preventDefault();
             
-            const transObj = {};
-            data.transactions.forEach(t => {
-                if (t.timestamp) transObj[t.timestamp] = t;
+            const oldDateStr = formatDate(selectedDate);
+            const newDateStr = document.getElementById('editTaskDate').value;
+            
+            if (!newDateStr) {
+                alert('Veuillez sélectionner une date valide.');
+                return;
+            }
+
+            // Trouver la tâche dans l'ancienne date
+            let task = null;
+            let taskIndex = -1;
+            if (tasks[oldDateStr]) {
+                taskIndex = tasks[oldDateStr].findIndex(t => t.id === editingTaskId);
+                if (taskIndex !== -1) {
+                    task = tasks[oldDateStr][taskIndex];
+                }
+            }
+
+            if (!task) {
+                alert('Erreur : tâche introuvable.');
+                return;
+            }
+
+            // Mettre à jour les propriétés
+            task.title = document.getElementById('editTaskTitle').value.trim();
+            task.description = document.getElementById('editTaskDescription').value.trim();
+            task.startTime = document.getElementById('editTaskStartTime').value;
+            task.endTime = document.getElementById('editTaskEndTime').value;
+            task.date = newDateStr;
+
+            // Si la date a changé, déplacer la tâche
+            if (oldDateStr !== newDateStr) {
+                // Supprimer de l'ancienne liste
+                tasks[oldDateStr].splice(taskIndex, 1);
+                if (tasks[oldDateStr].length === 0) {
+                    delete tasks[oldDateStr];
+                }
+                
+                // Ajouter à la nouvelle date
+                if (!tasks[newDateStr]) {
+                    tasks[newDateStr] = [];
+                }
+                tasks[newDateStr].push(task);
+                
+                // Si l'alarme est active, reprogrammer
+                if (task.alarm) {
+                    if (alarmTimeouts[task.id]) {
+                        clearTimeout(alarmTimeouts[task.id]);
+                        delete alarmTimeouts[task.id];
+                    }
+                    scheduleAlarm(task, newDateStr);
+                }
+            } else if (task.alarm) {
+                // Même date, mais l'heure a peut-être changé
+                if (alarmTimeouts[task.id]) {
+                    clearTimeout(alarmTimeouts[task.id]);
+                    delete alarmTimeouts[task.id];
+                }
+                scheduleAlarm(task, newDateStr);
+            }
+
+            saveTasks();
+            closeEditModal();
+            
+            // Sélectionner la nouvelle date si elle a changé
+            if (oldDateStr !== newDateStr) {
+                const [year, month, day] = newDateStr.split('-').map(Number);
+                const newDate = new Date(year, month - 1, day);
+                selectDate(newDate);
+            } else {
+                renderTasks();
+                renderCalendar();
+            }
+        }
+
+        // ========== STORAGE ==========
+        function saveTasks() {
+            localStorage.setItem('notebookTasks_agathe', JSON.stringify(tasks));
+        }
+
+        function loadTasks() {
+            const stored = localStorage.getItem('notebookTasks_agathe');
+            tasks = stored ? JSON.parse(stored) : {};
+            // Restaurer les alarmes actives
+            for (const dateStr in tasks) {
+                for (const task of tasks[dateStr]) {
+                    if (task.alarm) {
+                        scheduleAlarm(task, dateStr);
+                    }
+                }
+            }
+        }
+
+        // ========== UTILS ==========
+        function formatDate(date) {
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const d = String(date.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // ========== TÉLÉCHARGEMENT DIRECT DU HTML ==========
+        function setupDownloadButton() {
+            const btn = document.getElementById('btnDownloadApp');
+            btn.addEventListener('click', () => {
+                downloadApp();
             });
-            
-            const updates = {};
-            updates['mka_data/transactions'] = transObj;
-            
-            await update(ref(db), updates);
-            
-            document.getElementById("cleanupNotify").classList.add("hidden");
-            alert("🧹 Application allégée avec succès sur tous les téléphones !");
-            render();
-        } catch (error) {
-            console.error(error);
-            alert("❌ Échec du nettoyage : Connexion instable.");
         }
-    }
-};
 
-setInterval(runAutoCleanup, 30000);
+        function downloadApp() {
+            const htmlContent = document.documentElement.outerHTML;
+            const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
 
-window.onload = () => {
-    runAutoCleanup();
-};
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'notebook_agathe_my_wife.html';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
 
-window.deleteOperator = function(index){
-    if(!confirm("Supprimer cet opérateur ?")) return;
-    data.operators.splice(index, 1);
-    save();
-    render();
-};
+            setTimeout(() => URL.revokeObjectURL(url), 100);
 
-window.deleteType = function(index){
-    if(!confirm("Supprimer ce type ?")) return;
-    data.types.splice(index, 1);
-    save();
-    render();
-};
+            alert('✅ Fichier téléchargé !\n\n💡 Pour une meilleure expérience, utilisez Chrome ou Edge sur mobile et ajoutez la page à l\'écran d\'accueil.');
+        }
 
-  let deferredPrompt;
-const installBtn = document.getElementById('installBtn');
-
-window.addEventListener('beforeinstallprompt', (e) => {
-  e.preventDefault();
-  deferredPrompt = e;
-  if (installBtn) {
-    installBtn.style.display = 'block';
-  }
-  console.log("MKA Shop : Prêt pour l'installation manuelle.");
-});
-
-if (installBtn) {
-  installBtn.addEventListener('click', async () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      console.log(`Réponse de l'utilisateur : ${outcome}`);
-      deferredPrompt = null;
-      installBtn.style.display = 'none';
-    }
-  });
-}
-
-window.addEventListener('appinstalled', () => {
-  console.log('MKA Shop : Installation réussie !');
-  if (installBtn) {
-    installBtn.style.display = 'none';
-  }
-  deferredPrompt = null;
-});
-
-  
-</script>  </body>  
+        // ========== SERVICE WORKER ==========
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js')
+                .then(() => console.log('✅ SW enregistré'))
+                .catch(err => console.warn('⚠️ SW échec:', err));
+        }
+    </script>
+</body>
 </html>
