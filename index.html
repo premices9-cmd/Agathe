@@ -9,7 +9,7 @@
    <meta name="apple-mobile-web-app-title" content="MKA Shop">
    <link rel="apple-touch-icon" href="icon.png">
    <link rel="icon" href="icon.png"> 
-   <title>MKA Pro Business V5.3.1 - Full Logic</title>  
+   <title>MKA Pro Business V5.3.2 - Full Logic</title>  
    <meta name="theme-color" content="#0f172a">  
    <meta name="mobile-web-app-capable" content="yes">
    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -39,7 +39,6 @@
    .nav-hist button.active { background: #0ea5e9; }  
    .debt-alert { background: #fff7ed; border: 1px solid #ea580c; color: #9a3412; padding: 8px; border-radius: 8px; font-size: 12px; margin-bottom: 5px; }  
 
-   /* Styles pour la liste déroulante améliorée du règlement dette */
    .debt-search-wrapper { position: relative; width: 100%; }
    .debt-search-wrapper input { width: 100%; padding: 10px; font-size: 15px; border-radius: 8px; border: 1px solid #cbd5e1; box-sizing: border-box; }
    .debt-suggestions {
@@ -95,7 +94,6 @@
    .badge-moi { background: #dcfce7; color: #166534; }
    .badge-both { background: #fef3c7; color: #92400e; }
 
-   /* Styles pour la recherche de noms dans les opérations clients */
    .client-name-search-wrapper { position: relative; width: 100%; }
    .client-name-search-wrapper input { width: 100%; padding: 10px; font-size: 15px; border-radius: 8px; border: 1px solid #cbd5e1; box-sizing: border-box; }
    .client-name-suggestions {
@@ -185,13 +183,13 @@
              alt="MKA SHOP" 
              style="width: 85px; height: 85px; border-radius: 20px; border: 2px solid #facc15; box-shadow: 0 8px 15px rgba(0,0,0,0.5);">
         <h1 style="margin: 12px 0 0 0; font-size: 22px; color: #facc15; text-transform: uppercase; letter-spacing: 1px; font-weight: 800;">
-            MKA SHOP V5.3.1
+            MKA SHOP V5.3.2
         </h1>
     </div>
     
     <div style="text-align: center; margin: 15px auto;">
     <button id="installBtn" style="display: none; background: #3b82f6; color: white; border: none; padding: 12px 20px; border-radius: 25px; font-size: 14px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">
-      📲 Installer MKA Shop V5.3.1
+      📲 Installer MKA Shop V5.3.2
      </button>
     </div>
 
@@ -446,7 +444,6 @@
             <button id="btn-h-dette_moi" onclick="showFullHistory('dette_moi')">DETTES MOI</button> 
             <button id="btn-h-depenses" onclick="showFullHistory('depenses')">DÉPENSES</button>
             <button id="btn-h-suppressions" onclick="showFullHistory('suppressions')" style="background: #ef4444; color:white;">🗑️ SUPPRESSIONS</button>
-            <!-- Nouveaux boutons pour les listes de noms -->
             <button id="btn-h-list_client" onclick="showFullHistory('list_client')" style="background: #dc2626; color:white;">📋 CLIENTS QUI DOIVENT</button>
             <button id="btn-h-list_moi" onclick="showFullHistory('list_moi')" style="background: #16a34a; color:white;">📋 NOMS QUE JE DOIS</button>
         </div>  
@@ -485,7 +482,8 @@ let data = {
     taux: 2800,
     config: { pinAdmin: "1234", pinUser: "0000" },
     debts: {},
-    deletedNames: [] 
+    deletedNames: [],
+    whatsappNumbers: {} 
 };
 
 let isDataLoaded = false;
@@ -508,14 +506,12 @@ onValue(ref(db, 'mka_data'), (snap) => {
     data.caisse = incoming.caisse || { USD: 0, CDF: 0 };
     data.taux = incoming.taux || 2800;
     data.deletedNames = incoming.deletedNames || [];
+    data.whatsappNumbers = incoming.whatsappNumbers || {};
 
     const obj = incoming.transactions || {};
     data.transactions = Object.values(obj).sort((a, b) => b.timestamp - a.timestamp);
 
-    // 🔥 Créer automatiquement les opérateurs de dette s'ils n'existent pas
     ensureDebtOperators();
-    
-    // 🔥 Rétablir la cohérence des opérateurs de dette (force le recalcul)
     syncDebtOperators(true);
 
     isDataLoaded = true;
@@ -546,6 +542,7 @@ window.save = async function() {
         updates['mka_data/debts'] = data.debts;
         updates['mka_data/types'] = data.types;
         updates['mka_data/deletedNames'] = data.deletedNames;
+        updates['mka_data/whatsappNumbers'] = data.whatsappNumbers;
 
         await update(ref(db), updates);
         console.log("Synchronisation réussie ✅");
@@ -562,12 +559,9 @@ const save = window.save;
 const fmt = (n) => parseFloat(n || 0).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).replace(/,/g, '.');  
 const normalize = (str) => str ? str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : "";
 
-// ============================================
-// 🔥 FONCTION POUR OBTENIR LA DATE ET L'HEURE DE GOMA (UTC+2)
-// ============================================
 function getGomaTime() {
     const now = new Date();
-    const gomaOffset = 2 * 60; // Goma est UTC+2
+    const gomaOffset = 2 * 60;
     const localOffset = now.getTimezoneOffset();
     const gomaTime = new Date(now.getTime() + (localOffset + gomaOffset) * 60000);
     return gomaTime;
@@ -586,9 +580,6 @@ function formatGomaDate(date) {
     });
 }
 
-// ============================================
-// 🔥 NORMALISATION ULTRA-PERMISSIVE
-// ============================================
 const normalizeStrict = (str) => {
     if (!str) return "";
     return str
@@ -600,12 +591,8 @@ const normalizeStrict = (str) => {
         .trim();
 };
 
-// ============================================
-// 🔥 CRÉATION AUTOMATIQUE DES OPÉRATEURS DE DETTE
-// ============================================
 function ensureDebtOperators() {
     let changed = false;
-    // Vérifier si un opérateur "dette client" existe
     const hasClient = data.operators.some(op => normalize(op.name).includes('dette client'));
     if (!hasClient) {
         data.operators.push({
@@ -617,7 +604,6 @@ function ensureDebtOperators() {
         });
         changed = true;
     }
-    // Vérifier si un opérateur "dette moi" existe
     const hasMoi = data.operators.some(op => normalize(op.name).includes('dette moi'));
     if (!hasMoi) {
         data.operators.push({
@@ -634,14 +620,10 @@ function ensureDebtOperators() {
     }
 }
 
-// ============================================
-// 🔥 SYNCHRONISATION FORCÉE DES OPÉRATEURS DE DETTE
-// ============================================
 function syncDebtOperators(force = false) {
     if (!data.debts) return;
     let changed = false;
     
-    // Calcul des totaux à partir de data.debts
     let totalClientUSD = 0, totalClientCDF = 0;
     let totalMoiUSD = 0, totalMoiCDF = 0;
     Object.keys(data.debts).forEach(key => {
@@ -655,13 +637,11 @@ function syncDebtOperators(force = false) {
         }
     });
     
-    // Arrondir à 2 décimales
     totalClientUSD = Math.round(totalClientUSD * 100) / 100;
     totalClientCDF = Math.round(totalClientCDF);
     totalMoiUSD = Math.round(totalMoiUSD * 100) / 100;
     totalMoiCDF = Math.round(totalMoiCDF);
     
-    // Mettre à jour les opérateurs de dette
     data.operators.forEach(op => {
         const n = normalize(op.name);
         if (n.includes('dette client')) {
@@ -684,14 +664,9 @@ function syncDebtOperators(force = false) {
     }
 }
 
-// ============================================
-// 🔥 RÉCUPÉRATION DE TOUS LES NOMS UNIQUES AVEC LEUR SITUATION
-// (Version corrigée : conserve les noms supprimés s'ils ont encore une dette active)
-// ============================================
 function getAllClientNames() {
     const nameMap = new Map();
 
-    // 1. Depuis les dettes
     Object.keys(data.debts).forEach(key => {
         const underscoreIndex = key.indexOf('_');
         if (underscoreIndex === -1) return;
@@ -719,7 +694,6 @@ function getAllClientNames() {
         }
     });
 
-    // 2. Depuis les transactions
     data.transactions.forEach(t => {
         if (t.person && t.person.trim().length > 0) {
             const name = t.person.trim();
@@ -736,11 +710,9 @@ function getAllClientNames() {
         }
     });
 
-    // 3. Exclure les noms supprimés, sauf ceux qui ont encore une dette active
     const deletedKeys = data.deletedNames.map(n => normalizeStrict(n));
     const result = Array.from(nameMap.entries())
         .filter(([key, value]) => {
-            // Si le nom est dans deletedKeys, on le conserve seulement s'il a une dette active
             if (deletedKeys.includes(key)) {
                 return value.hasDebtClient || value.hasDebtMoi;
             }
@@ -759,9 +731,6 @@ function getAllClientNames() {
     return result;
 }
 
-// ============================================
-// 🔥 FILTRAGE DES NOMS POUR LE CHAMP CLIENT (Opérations)
-// ============================================
 window.filterClientNames = function() {
     const input = document.getElementById("personName");
     const suggestionsBox = document.getElementById("clientNameSuggestions");
@@ -819,9 +788,6 @@ window.selectClientName = function(name) {
     togglePaySim();
 };
 
-// ============================================
-// 🔥 SUPPRESSION D'UN NOM DU SYSTÈME
-// ============================================
 window.deleteClientName = async function(name) {
     if (!name || name.trim().length === 0) return;
     const confirmMsg = `⚠️ Voulez-vous vraiment supprimer le nom "${name}" du système ?\n\nCette action :\n- Supprime ce nom des suggestions\n- Les transactions restent dans l'historique\n- Une trace sera enregistrée dans l'historique des suppressions`;
@@ -829,9 +795,6 @@ window.deleteClientName = async function(name) {
     if (!confirm(confirmMsg)) return;
 
     try {
-        // Normaliser le nom pour le stockage
-        const normalizedName = normalizeStrict(name.trim());
-        // Ajouter le nom brut et normalisé pour la suppression
         if (!data.deletedNames.includes(name.trim())) {
             data.deletedNames.push(name.trim());
         }
@@ -868,9 +831,6 @@ window.deleteClientName = async function(name) {
     }
 };
 
-// ============================================
-// 🔥 FILTRAGE DES SUGGESTIONS POUR LE RÈGLEMENT DES DETTES (TOUS LES NOMS AVEC DETTES, MÊME SUPPRIMÉS)
-// ============================================
 window.filterDebtSuggestions = function() {
     const input = document.getElementById("debtPersonName");
     const suggestionsBox = document.getElementById("debtSuggestions");
@@ -893,7 +853,6 @@ window.filterDebtSuggestions = function() {
         const normalizedName = name.trim();
         const normalizedKey = normalizeStrict(normalizedName);
         
-        // 🔥 On ne filtre PAS par deletedNames pour le règlement
         if (!debtNames.has(normalizedKey)) {
             debtNames.set(normalizedKey, { 
                 original: normalizedName,
@@ -969,7 +928,6 @@ window.selectDebtName = function(name) {
     checkDebtBalance();
 };
 
-// Clic en dehors des listes pour les fermer
 document.addEventListener('click', function(e) {
     const debtWrapper = document.querySelector('.debt-search-wrapper');
     if (debtWrapper && !debtWrapper.contains(e.target)) {
@@ -1222,18 +1180,19 @@ if (t.impacts?.virtuel) {
             if (opG) {
                 opG.USD += impUSD;
                 opG.CDF += impCDF;
-                // Arrondir pour éviter les erreurs d'arrondi
                 opG.USD = Math.round(opG.USD * 100) / 100;
                 opG.CDF = Math.round(opG.CDF);
             }
         }
     }
 
-    // 🔥 Après toute modification de dettes, synchroniser les opérateurs de dette (force le recalcul)
     syncDebtOperators(true);
 }
 
-  window.addTransaction = async () => { 
+// ============================================
+// 🔥 addTransaction CORRIGÉE (gestion double cas dette)
+// ============================================
+window.addTransaction = async () => { 
     if (!isDataLoaded || !data.config) { 
         alert("⚠️ Application non connectée ou configuration indisponible. Veuillez patienter."); 
         return; 
@@ -1258,17 +1217,19 @@ if (t.impacts?.virtuel) {
 
     const ty = data.types[tyI];
     const op = data.operators[opI];
-    if (!ty || !op) return;
+    if (!ty || !op) {
+        alert("Sélectionnez un type et un opérateur valides.");
+        return;
+    }
 
     const opNorm = normalize(op.name);
-    const isDettePrincipal = opNorm.includes("dette");
+    const isDettePrincipal = opNorm.includes("dette client") || opNorm.includes("dette moi");
     const isDepensePrincipal = opNorm.includes("depense");
     const isInterSim = (modeNorm.includes("inter") || modeNorm.includes("sim") || modeNorm.includes("virtuel"));
 
-    // 🔥 Détecter si le mode est une dette (indépendamment de l'opérateur)
     const isDebtMode = modeNorm === "dette_client" || modeNorm === "dette_moi";
 
-    // 🔥 Vérifier que le nom est renseigné pour une dette
+    // Vérification du nom pour les dettes
     if ((isDebtMode || isDettePrincipal) && (!person || person.trim() === "")) {
         alert("⚠️ Veuillez saisir le nom de la personne pour cette dette.");
         return;
@@ -1276,23 +1237,20 @@ if (t.impacts?.virtuel) {
 
     const uniqueTimestamp = Date.now();
 
-    // ============================================
-    // 🔥 GESTION DE LA RÉAPPARITION AUTOMATIQUE DES NOMS
-    // ============================================
+    // Réactivation auto du nom
     if (person && data.deletedNames.includes(person.trim())) {
-        // Retirer le nom de la liste noire s'il apparaît dans une nouvelle transaction
         data.deletedNames = data.deletedNames.filter(n => n.trim() !== person.trim());
-        // Sauvegarder la liste mise à jour
         try {
             const updates = {};
             updates['mka_data/deletedNames'] = data.deletedNames;
             await update(ref(db), updates);
             console.log(`✅ Nom "${person}" réactivé automatiquement.`);
         } catch (e) {
-            console.warn("Impossible de réactiver le nom immédiatement, correction lors du prochain sync.", e);
+            console.warn("Impossible de réactiver le nom immédiatement.", e);
         }
     }
 
+    // Création de la transaction
     const t = createTransaction({
         typeNom: ty.name,
         operator: op.name,
@@ -1311,72 +1269,89 @@ if (t.impacts?.virtuel) {
     t.impacts.operator = t.impacts.operator || { USD:0, CDF:0 };
     t.impacts.caisse = t.impacts.caisse || { USD:0, CDF:0 };
 
+    const impO = parseInt(ty.impO) || 0;
+    const dirCaisse = parseInt(ty.impC) || 0;
+
     // ==========================================
-    // 1. GESTION DES DETTES (mode dette ou opérateur dette)
+    // 1. Détermination du type de dette
     // ==========================================
-    if (isDebtMode || isDettePrincipal) {
-        // Enregistrer le montant total de la dette
-        t.detteUSD = (cur === "USD") ? amtSIM : 0;
-        t.detteCDF = (cur === "CDF") ? amtSIM : 0;
-        // L'impact sur la caisse est déterminé par le type d'action (ty.impC)
-        // On ne modifie pas l'opérateur ici, car la dette sera gérée via le mécanisme des dettes
+    let typeDette = "";
+    if (isDettePrincipal) {
+        if (opNorm.includes("dette client")) typeDette = "dette client";
+        else if (opNorm.includes("dette moi")) typeDette = "dette moi";
+    } else if (isDebtMode) {
+        typeDette = modeNorm === "dette_client" ? "dette client" : "dette moi";
     }
 
     // ==========================================
-    // 2. GESTION DES DÉPENSES
+    // 2. Application des impacts
     // ==========================================
+
+    // --- a) Impact sur l'opérateur (sauf si opérateur de dette) ---
+    if (!isDettePrincipal && impO !== 0) {
+        t.impacts.operator.USD = (cur === "USD" ? amtSIM : 0) * impO;
+        t.impacts.operator.CDF = (cur === "CDF" ? amtSIM : 0) * impO;
+    }
+
+    // --- b) Impact sur la caisse ---
+    if (isDettePrincipal) {
+        // Si l'opérateur est un compte de dette, la caisse est impactée par impC * montant total
+        t.impacts.caisse.USD = (cur === "USD" ? amtSIM : 0) * dirCaisse + commUSD;
+        t.impacts.caisse.CDF = (cur === "CDF" ? amtSIM : 0) * dirCaisse + commCDF;
+    } else {
+        // Sinon, la caisse est impactée par impC * cash payé
+        t.impacts.caisse.USD = (mixUSD * dirCaisse) + commUSD;
+        t.impacts.caisse.CDF = (mixCDF * dirCaisse) + commCDF;
+    }
+
+    // --- c) Gestion du stock ---
+    if (stkM !== 0) {
+        t.impacts.stock = stkM;
+    }
+
+    // --- d) Gestion de la dette ---
+    if (typeDette) {
+        t.typeDette = typeDette;
+        if (isDettePrincipal) {
+            // Dette = montant total
+            t.detteUSD = (cur === "USD") ? amtSIM : 0;
+            t.detteCDF = (cur === "CDF") ? amtSIM : 0;
+        } else if (isDebtMode) {
+            // Dette = différence (montant - cash)
+            const montantNonPayeUSD = cur === "USD" ? Math.max(0, amtSIM - mixUSD) : 0;
+            const montantNonPayeCDF = cur === "CDF" ? Math.max(0, amtSIM - mixCDF) : 0;
+            t.detteUSD = montantNonPayeUSD;
+            t.detteCDF = montantNonPayeCDF;
+        }
+    }
+
+    // --- e) Inter-SIM (si mode virtuel) ---
+    if (isInterSim && !isDettePrincipal) {
+        const paySimIdx = parseInt(document.getElementById("paySimSelect").value);
+        if (isNaN(paySimIdx)) {
+            alert("Veuillez sélectionner une SIM source.");
+            return;
+        }
+        const montantNonPayeUSD = cur === "USD" ? Math.max(0, amtSIM - mixUSD) : 0;
+        const montantNonPayeCDF = cur === "CDF" ? Math.max(0, amtSIM - mixCDF) : 0;
+        t.impacts.virtuel = {
+            opIdx: paySimIdx,
+            USD: -montantNonPayeUSD,
+            CDF: -montantNonPayeCDF
+        };
+    }
+
+    // --- f) Dépense ---
     if (isDepensePrincipal) {
         t.isDepense = true;
-        t.realUSD = (cur === "USD") ? amtSIM : 0;
-        t.realCDF = (cur === "CDF") ? amtSIM : 0;
-        t.impacts.caisse.USD = (-mixUSD) + commUSD;
-        t.impacts.caisse.CDF = (-mixCDF) + commCDF;
+        // On force la sortie sur la caisse (déjà gérée par dirCaisse, mais on peut renforcer)
+        t.impacts.caisse.USD = -mixUSD + commUSD;
+        t.impacts.caisse.CDF = -mixCDF + commCDF;
     }
 
     // ==========================================
-    // 3. GESTION DE L'INTER-SIM
+    // 3. Sauvegarde et envoi
     // ==========================================
-    if (isInterSim) {
-        const taux = parseFloat(data.taux) || 1;
-        const paySimIdx = parseInt(document.getElementById("paySimSelect").value);
-        let diffUSD = 0, diffCDF = 0;
-        if (cur === "USD") {
-            const totalCash = mixUSD + (mixCDF / taux);
-            diffUSD = Math.max(0, amtSIM - totalCash);
-        } else {
-            const totalCash = mixCDF + (mixUSD * taux);
-            diffCDF = Math.max(0, amtSIM - totalCash);
-        }
-        t.virtualUSD = diffUSD; t.virtualCDF = diffCDF; t.virtualOpIdx = paySimIdx;
-        t.impacts.virtuel = { opIdx: paySimIdx, USD: -diffUSD, CDF: -diffCDF };
-        const dirCaisse = parseInt(ty.impC) || 0;
-        t.impacts.caisse.USD = (mixUSD * dirCaisse) + commUSD;
-        t.impacts.caisse.CDF = (mixCDF * dirCaisse) + commCDF;
-    }
-
-    // ==========================================
-    // 4. CAS STANDARD (opérateur non-dette, mode cash ou autre)
-    // ==========================================
-    if (!isDettePrincipal && !isDepensePrincipal && !isInterSim && !isDebtMode) {
-        // Impact sur l'opérateur
-        t.impacts.operator.USD = (cur === "USD" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
-        t.impacts.operator.CDF = (cur === "CDF" ? amtSIM : 0) * (parseInt(ty.impO) || 0);
-        // Impact sur la caisse
-        const dirCaisse = parseInt(ty.impC) || 0;
-        t.impacts.caisse.USD = (mixUSD * dirCaisse) + commUSD;
-        t.impacts.caisse.CDF = (mixCDF * dirCaisse) + commCDF;
-    }
-
-    // ==========================================
-    // 5. IMPACT CAISSE POUR LES DETTES (si pas déjà défini)
-    // ==========================================
-    if ((isDebtMode || isDettePrincipal) && !t.impacts.caisse.USD && !t.impacts.caisse.CDF) {
-        // Si aucun impact caisse n'a été défini (ex: le type d'action n'a pas d'impact caisse), on le définit par défaut
-        const dirCaisse = parseInt(ty.impC) || 0;
-        t.impacts.caisse.USD = (mixUSD * dirCaisse) + commUSD;
-        t.impacts.caisse.CDF = (mixCDF * dirCaisse) + commCDF;
-    }
-
     const backupData = JSON.parse(JSON.stringify(data));
 
     try {
@@ -1394,9 +1369,6 @@ if (t.impacts?.virtuel) {
             simSourceName = sourceOp ? ` [via ${sourceOp.name}]` : "";
         }
 
-        // ============================================
-        // 🔥 UTILISATION DE LA DATE DE GOMA
-        // ============================================
         const gomaDate = formatGomaDate();
 
         const newEntry = {
@@ -1404,14 +1376,12 @@ if (t.impacts?.virtuel) {
             person,
             date: gomaDate,
             desc: `${ty.name} - ${op.name}${simSourceName} (${person ? `NOM: ${person} | ` : ''})${motif}`,
-
             amtSIM,
             curSIM: cur,
             usdCash: mixUSD,
             cdfCash: mixCDF,
             commission: { usd: commUSD, cdf: commCDF },
             opTaux: opTauxSaisi,
-
         };
 
         data.transactions.unshift(newEntry);
@@ -1421,7 +1391,7 @@ if (t.impacts?.virtuel) {
         updates['mka_data/caisse'] = data.caisse;
         updates['mka_data/operators'] = data.operators;
         updates['mka_data/debts'] = data.debts;
-        updates['mka_data/deletedNames'] = data.deletedNames; // Sauvegarde de la liste mise à jour
+        updates['mka_data/deletedNames'] = data.deletedNames;
 
         await update(ref(db), updates);
 
@@ -1443,7 +1413,6 @@ if (t.impacts?.virtuel) {
         render();
     }
 };
-
 
   window.settleAccountV2 = async () => {
     const opIdx = document.getElementById("settleOpIdx").value;
@@ -1551,9 +1520,6 @@ if (t.impacts?.virtuel) {
         if (remiseUSD > 0 || remiseCDF > 0) bonusDesc += ` [Com/Réduction: ${remiseUSD}$ / ${remiseCDF}FC]`;
         if (pourboireUSD > 0 || pourboireCDF > 0) bonusDesc += ` [Pourboire Caisse: ${pourboireUSD}$ / ${pourboireCDF}FC]`;
 
-        // ============================================
-        // 🔥 UTILISATION DE LA DATE DE GOMA
-        // ============================================
         const gomaDate = formatGomaDate();
 
         const finalEntry = {
@@ -1590,6 +1556,125 @@ if (t.impacts?.virtuel) {
         console.error("Erreur Sync:", error);
         alert("❌ ERREUR RÉSEAU : Impossible de valider le règlement.");
         render();
+    }
+};
+
+window.updateWhatsAppNumber = async function(person, inputId) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    const number = input.value.trim();
+    if (!person) return;
+    
+    const normalizedPerson = normalizeStrict(person);
+    if (number === "") {
+        delete data.whatsappNumbers[normalizedPerson];
+    } else {
+        data.whatsappNumbers[normalizedPerson] = number;
+    }
+    
+    try {
+        const updates = {};
+        updates['mka_data/whatsappNumbers'] = data.whatsappNumbers;
+        await update(ref(db), updates);
+        alert("✅ Numéro WhatsApp enregistré !");
+        const activeFilter = document.querySelector(".nav-hist button.active")?.id?.replace('btn-h-', '');
+        if (activeFilter) {
+            showFullHistory(activeFilter);
+        }
+    } catch (e) {
+        alert("❌ Erreur réseau : impossible d'enregistrer le numéro.");
+    }
+};
+
+window.sendWhatsAppReminder = (person, usd, cdf) => {
+    const filter = document.querySelector(".nav-hist button.active")?.id;
+    const estDetteMoi = (filter === "btn-h-dette_moi") || (filter === "btn-h-list_moi");
+
+    let message = "";
+    if (estDetteMoi) {
+        message = `Bonjour, nous vous confirmons une dette de ${fmt(usd)}$ et ${fmt(cdf)} FC en votre faveur. Nous sommes prêts à vous payer à votre demande. Merci.`;
+    } else {
+        message = `Bonjour, nous vous rappelons votre dette de ${fmt(usd)}$ et ${fmt(cdf)} FC chez MKA SHOP. Merci de régulariser dès que possible.`;
+    }
+
+    const encodedMsg = encodeURIComponent(message);
+    const normalizedPerson = normalizeStrict(person);
+    const numero = data.whatsappNumbers[normalizedPerson] || '';
+    if (numero) {
+        window.open(`https://wa.me/${numero}?text=${encodedMsg}`, '_blank');
+    } else {
+        window.open(`https://wa.me/?text=${encodedMsg}`, '_blank');
+    }
+};
+
+window.sendWhatsAppTrustMessage = (person, montantAjouteUsd, montantAjouteCdf, ancienTotalUsd, ancienTotalCdf) => {
+    const filter = document.querySelector(".nav-hist button.active")?.id;
+    const estDetteMoi = (filter === "btn-h-dette_moi") || (filter === "btn-h-list_moi");
+
+    const nouveauTotalUsd = (parseFloat(ancienTotalUsd) || 0) + (parseFloat(montantAjouteUsd) || 0);
+    const nouveauTotalCdf = (parseFloat(ancienTotalCdf) || 0) + (parseFloat(montantAjouteCdf) || 0);
+
+    let message = "";
+    if (estDetteMoi) {
+        message = `Bonjour, nous vous confirmons une dette complémentaire de ${fmt(montantAjouteUsd)}$ / ${fmt(montantAjouteCdf)} FC. Total dû : ${fmt(nouveauTotalUsd)}$ / ${fmt(nouveauTotalCdf)} FC. Merci pour votre confiance.`;
+    } else {
+        message = `Bonjour, nous vous confirmons un crédit de ${fmt(montantAjouteUsd)}$ / ${fmt(montantAjouteCdf)} FC. Votre solde débiteur total : ${fmt(nouveauTotalUsd)}$ / ${fmt(nouveauTotalCdf)} FC. Merci.`;
+    }
+
+    const encodedMsg = encodeURIComponent(message);
+    const normalizedPerson = normalizeStrict(person);
+    const numero = data.whatsappNumbers[normalizedPerson] || '';
+    if (numero) {
+        window.open(`https://wa.me/${numero}?text=${encodedMsg}`, '_blank');
+    } else {
+        window.open(`https://wa.me/?text=${encodedMsg}`, '_blank');
+    }
+};
+
+window.sendWhatsAppReceipt = (person, usdPaye, cdfPaye, resteUsd, resteCdf, canalPaiementArg = null) => {
+    const estSolde = (resteUsd <= 0.1 && resteCdf <= 100);
+    const filter = document.querySelector(".nav-hist button.active")?.id;
+    const estDetteMoi = (filter === "btn-h-dette_moi") || (filter === "btn-h-list_moi");
+    
+    let canalPaiement = "en espèces";
+    if (canalPaiementArg && canalPaiementArg.trim() !== "") {
+        if (canalPaiementArg.toLowerCase().includes("caisse") || canalPaiementArg.toLowerCase().includes("cash")) {
+            canalPaiement = "en espèces";
+        } else {
+            canalPaiement = `via ${canalPaiementArg}`;
+        }
+    } else {
+        const destSelect = document.getElementById("settleDest") || document.getElementById("settleSource");
+        if (destSelect && destSelect.value && destSelect.value.toLowerCase() !== "caisse") {
+            const nomCompte = destSelect.options[destSelect.selectedIndex].text;
+            canalPaiement = `via ${nomCompte}`;
+        }
+    }
+
+    let message = "";
+    if (estDetteMoi) {
+        message = `Bonjour, nous vous avons versé ${fmt(usdPaye)}$ / ${fmt(cdfPaye)} FC ${canalPaiement}.`;
+        if (estSolde) {
+            message += ` Dette totalement soldée. Merci !`;
+        } else {
+            message += ` Solde restant : ${fmt(resteUsd)}$ / ${fmt(resteCdf)} FC.`;
+        }
+    } else {
+        message = `Bonjour, nous avons bien reçu votre paiement de ${fmt(usdPaye)}$ / ${fmt(cdfPaye)} FC ${canalPaiement}.`;
+        if (estSolde) {
+            message += ` Compte soldé. Merci !`;
+        } else {
+            message += ` Solde restant : ${fmt(resteUsd)}$ / ${fmt(resteCdf)} FC.`;
+        }
+    }
+
+    const encodedMsg = encodeURIComponent(message);
+    const normalizedPerson = normalizeStrict(person);
+    const numero = data.whatsappNumbers[normalizedPerson] || '';
+    if (numero) {
+        window.open(`https://wa.me/${numero}?text=${encodedMsg}`, '_blank');
+    } else {
+        window.open(`https://wa.me/?text=${encodedMsg}`, '_blank');
     }
 };
 
@@ -1664,9 +1749,6 @@ window.showFullHistory = (filter) => {
             normalize(t.desc || "").includes("suppression")
         );
     }
-    // ============================================
-    // 🔥 NOUVEAUX FILTRES : LISTES DE NOMS (TOUS, MÊME SUPPRIMÉS)
-    // ============================================
     else if(filter === 'list_client') {
         const debtClientMap = new Map();
         Object.keys(data.debts).forEach(key => {
@@ -1720,13 +1802,17 @@ window.showFullHistory = (filter) => {
         const realIdx = data.transactions.indexOf(t);
         const desc = t.desc || "";  
 
-        // --- 0. AFFICHAGE SPÉCIAL POUR LES LISTES DE NOMS ---
         if (t.isDebtList) {
             const isClient = t.listType === 'client';
             const bgColor = isClient ? '#fef2f2' : '#f0fdf4';
             const borderColor = isClient ? '#dc2626' : '#16a34a';
             const icon = isClient ? '📝' : '💳';
             const title = isClient ? 'CLIENT QUI DOIT' : 'NOM QUE JE DOIS';
+            const person = t.person;
+            const normalizedPerson = normalizeStrict(person);
+            const currentNumber = data.whatsappNumbers[normalizedPerson] || '';
+            const inputId = `whatsapp-${normalizedPerson}-${Date.now()}`;
+
             return `
             <div style="background:${bgColor}; border-radius:16px; padding:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); border-left:5px solid ${borderColor};">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
@@ -1734,26 +1820,33 @@ window.showFullHistory = (filter) => {
                     <span style="font-weight:bold; color:#1e293b; font-size:12px;">${icon} ${title}</span>
                 </div>
                 <div style="background:white; padding:12px; border-radius:8px;">
-                    <div style="font-weight:bold; font-size:14px; color:#0f172a;">${t.person}</div>
+                    <div style="font-weight:bold; font-size:14px; color:#0f172a;">${person}</div>
                     <div style="display:flex; gap:15px; margin-top:5px;">
                         <span style="color:#dc2626; font-weight:bold;">${fmt(t.debtUSD)}$</span>
                         <span style="color:#dc2626; font-weight:bold;">${fmt(t.debtCDF)} FC</span>
                     </div>
-                    ${isClient ? 
-                        `<button onclick="sendWhatsAppReminder('${t.person.replace(/'/g, "\\'")}', ${t.debtUSD}, ${t.debtCDF})" 
-                            style="background:#25D366; color:white; border:none; padding:6px 12px; border-radius:6px; font-size:10px; margin-top:8px; cursor:pointer; font-weight:bold; width:100%;">
-                            📱 Envoyer Rappel WhatsApp
-                        </button>` :
-                        `<button onclick="sendWhatsAppTrustMessage('${t.person.replace(/'/g, "\\'")}', 0, 0, ${t.debtUSD}, ${t.debtCDF})" 
-                            style="background:#0ea5e9; color:white; border:none; padding:6px 12px; border-radius:6px; font-size:10px; margin-top:8px; cursor:pointer; font-weight:bold; width:100%;">
-                            📱 Envoyer Reconnaissance de Dette
-                        </button>`
-                    }
+                    
+                    <div style="display:flex; gap:6px; margin-top:10px; align-items:center; flex-wrap:wrap;">
+                        <input type="text" id="${inputId}" placeholder="Numéro WhatsApp (ex: 243...)" value="${currentNumber}" style="flex:1; min-width:120px; padding:6px; font-size:12px; border-radius:6px; border:1px solid #cbd5e1;">
+                        <button onclick="updateWhatsAppNumber('${person.replace(/'/g, "\\'")}', '${inputId}')" style="background:#0ea5e9; color:white; border:none; padding:6px 12px; border-radius:6px; font-size:10px; cursor:pointer; font-weight:bold; width:auto;">💾 Enr.</button>
+                    </div>
+
+                    <div style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
+                        ${isClient ? 
+                            `<button onclick="sendWhatsAppReminder('${person.replace(/'/g, "\\'")}', ${t.debtUSD}, ${t.debtCDF})" 
+                                style="background:#25D366; color:white; border:none; padding:6px 12px; border-radius:6px; font-size:10px; cursor:pointer; font-weight:bold; flex:1;">
+                                📱 Rappel
+                            </button>` :
+                            `<button onclick="sendWhatsAppTrustMessage('${person.replace(/'/g, "\\'")}', 0, 0, ${t.debtUSD}, ${t.debtCDF})" 
+                                style="background:#0ea5e9; color:white; border:none; padding:6px 12px; border-radius:6px; font-size:10px; cursor:pointer; font-weight:bold; flex:1;">
+                                📱 Reconnaissance
+                            </button>`
+                        }
+                    </div>
                 </div>
             </div>`;
         }
 
-        // --- 1. DESIGN SPÉCIAL POUR LES SUPPRESSIONS DE NOMS ---
         if (t.isDeletion || normalize(t.typeNom || "").includes("suppression")) {
             return `
             <div style="background:#fef2f2; border-radius:16px; padding:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); border-left:5px solid #ef4444;">
@@ -1773,7 +1866,6 @@ window.showFullHistory = (filter) => {
             </div>`;
         }
 
-        // --- 2. DESIGN SPÉCIAL POUR LES TRANSFERTS ---
         if (t.mode === 'transfert' && t.transferDetails) {
             const d = t.transferDetails;
             return `
@@ -1820,7 +1912,10 @@ if (t.isReglement) {
     const rUSD = a.USD;
     const rCDF = a.CDF;
 
-    const receiptButton = `<button onclick="sendWhatsAppReceipt('${t.person.replace(/'/g, "\\'")}', ${pUSD}, ${pCDF}, ${rUSD}, ${rCDF}, '${t.operator ? t.operator.replace(/'/g, "\\'") : ''}')" 
+    const person = t.person || '';
+    const normalizedPerson = normalizeStrict(person);
+    const currentNumber = data.whatsappNumbers[normalizedPerson] || '';
+    const receiptButton = `<button onclick="sendWhatsAppReceipt('${person.replace(/'/g, "\\'")}', ${pUSD}, ${pCDF}, ${rUSD}, ${rCDF}, '${t.operator ? t.operator.replace(/'/g, "\\'") : ''}')" 
                         style="background:#25D366; color:white; border:none; padding:4px 8px; border-radius:6px; font-size:9px; margin-top:5px; cursor:pointer; width:100%; font-weight:bold;">
                         ✉️ Envoyer Reçu
                        </button>`;
@@ -1829,7 +1924,7 @@ if (t.isReglement) {
     <div style="background:#fff7ed; border-radius:16px; padding:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); border-left:5px solid #eab308; margin-bottom:12px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
             <span style="font-size:11px; color:#64748b;">${t.date}</span>
-            <span style="font-weight:bold; color:#854d0e; font-size:12px;">💰 RÈGLEMENT ${t.person.toUpperCase()}</span>
+            <span style="font-weight:bold; color:#854d0e; font-size:12px;">💰 RÈGLEMENT ${person.toUpperCase()}</span>
             
             ${isAdmin ? `
             <div style="display:flex; gap:6px;">
@@ -1902,7 +1997,6 @@ if (t.isReglement) {
     </div>`;
 }
 
-// --- 3. DESIGN SPÉCIAL POUR LES DÉPENSES ---
 if (t.mode === 'depense' || t.isDepense || normalize(desc).includes("depense")) {
     let stockDisplay = "";
     const qteStock = parseFloat(t.stk || (t.impacts && t.impacts.stock) || 0);
@@ -1938,7 +2032,6 @@ if (t.mode === 'depense' || t.isDepense || normalize(desc).includes("depense")) 
 }
 
 
-        // --- 4. DESIGN CLASSIQUE (VENTES, DEPOTS, RETRAITS, DETTES) ---
         const parts = desc.split("-");  
         const type = parts[0] ? parts[0].trim() : "";  
         const rest = parts[1] ? parts[1].trim() : "";  
@@ -2242,9 +2335,6 @@ window.cancelTransaction = async function(index) {
         if(dIdx === "caisse") data.caisse[dc] += dAmt; 
         else data.operators[dIdx][dc] += dAmt;
 
-        // ============================================
-        // 🔥 UTILISATION DE LA DATE DE GOMA
-        // ============================================
         const gomaDate = formatGomaDate();
 
         const t = { 
@@ -2425,107 +2515,9 @@ window.cancelTransaction = async function(index) {
     }
 };
     
-    window.sendWhatsAppTrustMessage = (person, montantAjouteUsd, montantAjouteCdf, ancienTotalUsd, ancienTotalCdf) => {
-    const filter = document.querySelector(".nav-hist button.active")?.id;
-    const estDetteMoi = (filter === "btn-h-dette_moi") || (filter === "btn-h-list_moi");
-
-    const nouveauTotalUsd = (parseFloat(ancienTotalUsd) || 0) + (parseFloat(montantAjouteUsd) || 0);
-    const nouveauTotalCdf = (parseFloat(ancienTotalCdf) || 0) + (parseFloat(montantAjouteCdf) || 0);
-
-    let message = "";
-
-    if (estDetteMoi) {
-        message = `*MKA SHOP — RECONNAISSANCE DE DETTE*\n\n` +
-                  `Bonjour,\n\n` +
-                  `Notre établissement *MKA SHOP* enregistre officiellement et reconnaît qu'il vous doit ce jour un montant complémentaire de *${fmt(montantAjouteUsd)}$ / ${fmt(montantAjouteCdf)} FC*.\n\n` +
-                  `Cela porte notre dette totale envers vous à *${fmt(nouveauTotalUsd)}$* et *${fmt(nouveauTotalCdf)} FC*.\n` +
-                  `Nous vous rassurons que nous mettons tout en œuvre pour vous payer à votre demande, à tout moment. Merci beaucoup pour votre confiance auprès de notre établissement.`;
-    } else {
-        message = `*MKA SHOP — ACCORD DE CRÉDIT*\n\n` +
-                  `Cher(e) client(e) *${person.toUpperCase()}*,\n\n` +
-                  `Nous vous informons qu'un crédit complémentaire de *${fmt(montantAjouteUsd)}$ / ${fmt(montantAjouteCdf)} FC* a été accordé sur votre compte.\n\n` +
-                  `Votre solde débiteur total est désormais de *${fmt(nouveauTotalUsd)}$* et *${fmt(nouveauTotalCdf)} FC*.\n` +
-                  `Nous vous remercions pour votre fidélité et votre honnêteté habituelle.`;
-    }
-
-    const encodedMsg = encodeURIComponent(message);
-    window.open(`https://wa.me/?text=${encodedMsg}`, '_blank');
-};
-
-window.sendWhatsAppReminder = (person, usd, cdf) => {
-    const filter = document.querySelector(".nav-hist button.active")?.id;
-    const estDetteMoi = (filter === "btn-h-dette_moi") || (filter === "btn-h-list_moi");
-
-    let message = "";
-
-    if (estDetteMoi) {
-        message = `*MKA SHOP — ENGAGEMENT DE PAIEMENT*\n\n` +
-                  `Bonjour,\n\n` +
-                  `Notre établissement *MKA SHOP* enregistre et reconnaît qu'il vous doit actuellement les montants de : *${fmt(usd)}$* et *${fmt(cdf)} FC*.\n\n` +
-                  `Nous tenons à vous rassurer que nous sommes prêts à vous payer à votre demande, à tout moment. Merci beaucoup pour votre confiance continue auprès de notre établissement.`;
-    } else {
-        message = `*MKA SHOP — RAPPEL DE RÉGULARISATION*\n\n` +
-                  `Bonjour cher(e) client(e) *${person.toUpperCase()}*,\n\n` +
-                  `Nous prenons contact pour vous informer que vous avez contracté une dette au sein de notre établissement.\n\n` +
-                  `Le montant à payer est de : *${fmt(usd)}$* et *${fmt(cdf)} FC*.\n\n` +
-                  `Nous vous invitons à bien vouloir régulariser cette situation au plus tôt, idéalement lors de vos prochains passages habituels. Merci pour votre confiance auprès de notre établissement.`;
-    }
-
-    const encodedMsg = encodeURIComponent(message);
-    window.open(`https://wa.me/?text=${encodedMsg}`, '_blank');
-};
-
-window.sendWhatsAppReceipt = (person, usdPaye, cdfPaye, resteUsd, resteCdf, canalPaiementArg = null) => {
-    const estSolde = (resteUsd <= 0.1 && resteCdf <= 100);
-    const filter = document.querySelector(".nav-hist button.active")?.id;
-    const estDetteMoi = (filter === "btn-h-dette_moi") || (filter === "btn-h-list_moi");
-    
-    let canalPaiement = "en espèces (Cash)";
-
-    if (canalPaiementArg && canalPaiementArg.trim() !== "") {
-        if (canalPaiementArg.toLowerCase().includes("caisse") || canalPaiementArg.toLowerCase().includes("cash")) {
-            canalPaiement = "en espèces (Cash)";
-        } else {
-            canalPaiement = `via le compte SIM *${canalPaiementArg}*`;
-        }
-    } else {
-        const destSelect = document.getElementById("settleDest") || document.getElementById("settleSource");
-        if (destSelect && destSelect.value && destSelect.value.toLowerCase() !== "caisse") {
-            const nomCompte = destSelect.options[destSelect.selectedIndex].text;
-            canalPaiement = `via le compte SIM *${nomCompte}*`;
-        }
-    }
-
-    let message = `*MKA SHOP — REÇU DE PAIEMENT*\n\n`;
-
-    if (estDetteMoi) {
-        message += `Bonjour,\n\n` +
-                   `Nous vous confirmons que notre établissement vous a versé la somme de *${fmt(usdPaye)}$* et *${fmt(cdfPaye)} FC* ${canalPaiement}.\n\n`;
-        if (estSolde) {
-            message += `✅ Cette dette est désormais *TOTALEMENT SOLDÉE*. Merci infiniment pour votre confiance !`;
-        } else {
-            message += `📉 Le solde restant que notre établissement vous doit est de : *${fmt(resteUsd)}$* et *${fmt(resteCdf)} FC*.`;
-        }
-    } else {
-        message += `Cher(e) client(e) *${person.toUpperCase()}*,\n\n` +
-                   `Nous vous confirmons la bonne réception de votre versement de *${fmt(usdPaye)}$* et *${fmt(cdfPaye)} FC* effectué ${canalPaiement}.\n\n`;
-        if (estSolde) {
-            message += `✅ Votre compte est désormais *ENTIÈREMENT SOLDÉ*. Merci pour votre confiance et votre fidélité !`;
-        } else {
-            message += `📉 Votre solde restant à payer est de : *${fmt(resteUsd)}$* et *${fmt(resteCdf)} FC*.\n\n` +
-                       `Au plaisir de vous revoir lors de vos passages habituels.`;
-        }
-    }
-    
-    const encodedMsg = encodeURIComponent(message);
-    window.open(`https://wa.me/?text=${encodedMsg}`, '_blank');
-};
-
     function render() {
-      // 🔥 Mettre à jour les opérateurs de dette pour la sauvegarde, mais on va afficher les totaux calculés directement
       syncDebtOperators(true);
 
-      // Calculer les totaux des dettes directement depuis data.debts
       let totalClientUSD = 0, totalClientCDF = 0;
       let totalMoiUSD = 0, totalMoiCDF = 0;
       Object.keys(data.debts).forEach(key => {
@@ -2538,7 +2530,6 @@ window.sendWhatsAppReceipt = (person, usdPaye, cdfPaye, resteUsd, resteCdf, cana
               totalMoiCDF += debt.CDF || 0;
           }
       });
-      // Arrondir
       totalClientUSD = Math.round(totalClientUSD * 100) / 100;
       totalClientCDF = Math.round(totalClientCDF);
       totalMoiUSD = Math.round(totalMoiUSD * 100) / 100;
@@ -2590,7 +2581,6 @@ window.sendWhatsAppReceipt = (person, usdPaye, cdfPaye, resteUsd, resteCdf, cana
 
         if(n.includes("dette moi")) { 
             cardClass = "negative";
-            // On affiche les totaux calculés directement plutôt que les valeurs de l'opérateur
             totalDetteMoi += valEquivUSD; 
         }     
         else if(n.includes("dette client")) { 
@@ -2606,7 +2596,6 @@ window.sendWhatsAppReceipt = (person, usdPaye, cdfPaye, resteUsd, resteCdf, cana
         
         totalS += stk;
 
-        // Affichage spécifique pour les opérateurs de dette : on utilise les totaux calculés
         let displayUSD = usd;
         let displayCDF = cdf;
         if (n.includes('dette client')) {
@@ -2620,8 +2609,11 @@ window.sendWhatsAppReceipt = (person, usdPaye, cdfPaye, resteUsd, resteCdf, cana
         return `<div class="card ${cardClass}"><b>${o.name}</b>: ${fmt(displayUSD)}$ | ${fmt(displayCDF)}FC<br><small>Stock: ${fmt(o.stock)} SIM</small></div>`;    
     }).join("");    
 
-    // On recalcule la VNC avec les totaux réels des dettes
-    const vncFinale = totalCaisse + totalSims + totalClientUSD - totalMoiUSD;
+    // 🔥 CORRECTION : Convertir les dettes en CDF en USD pour la VNC
+    const totalClientEquivUSD = totalClientUSD + (totalClientCDF / taux);
+    const totalMoiEquivUSD = totalMoiUSD + (totalMoiCDF / taux);
+    
+    const vncFinale = totalCaisse + totalSims + totalClientEquivUSD - totalMoiEquivUSD;
 
     document.getElementById("totalVNC").innerText = fmt(vncFinale) + " $";    
     document.getElementById("totalStock").innerText = fmt(totalS);    
