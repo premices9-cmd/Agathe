@@ -9,7 +9,7 @@
    <meta name="apple-mobile-web-app-title" content="MKA Shop">
    <link rel="apple-touch-icon" href="icon.png">
    <link rel="icon" href="icon.png"> 
-   <title>MKA Pro Business V5.3.2 - Full Logic</title>  
+   <title>MKA Pro Business V5.3.4 - Full Logic</title>  
    <meta name="theme-color" content="#0f172a">  
    <meta name="mobile-web-app-capable" content="yes">
    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -38,6 +38,12 @@
    .nav-hist button { width: auto; font-size: 11px; white-space: nowrap; background: #64748b; padding: 8px 12px; }  
    .nav-hist button.active { background: #0ea5e9; }  
    .debt-alert { background: #fff7ed; border: 1px solid #ea580c; color: #9a3412; padding: 8px; border-radius: 8px; font-size: 12px; margin-bottom: 5px; }  
+   .cloture-box { background: #f0fdf4; border: 2px solid #22c55e; padding: 15px; border-radius: 12px; margin: 15px 0; }  
+   .cloture-box .stat { font-size: 14px; margin: 5px 0; }  
+   .cloture-box .stat .label { color: #64748b; }  
+   .cloture-box .stat .value { font-weight: bold; }  
+   .cloture-box .stat .positive { color: #16a34a; }  
+   .cloture-box .stat .negative { color: #dc2626; }  
 
    .debt-search-wrapper { position: relative; width: 100%; }
    .debt-search-wrapper input { width: 100%; padding: 10px; font-size: 15px; border-radius: 8px; border: 1px solid #cbd5e1; box-sizing: border-box; }
@@ -183,13 +189,13 @@
              alt="MKA SHOP" 
              style="width: 85px; height: 85px; border-radius: 20px; border: 2px solid #facc15; box-shadow: 0 8px 15px rgba(0,0,0,0.5);">
         <h1 style="margin: 12px 0 0 0; font-size: 22px; color: #facc15; text-transform: uppercase; letter-spacing: 1px; font-weight: 800;">
-            MKA SHOP V5.3.2
+            MKA SHOP V5.3.4
         </h1>
     </div>
     
     <div style="text-align: center; margin: 15px auto;">
     <button id="installBtn" style="display: none; background: #3b82f6; color: white; border: none; padding: 12px 20px; border-radius: 25px; font-size: 14px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">
-      📲 Installer MKA Shop V5.3.2
+      📲 Installer MKA Shop V5.3.4
      </button>
     </div>
 
@@ -213,6 +219,45 @@
         <div class="vnc-val" id="totalVNC">0.00 $</div>  
         <div style="font-size: 10px;">Taux: <span id="rateM"></span> | Stock: <span id="totalStock">0</span></div>  
     </div>  
+
+    <!-- Section Clôture Journalière -->
+    <div class="cloture-box" id="clotureSection">
+        <h4 style="margin:0 0 10px 0; color:#166534;">📊 CLÔTURE JOURNALIÈRE</h4>
+        <div class="grid-2">
+            <div class="stat">
+                <span class="label">VNC Actuelle :</span><br>
+                <span class="value positive" id="vncActuelle">0.00 $</span>
+            </div>
+            <div class="stat">
+                <span class="label">VNC Clôture Hier :</span><br>
+                <span class="value" id="vncHierDisplay">0.00 $</span>
+            </div>
+        </div>
+        <div class="grid-2">
+            <div class="stat">
+                <span class="label">Dépenses du Jour :</span><br>
+                <span class="value negative" id="depensesJour">0.00 $</span>
+            </div>
+            <div class="stat">
+                <span class="label">Intérêt Brut :</span><br>
+                <span class="value positive" id="interetBrut">0.00 $</span>
+            </div>
+        </div>
+        <div class="grid-2">
+            <div class="stat">
+                <span class="label">Intérêt Net :</span><br>
+                <span class="value positive" id="interetNet">0.00 $</span>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:2px;">
+                <label class="label-sm" style="color:#166534;">Ajuster VNC Hier :</label>
+                <div style="display:flex; gap:2px;">
+                    <input type="number" id="manualVncHier" placeholder="VNC Hier" step="0.01">
+                    <button onclick="updateVncHier()" style="width:60px; background:#166534; font-size:10px;">OK</button>
+                </div>
+            </div>
+        </div>
+        <button onclick="enregistrerCloture()" style="background:#16a34a; margin-top:10px;">📝 ENREGISTRER CLÔTURE DU JOUR</button>
+    </div>
 
     <div style="display:flex; justify-content:space-between; margin-bottom:15px;">  
         <button onclick="logout()" style="background:#ef4444; width:auto; padding:8px 15px;">QUITTER</button>  
@@ -443,6 +488,7 @@
             <button id="btn-h-dette_client" onclick="showFullHistory('dette_client')">DETTES CLIENTS</button>  
             <button id="btn-h-dette_moi" onclick="showFullHistory('dette_moi')">DETTES MOI</button> 
             <button id="btn-h-depenses" onclick="showFullHistory('depenses')">DÉPENSES</button>
+            <button id="btn-h-clotures" onclick="showFullHistory('clotures')" style="background: #16a34a; color:white;">📊 CLÔTURES</button>
             <button id="btn-h-suppressions" onclick="showFullHistory('suppressions')" style="background: #ef4444; color:white;">🗑️ SUPPRESSIONS</button>
             <button id="btn-h-list_client" onclick="showFullHistory('list_client')" style="background: #dc2626; color:white;">📋 CLIENTS QUI DOIVENT</button>
             <button id="btn-h-list_moi" onclick="showFullHistory('list_moi')" style="background: #16a34a; color:white;">📋 NOMS QUE JE DOIS</button>
@@ -483,7 +529,12 @@ let data = {
     config: { pinAdmin: "1234", pinUser: "0000" },
     debts: {},
     deletedNames: [],
-    whatsappNumbers: {} 
+    whatsappNumbers: {},
+    clotures: [],
+    vncHier: 0,
+    depensesJour: 0,
+    cloturesHebdo: [],
+    cloturesMensuelles: []
 };
 
 let isDataLoaded = false;
@@ -507,6 +558,11 @@ onValue(ref(db, 'mka_data'), (snap) => {
     data.taux = incoming.taux || 2800;
     data.deletedNames = incoming.deletedNames || [];
     data.whatsappNumbers = incoming.whatsappNumbers || {};
+    data.clotures = incoming.clotures || [];
+    data.vncHier = incoming.vncHier || 0;
+    data.depensesJour = incoming.depensesJour || 0;
+    data.cloturesHebdo = incoming.cloturesHebdo || [];
+    data.cloturesMensuelles = incoming.cloturesMensuelles || [];
 
     const obj = incoming.transactions || {};
     data.transactions = Object.values(obj).sort((a, b) => b.timestamp - a.timestamp);
@@ -543,6 +599,11 @@ window.save = async function() {
         updates['mka_data/types'] = data.types;
         updates['mka_data/deletedNames'] = data.deletedNames;
         updates['mka_data/whatsappNumbers'] = data.whatsappNumbers;
+        updates['mka_data/clotures'] = data.clotures;
+        updates['mka_data/vncHier'] = data.vncHier;
+        updates['mka_data/depensesJour'] = data.depensesJour;
+        updates['mka_data/cloturesHebdo'] = data.cloturesHebdo;
+        updates['mka_data/cloturesMensuelles'] = data.cloturesMensuelles;
 
         await update(ref(db), updates);
         console.log("Synchronisation réussie ✅");
@@ -608,6 +669,18 @@ function ensureDebtOperators() {
     if (!hasMoi) {
         data.operators.push({
             name: 'Dette Moi',
+            USD: 0,
+            CDF: 0,
+            stock: 0,
+            prixAchat: 0
+        });
+        changed = true;
+    }
+    // S'assurer que le compte Dépenses existe
+    const hasDepenses = data.operators.some(op => normalize(op.name).includes('depenses'));
+    if (!hasDepenses) {
+        data.operators.push({
+            name: 'Dépenses',
             USD: 0,
             CDF: 0,
             stock: 0,
@@ -1101,14 +1174,60 @@ document.addEventListener('click', function(e) {
     // =========================
     let op = data.operators.find(o => o.name === t.operator);
     const isDettePrincipal = normalize(t.operator).includes("dette");
+    const isDepensesPrincipal = normalize(t.operator).includes("depenses");
 
-    if (op && t.impacts?.operator && !isDettePrincipal) {
+    if (op && t.impacts?.operator && !isDettePrincipal && !isDepensesPrincipal) {
         op.USD += (t.impacts.operator.USD || 0) * factor;
         op.CDF += (t.impacts.operator.CDF || 0) * factor;
 
         if (t.stk) {
             op.stock = (parseFloat(op.stock) || 0) + (parseFloat(t.stk) * factor);
             op.stock = Math.round(op.stock * 100) / 100;
+        }
+    }
+
+    // =========================
+    // Gestion des Dépenses (mode depense) - CORRIGÉ
+    // =========================
+    if (t.mode === "depense" || t.isDepense) {
+        // Trouver le compte Dépenses
+        let depensesOp = data.operators.find(o => normalize(o.name).includes('depenses'));
+        if (!depensesOp) {
+            // Créer le compte Dépenses s'il n'existe pas
+            depensesOp = {
+                name: 'Dépenses',
+                USD: 0,
+                CDF: 0,
+                stock: 0,
+                prixAchat: 0
+            };
+            data.operators.push(depensesOp);
+        }
+        
+        // Calcul de la différence en USD uniquement
+        let diffUSD = 0;
+        if (t.curSIM === "USD") {
+            diffUSD = (t.amtSIM || 0) - (t.usdCash || 0);
+        } else if (t.curSIM === "CDF") {
+            // Convertir en USD avec le taux de l'application
+            const taux = parseFloat(data.taux) || 1;
+            const amtUSD = (t.amtSIM || 0) / taux;
+            const cashUSD = (t.cdfCash || 0) / taux;
+            diffUSD = amtUSD - cashUSD;
+        } else {
+            // Fallback
+            diffUSD = (t.amtSIM || t.amt || 0) - (t.usdCash || t.realUSD || 0);
+        }
+        
+        // Ajouter au compte Dépenses (uniquement en USD)
+        depensesOp.USD += diffUSD * factor;
+        // Le CDF du compte Dépenses reste à 0 car on convertit tout en USD
+        
+        // Enregistrer le montant total de la dépense en USD pour la clôture
+        if (!reverse) {
+            data.depensesJour += diffUSD;
+        } else {
+            data.depensesJour -= diffUSD;
         }
     }
 
@@ -1190,7 +1309,7 @@ if (t.impacts?.virtuel) {
 }
 
 // ============================================
-// 🔥 addTransaction CORRIGÉE (gestion double cas dette)
+// 🔥 addTransaction CORRIGÉE
 // ============================================
 window.addTransaction = async () => { 
     if (!isDataLoaded || !data.config) { 
@@ -1224,7 +1343,8 @@ window.addTransaction = async () => {
 
     const opNorm = normalize(op.name);
     const isDettePrincipal = opNorm.includes("dette client") || opNorm.includes("dette moi");
-    const isDepensePrincipal = opNorm.includes("depense");
+    const isDepensesPrincipal = opNorm.includes("depenses");
+    const isDepenseMode = modeNorm === "depense" || isDepensesPrincipal;
     const isInterSim = (modeNorm.includes("inter") || modeNorm.includes("sim") || modeNorm.includes("virtuel"));
 
     const isDebtMode = modeNorm === "dette_client" || modeNorm === "dette_moi";
@@ -1268,6 +1388,10 @@ window.addTransaction = async () => {
     t.impacts = t.impacts || {};
     t.impacts.operator = t.impacts.operator || { USD:0, CDF:0 };
     t.impacts.caisse = t.impacts.caisse || { USD:0, CDF:0 };
+    t.amtSIM = amtSIM;
+    t.usdCash = mixUSD;
+    t.cdfCash = mixCDF;
+    t.curSIM = cur; // Important pour les dépenses en CDF
 
     const impO = parseInt(ty.impO) || 0;
     const dirCaisse = parseInt(ty.impC) || 0;
@@ -1287,22 +1411,15 @@ window.addTransaction = async () => {
     // 2. Application des impacts
     // ==========================================
 
-    // --- a) Impact sur l'opérateur (sauf si opérateur de dette) ---
-    if (!isDettePrincipal && impO !== 0) {
+    // --- a) Impact sur l'opérateur (sauf si opérateur de dette ou dépenses) ---
+    if (!isDettePrincipal && !isDepensesPrincipal && impO !== 0) {
         t.impacts.operator.USD = (cur === "USD" ? amtSIM : 0) * impO;
         t.impacts.operator.CDF = (cur === "CDF" ? amtSIM : 0) * impO;
     }
 
     // --- b) Impact sur la caisse ---
-    if (isDettePrincipal) {
-        // Si l'opérateur est un compte de dette, la caisse est impactée par impC * montant total
-        t.impacts.caisse.USD = (cur === "USD" ? amtSIM : 0) * dirCaisse + commUSD;
-        t.impacts.caisse.CDF = (cur === "CDF" ? amtSIM : 0) * dirCaisse + commCDF;
-    } else {
-        // Sinon, la caisse est impactée par impC * cash payé
-        t.impacts.caisse.USD = (mixUSD * dirCaisse) + commUSD;
-        t.impacts.caisse.CDF = (mixCDF * dirCaisse) + commCDF;
-    }
+    t.impacts.caisse.USD = (mixUSD * dirCaisse) + commUSD;
+    t.impacts.caisse.CDF = (mixCDF * dirCaisse) + commCDF;
 
     // --- c) Gestion du stock ---
     if (stkM !== 0) {
@@ -1313,11 +1430,9 @@ window.addTransaction = async () => {
     if (typeDette) {
         t.typeDette = typeDette;
         if (isDettePrincipal) {
-            // Dette = montant total
             t.detteUSD = (cur === "USD") ? amtSIM : 0;
             t.detteCDF = (cur === "CDF") ? amtSIM : 0;
         } else if (isDebtMode) {
-            // Dette = différence (montant - cash)
             const montantNonPayeUSD = cur === "USD" ? Math.max(0, amtSIM - mixUSD) : 0;
             const montantNonPayeCDF = cur === "CDF" ? Math.max(0, amtSIM - mixCDF) : 0;
             t.detteUSD = montantNonPayeUSD;
@@ -1326,7 +1441,7 @@ window.addTransaction = async () => {
     }
 
     // --- e) Inter-SIM (si mode virtuel) ---
-    if (isInterSim && !isDettePrincipal) {
+    if (isInterSim && !isDettePrincipal && !isDepensesPrincipal) {
         const paySimIdx = parseInt(document.getElementById("paySimSelect").value);
         if (isNaN(paySimIdx)) {
             alert("Veuillez sélectionner une SIM source.");
@@ -1342,11 +1457,15 @@ window.addTransaction = async () => {
     }
 
     // --- f) Dépense ---
-    if (isDepensePrincipal) {
+    if (isDepenseMode) {
         t.isDepense = true;
-        // On force la sortie sur la caisse (déjà gérée par dirCaisse, mais on peut renforcer)
-        t.impacts.caisse.USD = -mixUSD + commUSD;
-        t.impacts.caisse.CDF = -mixCDF + commCDF;
+        // La caisse est déjà gérée par dirCaisse
+        // Le compte Dépenses sera mis à jour dans applyImpacts
+        // On force la sortie sur la caisse si c'est une dépense
+        if (!isDepensesPrincipal) {
+            t.impacts.caisse.USD = -mixUSD + commUSD;
+            t.impacts.caisse.CDF = -mixCDF + commCDF;
+        }
     }
 
     // ==========================================
@@ -1392,6 +1511,7 @@ window.addTransaction = async () => {
         updates['mka_data/operators'] = data.operators;
         updates['mka_data/debts'] = data.debts;
         updates['mka_data/deletedNames'] = data.deletedNames;
+        updates['mka_data/depensesJour'] = data.depensesJour;
 
         await update(ref(db), updates);
 
@@ -1678,7 +1798,263 @@ window.sendWhatsAppReceipt = (person, usdPaye, cdfPaye, resteUsd, resteCdf, cana
     }
 };
 
-    // RESTAURATION DE LA LOGIQUE D'HISTORIQUE PAR MOTS-CLÉS 
+// ============================================
+// 📊 CLÔTURE JOURNALIÈRE - CORRIGÉE
+// ============================================
+
+function calculerVNC() {
+    const taux = parseFloat(data.taux) || 1;
+    const totalCaisse = (parseFloat(data.caisse.USD) || 0) + ((parseFloat(data.caisse.CDF) || 0) / taux);
+    
+    let totalSims = 0;
+    let totalDetteClient = 0;
+    let totalDetteMoi = 0;
+    
+    data.operators.forEach(o => {
+        const usd = parseFloat(o.USD) || 0;
+        const cdf = parseFloat(o.CDF) || 0;
+        const stk = parseFloat(o.stock) || 0;
+        const px = parseFloat(o.prixAchat) || 0;
+        const n = normalize(o.name);
+        const valEquivUSD = usd + (cdf / taux);
+        
+        if(n.includes("dette moi")) {
+            totalDetteMoi += valEquivUSD;
+        } else if(n.includes("dette client")) {
+            totalDetteClient += valEquivUSD;
+        } else if(n.includes("depenses")) {
+            // EXCLURE le compte Dépenses de la VNC
+        } else {
+            totalSims += (valEquivUSD + (stk * px));
+        }
+    });
+    
+    return totalCaisse + totalSims + totalDetteClient - totalDetteMoi;
+}
+
+function calculerDepensesJour() {
+    // Les dépenses du jour sont déjà enregistrées dans data.depensesJour en USD
+    return data.depensesJour || 0;
+}
+
+function miseAJourCloture() {
+    const vncActuelle = calculerVNC();
+    const vncHier = data.vncHier || 0;
+    const depensesJour = data.depensesJour || 0;
+    
+    const interetBrut = vncActuelle - vncHier + depensesJour;
+    const interetNet = vncActuelle - vncHier;
+    
+    document.getElementById("vncActuelle").textContent = fmt(vncActuelle) + " $";
+    document.getElementById("vncHierDisplay").textContent = fmt(vncHier) + " $";
+    document.getElementById("depensesJour").textContent = fmt(depensesJour) + " $";
+    document.getElementById("interetBrut").textContent = fmt(interetBrut) + " $";
+    document.getElementById("interetNet").textContent = fmt(interetNet) + " $";
+}
+
+window.updateVncHier = function() {
+    const val = parseFloat(document.getElementById("manualVncHier").value);
+    if (!isNaN(val) && val >= 0) {
+        data.vncHier = val;
+        save();
+        miseAJourCloture();
+        document.getElementById("manualVncHier").value = "";
+        alert("✅ VNC Clôture Hier mise à jour !");
+    } else {
+        alert("Veuillez entrer un nombre valide.");
+    }
+};
+
+window.enregistrerCloture = async function() {
+    const vncActuelle = calculerVNC();
+    const vncHier = data.vncHier || 0;
+    const depensesJour = data.depensesJour || 0;
+    
+    const interetBrut = vncActuelle - vncHier + depensesJour;
+    const interetNet = vncActuelle - vncHier;
+    
+    if (!confirm(`📊 Confirmer la clôture du jour ?\n\nVNC Actuelle : ${fmt(vncActuelle)}$\nVNC Hier : ${fmt(vncHier)}$\nDépenses Jour : ${fmt(depensesJour)}$\nIntérêt Brut : ${fmt(interetBrut)}$\nIntérêt Net : ${fmt(interetNet)}$\n\nCette action enregistrera la clôture et mettra à jour la VNC Hier.`)) {
+        return;
+    }
+    
+    try {
+        const gomaDate = formatGomaDate();
+        const entry = {
+            timestamp: Date.now(),
+            date: gomaDate,
+            vncActuelle: vncActuelle,
+            vncHier: vncHier,
+            depensesJour: depensesJour,
+            interetBrut: interetBrut,
+            interetNet: interetNet,
+            type: "CLOTURE_JOURNALIERE"
+        };
+        
+        // Ajouter à l'historique des clôtures
+        if (!data.clotures) data.clotures = [];
+        data.clotures.push(entry);
+        
+        // Mettre à jour la VNC Hier pour le jour suivant
+        data.vncHier = vncActuelle;
+        
+        // Réinitialiser les dépenses du jour
+        data.depensesJour = 0;
+        
+        // Ajouter dans les transactions
+        const transEntry = {
+            timestamp: Date.now(),
+            date: gomaDate,
+            typeNom: "CLOTURE",
+            desc: `📊 CLÔTURE DU JOUR - Intérêt Brut: ${fmt(interetBrut)}$ | Intérêt Net: ${fmt(interetNet)}$ | VNC: ${fmt(vncActuelle)}$`,
+            mode: "cloture",
+            isCloture: true,
+            isClotureJour: true,
+            vncActuelle: vncActuelle,
+            vncHier: vncHier,
+            depensesJour: depensesJour,
+            interetBrut: interetBrut,
+            interetNet: interetNet
+        };
+        data.transactions.unshift(transEntry);
+        
+        // Calculer les clôtures hebdomadaire et mensuelle si nécessaire
+        const dateObj = new Date(gomaDate);
+        const jourSemaine = dateObj.getDay(); // 0 = dimanche, 6 = samedi
+        
+        // Clôture hebdomadaire (si c'est dimanche)
+        if (jourSemaine === 0) {
+            const cloturesSemaine = data.clotures.filter(c => {
+                const d = new Date(c.date);
+                const diff = (dateObj - d) / (1000 * 60 * 60 * 24);
+                return diff >= 0 && diff < 7;
+            });
+            
+            if (cloturesSemaine.length > 0) {
+                const totalVNC = cloturesSemaine.reduce((sum, c) => sum + c.vncActuelle, 0);
+                const totalDepenses = cloturesSemaine.reduce((sum, c) => sum + c.depensesJour, 0);
+                const totalBrut = cloturesSemaine.reduce((sum, c) => sum + c.interetBrut, 0);
+                const totalNet = cloturesSemaine.reduce((sum, c) => sum + c.interetNet, 0);
+                
+                const hebdoEntry = {
+                    timestamp: Date.now(),
+                    date: gomaDate,
+                    vncActuelle: vncActuelle,
+                    vncHier: vncHier,
+                    depensesJour: totalDepenses,
+                    interetBrut: totalBrut,
+                    interetNet: totalNet,
+                    type: "CLOTURE_HEBDOMADAIRE",
+                    period: "hebdomadaire",
+                    nbJours: cloturesSemaine.length
+                };
+                
+                if (!data.cloturesHebdo) data.cloturesHebdo = [];
+                data.cloturesHebdo.push(hebdoEntry);
+                
+                // Ajouter aussi dans les transactions
+                const hebdoTrans = {
+                    timestamp: Date.now() + 1,
+                    date: gomaDate,
+                    typeNom: "CLOTURE_HEBDOMADAIRE",
+                    desc: `📊 CLÔTURE HEBDOMADAIRE - Intérêt Brut: ${fmt(totalBrut)}$ | Intérêt Net: ${fmt(totalNet)}$ | VNC: ${fmt(vncActuelle)}$`,
+                    mode: "cloture",
+                    isCloture: true,
+                    isClotureHebdo: true,
+                    vncActuelle: vncActuelle,
+                    vncHier: vncHier,
+                    depensesJour: totalDepenses,
+                    interetBrut: totalBrut,
+                    interetNet: totalNet,
+                    nbJours: cloturesSemaine.length
+                };
+                data.transactions.unshift(hebdoTrans);
+                updates[`mka_data/transactions/${Date.now() + 1}`] = hebdoTrans;
+            }
+        }
+        
+        // Clôture mensuelle (si c'est le dernier jour du mois)
+        const dernierJourMois = new Date(dateObj.getFullYear(), dateObj.getMonth() + 1, 0).getDate();
+        if (dateObj.getDate() === dernierJourMois) {
+            const cloturesMois = data.clotures.filter(c => {
+                const d = new Date(c.date);
+                return d.getMonth() === dateObj.getMonth() && d.getFullYear() === dateObj.getFullYear();
+            });
+            
+            if (cloturesMois.length > 0) {
+                const totalVNC = cloturesMois.reduce((sum, c) => sum + c.vncActuelle, 0);
+                const totalDepenses = cloturesMois.reduce((sum, c) => sum + c.depensesJour, 0);
+                const totalBrut = cloturesMois.reduce((sum, c) => sum + c.interetBrut, 0);
+                const totalNet = cloturesMois.reduce((sum, c) => sum + c.interetNet, 0);
+                
+                const mensuelEntry = {
+                    timestamp: Date.now(),
+                    date: gomaDate,
+                    vncActuelle: vncActuelle,
+                    vncHier: vncHier,
+                    depensesJour: totalDepenses,
+                    interetBrut: totalBrut,
+                    interetNet: totalNet,
+                    type: "CLOTURE_MENSUELLE",
+                    period: "mensuel",
+                    nbJours: cloturesMois.length,
+                    mois: dateObj.toLocaleString('fr-FR', { month: 'long', year: 'numeric' })
+                };
+                
+                if (!data.cloturesMensuelles) data.cloturesMensuelles = [];
+                data.cloturesMensuelles.push(mensuelEntry);
+                
+                // Ajouter aussi dans les transactions
+                const mensuelTrans = {
+                    timestamp: Date.now() + 2,
+                    date: gomaDate,
+                    typeNom: "CLOTURE_MENSUELLE",
+                    desc: `📊 CLÔTURE MENSUELLE (${dateObj.toLocaleString('fr-FR', { month: 'long', year: 'numeric' })}) - Intérêt Brut: ${fmt(totalBrut)}$ | Intérêt Net: ${fmt(totalNet)}$ | VNC: ${fmt(vncActuelle)}$`,
+                    mode: "cloture",
+                    isCloture: true,
+                    isClotureMensuel: true,
+                    vncActuelle: vncActuelle,
+                    vncHier: vncHier,
+                    depensesJour: totalDepenses,
+                    interetBrut: totalBrut,
+                    interetNet: totalNet,
+                    nbJours: cloturesMois.length,
+                    mois: dateObj.toLocaleString('fr-FR', { month: 'long', year: 'numeric' })
+                };
+                data.transactions.unshift(mensuelTrans);
+                updates[`mka_data/transactions/${Date.now() + 2}`] = mensuelTrans;
+            }
+        }
+        
+        const updates = {};
+        updates['mka_data/clotures'] = data.clotures;
+        updates['mka_data/vncHier'] = data.vncHier;
+        updates['mka_data/depensesJour'] = data.depensesJour;
+        updates[`mka_data/transactions/${Date.now()}`] = transEntry;
+        if (data.cloturesHebdo) updates['mka_data/cloturesHebdo'] = data.cloturesHebdo;
+        if (data.cloturesMensuelles) updates['mka_data/cloturesMensuelles'] = data.cloturesMensuelles;
+        
+        await update(ref(db), updates);
+        
+        alert("✅ Clôture enregistrée avec succès !");
+        render();
+        
+    } catch (error) {
+        console.error("Erreur lors de la clôture :", error);
+        alert("❌ Erreur réseau : Impossible d'enregistrer la clôture.");
+    }
+};
+
+// ============================================
+// HISTORIQUE DES CLÔTURES AVEC TYPES
+// ============================================
+
+// Ajout du filtre 'clotures' dans showFullHistory avec les différents types
+// La fonction showFullHistory est déjà dans le code plus bas
+// On va juste ajouter la gestion des clôtures hebdomadaires et mensuelles
+
+// ============================================
+// RESTAURATION DE LA LOGIQUE D'HISTORIQUE MODIFIÉE
+// ============================================
 window.showFullHistory = (filter) => {     
     const isAdmin = !document.getElementById("adminSection").classList.contains("hidden");    
     const list = document.getElementById("fullHistoryList");  
@@ -1719,6 +2095,44 @@ window.showFullHistory = (filter) => {
             normalize(t.operator || "").includes("depense") ||
             normalize(t.desc || "").includes("depense")
         );
+    }
+    else if(filter === 'clotures') {
+        // Récupérer toutes les clôtures (journalières, hebdomadaires, mensuelles)
+        const cloturesJour = data.transactions.filter(t => 
+            t.isCloture === true || 
+            normalize(t.typeNom || "").includes("cloture") ||
+            normalize(t.desc || "").includes("clôture")
+        );
+        
+        // Ajouter les clôtures hebdomadaires et mensuelles stockées
+        const cloturesHebdo = data.cloturesHebdo || [];
+        const cloturesMensuelles = data.cloturesMensuelles || [];
+        
+        // Créer des objets de transaction pour les clôtures hebdo et mensuelles
+        const hebdoTrans = cloturesHebdo.map(c => ({
+            ...c,
+            isCloture: true,
+            isClotureHebdo: true,
+            desc: `📊 CLÔTURE HEBDOMADAIRE (${c.nbJours || 7} jours) - Intérêt Brut: ${fmt(c.interetBrut)}$ | Intérêt Net: ${fmt(c.interetNet)}$`
+        }));
+        
+        const mensuelTrans = cloturesMensuelles.map(c => ({
+            ...c,
+            isCloture: true,
+            isClotureMensuel: true,
+            desc: `📊 CLÔTURE MENSUELLE (${c.mois || ''}) - Intérêt Brut: ${fmt(c.interetBrut)}$ | Intérêt Net: ${fmt(c.interetNet)}$`
+        }));
+        
+        filtered = [...cloturesJour, ...hebdoTrans, ...mensuelTrans];
+        
+        // Si pas de transactions de clôture, afficher les clôtures enregistrées
+        if (filtered.length === 0 && data.clotures && data.clotures.length > 0) {
+            filtered = data.clotures.map(c => ({
+                ...c,
+                isCloture: true,
+                desc: `📊 CLÔTURE - Intérêt Brut: ${fmt(c.interetBrut)}$ | Intérêt Net: ${fmt(c.interetNet)}$ | VNC: ${fmt(c.vncActuelle)}$`
+            }));
+        }
     }
     else if(filter === 'money') {
         filtered = data.transactions.filter(t => {
@@ -1796,6 +2210,98 @@ window.showFullHistory = (filter) => {
         }));
     }
 
+    // Si le filtre est 'clotures', on affiche les clôtures de manière plus détaillée
+    if (filter === 'clotures') {
+        let html = `<div style="display:flex; flex-direction:column; gap:12px;">`;
+        
+        if (filtered.length === 0) {
+            html += `<div style="text-align:center; padding:20px; color:#64748b;">Aucune clôture enregistrée.</div>`;
+        } else {
+            // Trier par date décroissante
+            filtered.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+            
+            filtered.forEach((t, idx) => {
+                const isClotureObj = t.isCloture || t.type === "CLOTURE" || t.type === "CLOTURE_JOURNALIERE";
+                const isHebdo = t.isClotureHebdo || t.period === "hebdomadaire";
+                const isMensuel = t.isClotureMensuel || t.period === "mensuel";
+                
+                if (isClotureObj || isHebdo || isMensuel) {
+                    const vncA = t.vncActuelle || 0;
+                    const vncH = t.vncHier || 0;
+                    const depJ = t.depensesJour || 0;
+                    const iBrut = t.interetBrut || 0;
+                    const iNet = t.interetNet || 0;
+                    const nbJours = t.nbJours || 1;
+                    
+                    let bgColor = "#f0fdf4";
+                    let borderColor = "#16a34a";
+                    let titleColor = "#166534";
+                    let icon = "📊";
+                    let title = "CLÔTURE DU JOUR";
+                    
+                    if (isHebdo) {
+                        bgColor = "#fef3c7";
+                        borderColor = "#f59e0b";
+                        titleColor = "#92400e";
+                        icon = "📅";
+                        title = `CLÔTURE HEBDOMADAIRE (${nbJours} jours)`;
+                    } else if (isMensuel) {
+                        bgColor = "#fce4ec";
+                        borderColor = "#dc2626";
+                        titleColor = "#991b1b";
+                        icon = "🗓️";
+                        title = `CLÔTURE MENSUELLE (${t.mois || ''})`;
+                    }
+                    
+                    html += `
+                    <div style="background:${bgColor}; border-radius:16px; padding:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); border-left:5px solid ${borderColor};">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                            <span style="font-size:11px; color:#64748b;">${t.date || 'Date inconnue'}</span>
+                            <span style="font-weight:bold; color:${titleColor}; font-size:12px;">${icon} ${title}</span>
+                            ${isAdmin && !isHebdo && !isMensuel ? `
+                            <div style="display:flex; gap:5px;">
+                                <button onclick="cancelTransaction(${data.transactions.indexOf(t)})" style="background:#f59e0b;color:#fff;border:none;padding:4px 8px;border-radius:6px;font-size:10px;cursor:pointer;">↩ Annuler</button>
+                            </div>` : ""}
+                        </div>
+                        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; background:white; padding:12px; border-radius:10px;">
+                            <div>
+                                <div style="font-size:9px; color:#64748b; text-transform:uppercase;">VNC Actuelle</div>
+                                <div style="font-weight:bold; color:#0f172a;">${fmt(vncA)}$</div>
+                            </div>
+                            <div>
+                                <div style="font-size:9px; color:#64748b; text-transform:uppercase;">VNC Hier</div>
+                                <div style="font-weight:bold; color:#0f172a;">${fmt(vncH)}$</div>
+                            </div>
+                            <div>
+                                <div style="font-size:9px; color:#64748b; text-transform:uppercase;">Dépenses Jour</div>
+                                <div style="font-weight:bold; color:#dc2626;">${fmt(depJ)}$</div>
+                            </div>
+                        </div>
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-top:8px;">
+                            <div style="background:#fef3c7; padding:8px; border-radius:8px; text-align:center;">
+                                <div style="font-size:9px; color:#92400e; text-transform:uppercase;">Intérêt Brut</div>
+                                <div style="font-weight:bold; color:#92400e; font-size:16px;">${fmt(iBrut)}$</div>
+                                <div style="font-size:8px; color:#92400e;">(VNC Actuelle - VNC Hier + Dépenses)</div>
+                            </div>
+                            <div style="background:#dcfce7; padding:8px; border-radius:8px; text-align:center;">
+                                <div style="font-size:9px; color:#166534; text-transform:uppercase;">Intérêt Net</div>
+                                <div style="font-weight:bold; color:#166534; font-size:16px;">${fmt(iNet)}$</div>
+                                <div style="font-size:8px; color:#166534;">(VNC Actuelle - VNC Hier)</div>
+                            </div>
+                        </div>
+                        ${t.desc ? `<div style="font-size:10px; margin-top:6px; color:#64748b; text-align:center; font-style:italic;">${t.desc}</div>` : ''}
+                    </div>`;
+                }
+            });
+        }
+        html += `</div>`;
+        list.innerHTML = html;
+        document.getElementById("historyModal").classList.remove("hidden");
+        return;
+    }
+
+    // Le reste du code de showFullHistory reste identique
+    // (la partie avec les cartes d'historique normales)
     let html = `<div style="display:flex; flex-direction:column; gap:12px;">`;  
   
     html += filtered.map((t) => {  
@@ -2006,6 +2512,22 @@ if (t.mode === 'depense' || t.isDepense || normalize(desc).includes("depense")) 
         stockDisplay = `<div style="color:${sColor}; font-weight:bold; font-size:10px; margin-top:2px;">Stock: ${sSign}${fmt(qteStock)}</div>`;
     }
 
+    // Calcul du montant ajouté au compte Dépenses en USD
+    let diffUSD = 0;
+    if (t.curSIM === "USD") {
+        diffUSD = (t.amtSIM || 0) - (t.usdCash || 0);
+    } else if (t.curSIM === "CDF") {
+        const taux = parseFloat(data.taux) || 1;
+        const amtUSD = (t.amtSIM || 0) / taux;
+        const cashUSD = (t.cdfCash || 0) / taux;
+        diffUSD = amtUSD - cashUSD;
+    } else {
+        diffUSD = (t.amtSIM || t.amt || 0) - (t.usdCash || t.realUSD || 0);
+    }
+    
+    const depensesDisplay = diffUSD > 0 ? 
+        `<div style="color:#ef4444; font-weight:bold; font-size:10px; margin-top:2px;">Dépenses: +${fmt(diffUSD)}$</div>` : '';
+
     return `
     <div style="background:#fef2f2; border-radius:16px; padding:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); border-left:5px solid #ef4444;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
@@ -2022,6 +2544,7 @@ if (t.mode === 'depense' || t.isDepense || normalize(desc).includes("depense")) 
                 <div style="font-weight:bold; font-size:13px; color:#1e293b;">${t.operator || "-"}</div>
                 <div style="font-size:11px; color:#64748b;">${desc}</div>
                 ${stockDisplay}
+                ${depensesDisplay}
             </div>
             <div style="text-align:right;">
                 <div style="font-size:16px; font-weight:bold; color:#ef4444;">-${fmt(t.amtSIM || t.amt)} ${t.curSIM || t.cur}</div>
@@ -2587,7 +3110,8 @@ window.cancelTransaction = async function(index) {
             cardClass = "negative"; 
             totalDetteClient += valEquivUSD; 
         }     
-        else if(n.includes("depense")) {
+        else if(n.includes("depenses")) {
+            // Le compte Dépenses est affiché mais exclu de la VNC
             cardClass = "negative";
         }
         else { 
@@ -2609,10 +3133,10 @@ window.cancelTransaction = async function(index) {
         return `<div class="card ${cardClass}"><b>${o.name}</b>: ${fmt(displayUSD)}$ | ${fmt(displayCDF)}FC<br><small>Stock: ${fmt(o.stock)} SIM</small></div>`;    
     }).join("");    
 
-    // 🔥 CORRECTION : Convertir les dettes en CDF en USD pour la VNC
     const totalClientEquivUSD = totalClientUSD + (totalClientCDF / taux);
     const totalMoiEquivUSD = totalMoiUSD + (totalMoiCDF / taux);
     
+    // EXCLURE le compte Dépenses de la VNC
     const vncFinale = totalCaisse + totalSims + totalClientEquivUSD - totalMoiEquivUSD;
 
     document.getElementById("totalVNC").innerText = fmt(vncFinale) + " $";    
@@ -2641,6 +3165,9 @@ window.cancelTransaction = async function(index) {
             <button class="btn-del" onclick="deleteType(${i})">X</button>
         </div>`
 ).join("");
+
+// Mise à jour des données de clôture
+miseAJourCloture();
 
 runAutoCleanup();
 }
