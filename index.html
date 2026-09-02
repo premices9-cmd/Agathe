@@ -1187,7 +1187,7 @@ document.addEventListener('click', function(e) {
     }
 
     // =========================
-    // Gestion des Dépenses (mode depense) - CORRIGÉ
+    // Gestion des Dépenses - CORRIGÉ
     // =========================
     if (t.mode === "depense" || t.isDepense) {
         // Trouver le compte Dépenses
@@ -1204,31 +1204,56 @@ document.addEventListener('click', function(e) {
             data.operators.push(depensesOp);
         }
         
-        // Calcul de la différence en USD uniquement
-        let diffUSD = 0;
-        if (t.curSIM === "USD") {
-            diffUSD = (t.amtSIM || 0) - (t.usdCash || 0);
-        } else if (t.curSIM === "CDF") {
-            // Convertir en USD avec le taux de l'application
-            const taux = parseFloat(data.taux) || 1;
-            const amtUSD = (t.amtSIM || 0) / taux;
-            const cashUSD = (t.cdfCash || 0) / taux;
-            diffUSD = amtUSD - cashUSD;
-        } else {
-            // Fallback
-            diffUSD = (t.amtSIM || t.amt || 0) - (t.usdCash || t.realUSD || 0);
+        // Si l'opérateur sélectionné est le compte Dépenses lui-même
+        if (isDepensesPrincipal) {
+            // Le montant principal total devient la dépense (pas de différence)
+            let totalDepenseUSD = 0;
+            if (t.curSIM === "USD") {
+                totalDepenseUSD = t.amtSIM || 0;
+            } else if (t.curSIM === "CDF") {
+                const taux = parseFloat(data.taux) || 1;
+                totalDepenseUSD = (t.amtSIM || 0) / taux;
+            } else {
+                totalDepenseUSD = t.amt || 0;
+            }
+            
+            // Ajouter le total au compte Dépenses
+            depensesOp.USD += totalDepenseUSD * factor;
+            
+            // Enregistrer la dépense totale
+            if (!reverse) {
+                data.depensesJour += totalDepenseUSD;
+            } else {
+                data.depensesJour -= totalDepenseUSD;
+            }
+        } 
+        // Si c'est un autre opérateur mais mode "depense"
+        else {
+            // Calcul de la différence entre le montant principal et le cash
+            let diffUSD = 0;
+            if (t.curSIM === "USD") {
+                diffUSD = (t.amtSIM || 0) - (t.usdCash || 0);
+            } else if (t.curSIM === "CDF") {
+                const taux = parseFloat(data.taux) || 1;
+                const amtUSD = (t.amtSIM || 0) / taux;
+                const cashUSD = (t.cdfCash || 0) / taux;
+                diffUSD = amtUSD - cashUSD;
+            } else {
+                diffUSD = (t.amtSIM || t.amt || 0) - (t.usdCash || t.realUSD || 0);
+            }
+            
+            // Ajouter la différence au compte Dépenses (seulement en USD)
+            depensesOp.USD += diffUSD * factor;
+            
+            // Enregistrer la dépense
+            if (!reverse) {
+                data.depensesJour += diffUSD;
+            } else {
+                data.depensesJour -= diffUSD;
+            }
         }
         
-        // Ajouter au compte Dépenses (uniquement en USD)
-        depensesOp.USD += diffUSD * factor;
         // Le CDF du compte Dépenses reste à 0 car on convertit tout en USD
-        
-        // Enregistrer le montant total de la dépense en USD pour la clôture
-        if (!reverse) {
-            data.depensesJour += diffUSD;
-        } else {
-            data.depensesJour -= diffUSD;
-        }
     }
 
 // =========================
@@ -1391,7 +1416,7 @@ window.addTransaction = async () => {
     t.amtSIM = amtSIM;
     t.usdCash = mixUSD;
     t.cdfCash = mixCDF;
-    t.curSIM = cur; // Important pour les dépenses en CDF
+    t.curSIM = cur;
 
     const impO = parseInt(ty.impO) || 0;
     const dirCaisse = parseInt(ty.impC) || 0;
@@ -1418,8 +1443,17 @@ window.addTransaction = async () => {
     }
 
     // --- b) Impact sur la caisse ---
-    t.impacts.caisse.USD = (mixUSD * dirCaisse) + commUSD;
-    t.impacts.caisse.CDF = (mixCDF * dirCaisse) + commCDF;
+    // Pour le compte Dépenses, la caisse est impactée selon dirCaisse
+    if (isDepensesPrincipal) {
+        // Le montant total est considéré comme sortie de caisse (si dirCaisse = -1)
+        // mais le cash joue son rôle selon impC
+        t.impacts.caisse.USD = (mixUSD * dirCaisse) + commUSD;
+        t.impacts.caisse.CDF = (mixCDF * dirCaisse) + commCDF;
+    } else {
+        // Pour les autres opérateurs
+        t.impacts.caisse.USD = (mixUSD * dirCaisse) + commUSD;
+        t.impacts.caisse.CDF = (mixCDF * dirCaisse) + commCDF;
+    }
 
     // --- c) Gestion du stock ---
     if (stkM !== 0) {
@@ -1459,13 +1493,7 @@ window.addTransaction = async () => {
     // --- f) Dépense ---
     if (isDepenseMode) {
         t.isDepense = true;
-        // La caisse est déjà gérée par dirCaisse
-        // Le compte Dépenses sera mis à jour dans applyImpacts
-        // On force la sortie sur la caisse si c'est une dépense
-        if (!isDepensesPrincipal) {
-            t.impacts.caisse.USD = -mixUSD + commUSD;
-            t.impacts.caisse.CDF = -mixCDF + commCDF;
-        }
+        // Le traitement des dépenses est fait dans applyImpacts
     }
 
     // ==========================================
@@ -2514,15 +2542,29 @@ if (t.mode === 'depense' || t.isDepense || normalize(desc).includes("depense")) 
 
     // Calcul du montant ajouté au compte Dépenses en USD
     let diffUSD = 0;
-    if (t.curSIM === "USD") {
-        diffUSD = (t.amtSIM || 0) - (t.usdCash || 0);
-    } else if (t.curSIM === "CDF") {
-        const taux = parseFloat(data.taux) || 1;
-        const amtUSD = (t.amtSIM || 0) / taux;
-        const cashUSD = (t.cdfCash || 0) / taux;
-        diffUSD = amtUSD - cashUSD;
+    const isDepensesPrincipal = normalize(t.operator || "").includes("depenses");
+    if (isDepensesPrincipal) {
+        // Pour le compte Dépenses, le montant total est la dépense
+        if (t.curSIM === "USD") {
+            diffUSD = t.amtSIM || 0;
+        } else if (t.curSIM === "CDF") {
+            const taux = parseFloat(data.taux) || 1;
+            diffUSD = (t.amtSIM || 0) / taux;
+        } else {
+            diffUSD = t.amt || 0;
+        }
     } else {
-        diffUSD = (t.amtSIM || t.amt || 0) - (t.usdCash || t.realUSD || 0);
+        // Pour les autres opérateurs, c'est la différence
+        if (t.curSIM === "USD") {
+            diffUSD = (t.amtSIM || 0) - (t.usdCash || 0);
+        } else if (t.curSIM === "CDF") {
+            const taux = parseFloat(data.taux) || 1;
+            const amtUSD = (t.amtSIM || 0) / taux;
+            const cashUSD = (t.cdfCash || 0) / taux;
+            diffUSD = amtUSD - cashUSD;
+        } else {
+            diffUSD = (t.amtSIM || t.amt || 0) - (t.usdCash || t.realUSD || 0);
+        }
     }
     
     const depensesDisplay = diffUSD > 0 ? 
