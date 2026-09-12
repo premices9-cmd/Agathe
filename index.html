@@ -9,7 +9,7 @@
    <meta name="apple-mobile-web-app-title" content="MKA Shop">
    <link rel="apple-touch-icon" href="icon.png">
    <link rel="icon" href="icon.png"> 
-   <title>MKA Pro Business V5.3.4 - Full Logic</title>  
+   <title>MKA Pro Business V5.3.5 - Clôture Hebdo Corrigée</title>  
    <meta name="theme-color" content="#0f172a">  
    <meta name="mobile-web-app-capable" content="yes">
    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -180,6 +180,29 @@
        border-radius: 4px;
        font-weight: bold;
    }
+   
+   /* Nouveau style pour les clôtures */
+   .cloture-stat-card {
+       background: white;
+       border-radius: 10px;
+       padding: 10px;
+       margin-top: 6px;
+       border: 1px solid #e2e8f0;
+   }
+   .cloture-stat-card .row {
+       display: flex;
+       justify-content: space-between;
+       font-size: 12px;
+       padding: 2px 0;
+   }
+   .cloture-stat-card .label {
+       color: #64748b;
+   }
+   .cloture-stat-card .value {
+       font-weight: bold;
+   }
+   .cloture-stat-card .positive { color: #16a34a; }
+   .cloture-stat-card .negative { color: #dc2626; }
 </style>
 
 </head>  
@@ -189,13 +212,13 @@
              alt="MKA SHOP" 
              style="width: 85px; height: 85px; border-radius: 20px; border: 2px solid #facc15; box-shadow: 0 8px 15px rgba(0,0,0,0.5);">
         <h1 style="margin: 12px 0 0 0; font-size: 22px; color: #facc15; text-transform: uppercase; letter-spacing: 1px; font-weight: 800;">
-            MKA SHOP V5.3.4
+            MKA SHOP V5.3.5
         </h1>
     </div>
     
     <div style="text-align: center; margin: 15px auto;">
     <button id="installBtn" style="display: none; background: #3b82f6; color: white; border: none; padding: 12px 20px; border-radius: 25px; font-size: 14px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">
-      📲 Installer MKA Shop V5.3.4
+      📲 Installer MKA Shop V5.3.5
      </button>
     </div>
 
@@ -257,6 +280,7 @@
             </div>
         </div>
         <button onclick="enregistrerCloture()" style="background:#16a34a; margin-top:10px;">📝 ENREGISTRER CLÔTURE DU JOUR</button>
+        <div id="clotureStatusMsg" style="margin-top:8px; font-size:12px; color:#64748b; text-align:center;"></div>
     </div>
 
     <div style="display:flex; justify-content:space-between; margin-bottom:15px;">  
@@ -534,7 +558,8 @@ let data = {
     vncHier: 0,
     depensesJour: 0,
     cloturesHebdo: [],
-    cloturesMensuelles: []
+    cloturesMensuelles: [],
+    derniereClotureHebdo: null // Nouveau : date de la dernière clôture hebdo
 };
 
 let isDataLoaded = false;
@@ -563,6 +588,7 @@ onValue(ref(db, 'mka_data'), (snap) => {
     data.depensesJour = incoming.depensesJour || 0;
     data.cloturesHebdo = incoming.cloturesHebdo || [];
     data.cloturesMensuelles = incoming.cloturesMensuelles || [];
+    data.derniereClotureHebdo = incoming.derniereClotureHebdo || null;
 
     const obj = incoming.transactions || {};
     data.transactions = Object.values(obj).sort((a, b) => b.timestamp - a.timestamp);
@@ -604,6 +630,7 @@ window.save = async function() {
         updates['mka_data/depensesJour'] = data.depensesJour;
         updates['mka_data/cloturesHebdo'] = data.cloturesHebdo;
         updates['mka_data/cloturesMensuelles'] = data.cloturesMensuelles;
+        updates['mka_data/derniereClotureHebdo'] = data.derniereClotureHebdo;
 
         await update(ref(db), updates);
         console.log("Synchronisation réussie ✅");
@@ -676,7 +703,6 @@ function ensureDebtOperators() {
         });
         changed = true;
     }
-    // S'assurer que le compte Dépenses existe
     const hasDepenses = data.operators.some(op => normalize(op.name).includes('depenses'));
     if (!hasDepenses) {
         data.operators.push({
@@ -1893,6 +1919,9 @@ window.updateVncHier = function() {
     }
 };
 
+// ============================================
+// 📊 CLÔTURE CORRIGÉE - AVEC DÉTECTION HEBDOMADAIRE AMÉLIORÉE
+// ============================================
 window.enregistrerCloture = async function() {
     const vncActuelle = calculerVNC();
     const vncHier = data.vncHier || 0;
@@ -1901,12 +1930,45 @@ window.enregistrerCloture = async function() {
     const interetBrut = vncActuelle - vncHier + depensesJour;
     const interetNet = vncActuelle - vncHier;
     
-    if (!confirm(`📊 Confirmer la clôture du jour ?\n\nVNC Actuelle : ${fmt(vncActuelle)}$\nVNC Hier : ${fmt(vncHier)}$\nDépenses Jour : ${fmt(depensesJour)}$\nIntérêt Brut : ${fmt(interetBrut)}$\nIntérêt Net : ${fmt(interetNet)}$\n\nCette action enregistrera la clôture et mettra à jour la VNC Hier.`)) {
+    const dateObj = getGomaTime();
+    const gomaDate = formatGomaDate(dateObj);
+    const jourSemaine = dateObj.getDay(); // 0 = dimanche, 6 = samedi
+    
+    // Vérifier si une clôture hebdomadaire doit être faite
+    let doitFaireHebdo = false;
+    let messageHebdo = "";
+    
+    if (jourSemaine === 0) {
+        // C'est dimanche, on fait toujours une clôture hebdo
+        doitFaireHebdo = true;
+        messageHebdo = "\n📅 CLÔTURE HEBDOMADAIRE (Dimanche)";
+    } else {
+        // Vérifier si on n'a pas fait de clôture hebdo depuis plus de 7 jours
+        const dateDerniereHebdo = data.derniereClotureHebdo ? new Date(data.derniereClotureHebdo) : null;
+        if (dateDerniereHebdo) {
+            const diffJours = (dateObj - dateDerniereHebdo) / (1000 * 60 * 60 * 24);
+            if (diffJours >= 7) {
+                doitFaireHebdo = true;
+                messageHebdo = `\n📅 CLÔTURE HEBDOMADAIRE (${Math.floor(diffJours)} jours depuis la dernière)`;
+            }
+        } else if (data.clotures && data.clotures.length >= 7) {
+            // Si aucune clôture hebdo n'a été faite mais qu'on a assez de données
+            doitFaireHebdo = true;
+            messageHebdo = "\n📅 CLÔTURE HEBDOMADAIRE (Première)";
+        }
+    }
+    
+    // Vérifier si c'est le dernier jour du mois pour la clôture mensuelle
+    const dernierJourMois = new Date(dateObj.getFullYear(), dateObj.getMonth() + 1, 0).getDate();
+    const estFinMois = dateObj.getDate() === dernierJourMois;
+    
+    let messageMensuel = estFinMois ? `\n🗓️ CLÔTURE MENSUELLE (${dateObj.toLocaleString('fr-FR', { month: 'long', year: 'numeric' })})` : "";
+    
+    if (!confirm(`📊 Confirmer la clôture du jour ?\n\nVNC Actuelle : ${fmt(vncActuelle)}$\nVNC Hier : ${fmt(vncHier)}$\nDépenses Jour : ${fmt(depensesJour)}$\nIntérêt Brut : ${fmt(interetBrut)}$\nIntérêt Net : ${fmt(interetNet)}$\n${messageHebdo}${messageMensuel}\n\nCette action enregistrera la clôture et mettra à jour la VNC Hier.`)) {
         return;
     }
     
     try {
-        const gomaDate = formatGomaDate();
         const entry = {
             timestamp: Date.now(),
             date: gomaDate,
@@ -1945,16 +2007,20 @@ window.enregistrerCloture = async function() {
         };
         data.transactions.unshift(transEntry);
         
-        // Calculer les clôtures hebdomadaire et mensuelle si nécessaire
-        const dateObj = new Date(gomaDate);
-        const jourSemaine = dateObj.getDay(); // 0 = dimanche, 6 = samedi
+        const updates = {};
+        updates[`mka_data/transactions/${Date.now()}`] = transEntry;
         
-        // Clôture hebdomadaire (si c'est dimanche)
-        if (jourSemaine === 0) {
+        // ==========================================
+        // 📅 CLÔTURE HEBDOMADAIRE (si conditions remplies)
+        // ==========================================
+        if (doitFaireHebdo) {
+            // Récupérer les clôtures depuis la dernière clôture hebdo ou les 7 derniers jours
+            const dateLimite = new Date(dateObj);
+            dateLimite.setDate(dateLimite.getDate() - 7);
+            
             const cloturesSemaine = data.clotures.filter(c => {
                 const d = new Date(c.date);
-                const diff = (dateObj - d) / (1000 * 60 * 60 * 24);
-                return diff >= 0 && diff < 7;
+                return d >= dateLimite && d <= dateObj;
             });
             
             if (cloturesSemaine.length > 0) {
@@ -1964,7 +2030,7 @@ window.enregistrerCloture = async function() {
                 const totalNet = cloturesSemaine.reduce((sum, c) => sum + c.interetNet, 0);
                 
                 const hebdoEntry = {
-                    timestamp: Date.now(),
+                    timestamp: Date.now() + 1,
                     date: gomaDate,
                     vncActuelle: vncActuelle,
                     vncHier: vncHier,
@@ -1973,18 +2039,21 @@ window.enregistrerCloture = async function() {
                     interetNet: totalNet,
                     type: "CLOTURE_HEBDOMADAIRE",
                     period: "hebdomadaire",
-                    nbJours: cloturesSemaine.length
+                    nbJours: cloturesSemaine.length,
+                    dateDebut: dateLimite.toISOString(),
+                    dateFin: dateObj.toISOString()
                 };
                 
                 if (!data.cloturesHebdo) data.cloturesHebdo = [];
                 data.cloturesHebdo.push(hebdoEntry);
+                data.derniereClotureHebdo = dateObj.toISOString();
                 
                 // Ajouter aussi dans les transactions
                 const hebdoTrans = {
                     timestamp: Date.now() + 1,
                     date: gomaDate,
                     typeNom: "CLOTURE_HEBDOMADAIRE",
-                    desc: `📊 CLÔTURE HEBDOMADAIRE - Intérêt Brut: ${fmt(totalBrut)}$ | Intérêt Net: ${fmt(totalNet)}$ | VNC: ${fmt(vncActuelle)}$`,
+                    desc: `📊 CLÔTURE HEBDOMADAIRE (${cloturesSemaine.length} jours) - Intérêt Brut: ${fmt(totalBrut)}$ | Intérêt Net: ${fmt(totalNet)}$ | VNC: ${fmt(vncActuelle)}$`,
                     mode: "cloture",
                     isCloture: true,
                     isClotureHebdo: true,
@@ -1993,16 +2062,25 @@ window.enregistrerCloture = async function() {
                     depensesJour: totalDepenses,
                     interetBrut: totalBrut,
                     interetNet: totalNet,
-                    nbJours: cloturesSemaine.length
+                    nbJours: cloturesSemaine.length,
+                    dateDebut: dateLimite.toISOString(),
+                    dateFin: dateObj.toISOString()
                 };
                 data.transactions.unshift(hebdoTrans);
                 updates[`mka_data/transactions/${Date.now() + 1}`] = hebdoTrans;
+                updates['mka_data/cloturesHebdo'] = data.cloturesHebdo;
+                updates['mka_data/derniereClotureHebdo'] = data.derniereClotureHebdo;
+                
+                document.getElementById("clotureStatusMsg").innerHTML = `✅ Clôture hebdomadaire enregistrée (${cloturesSemaine.length} jours)`;
+            } else {
+                document.getElementById("clotureStatusMsg").innerHTML = `⚠️ Pas assez de clôtures pour l'hebdomadaire (${cloturesSemaine.length} jours sur 7)`;
             }
         }
         
-        // Clôture mensuelle (si c'est le dernier jour du mois)
-        const dernierJourMois = new Date(dateObj.getFullYear(), dateObj.getMonth() + 1, 0).getDate();
-        if (dateObj.getDate() === dernierJourMois) {
+        // ==========================================
+        // 🗓️ CLÔTURE MENSUELLE (si c'est le dernier jour du mois)
+        // ==========================================
+        if (estFinMois) {
             const cloturesMois = data.clotures.filter(c => {
                 const d = new Date(c.date);
                 return d.getMonth() === dateObj.getMonth() && d.getFullYear() === dateObj.getFullYear();
@@ -2015,7 +2093,7 @@ window.enregistrerCloture = async function() {
                 const totalNet = cloturesMois.reduce((sum, c) => sum + c.interetNet, 0);
                 
                 const mensuelEntry = {
-                    timestamp: Date.now(),
+                    timestamp: Date.now() + 2,
                     date: gomaDate,
                     vncActuelle: vncActuelle,
                     vncHier: vncHier,
@@ -2050,16 +2128,15 @@ window.enregistrerCloture = async function() {
                 };
                 data.transactions.unshift(mensuelTrans);
                 updates[`mka_data/transactions/${Date.now() + 2}`] = mensuelTrans;
+                updates['mka_data/cloturesMensuelles'] = data.cloturesMensuelles;
+                
+                document.getElementById("clotureStatusMsg").innerHTML += ` | ✅ Clôture mensuelle enregistrée`;
             }
         }
         
-        const updates = {};
         updates['mka_data/clotures'] = data.clotures;
         updates['mka_data/vncHier'] = data.vncHier;
         updates['mka_data/depensesJour'] = data.depensesJour;
-        updates[`mka_data/transactions/${Date.now()}`] = transEntry;
-        if (data.cloturesHebdo) updates['mka_data/cloturesHebdo'] = data.cloturesHebdo;
-        if (data.cloturesMensuelles) updates['mka_data/cloturesMensuelles'] = data.cloturesMensuelles;
         
         await update(ref(db), updates);
         
@@ -2073,15 +2150,7 @@ window.enregistrerCloture = async function() {
 };
 
 // ============================================
-// HISTORIQUE DES CLÔTURES AVEC TYPES
-// ============================================
-
-// Ajout du filtre 'clotures' dans showFullHistory avec les différents types
-// La fonction showFullHistory est déjà dans le code plus bas
-// On va juste ajouter la gestion des clôtures hebdomadaires et mensuelles
-
-// ============================================
-// RESTAURATION DE LA LOGIQUE D'HISTORIQUE MODIFIÉE
+// RESTAURATION DE LA LOGIQUE D'HISTORIQUE
 // ============================================
 window.showFullHistory = (filter) => {     
     const isAdmin = !document.getElementById("adminSection").classList.contains("hidden");    
@@ -2329,7 +2398,6 @@ window.showFullHistory = (filter) => {
     }
 
     // Le reste du code de showFullHistory reste identique
-    // (la partie avec les cartes d'historique normales)
     let html = `<div style="display:flex; flex-direction:column; gap:12px;">`;  
   
     html += filtered.map((t) => {  
