@@ -9,7 +9,7 @@
    <meta name="apple-mobile-web-app-title" content="MKA Shop">
    <link rel="apple-touch-icon" href="icon.png">
    <link rel="icon" href="icon.png"> 
-   <title>MKA Pro Business V5.3.5 - Clôture Hebdo Corrigée</title>  
+   <title>MKA Pro Business V5.3.8 - Budget Intégré</title>  
    <meta name="theme-color" content="#0f172a">  
    <meta name="mobile-web-app-capable" content="yes">
    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -181,7 +181,6 @@
        font-weight: bold;
    }
    
-   /* Nouveau style pour les clôtures */
    .cloture-stat-card {
        background: white;
        border-radius: 10px;
@@ -203,6 +202,73 @@
    }
    .cloture-stat-card .positive { color: #16a34a; }
    .cloture-stat-card .negative { color: #dc2626; }
+
+   .budget-selector {
+       background: #f8fafc;
+       border: 2px solid #e2e8f0;
+       border-radius: 10px;
+       padding: 10px;
+       margin: 8px 0;
+   }
+   .budget-selector select {
+       border: 2px solid #0f172a;
+       font-weight: bold;
+   }
+   .budget-info {
+       display: flex;
+       justify-content: space-between;
+       align-items: center;
+       padding: 6px 10px;
+       margin-top: 6px;
+       border-radius: 8px;
+       font-size: 12px;
+   }
+   .budget-info.ok {
+       background: #dcfce7;
+       border: 1px solid #16a34a;
+       color: #166534;
+   }
+   .budget-info.warning {
+       background: #fef3c7;
+       border: 1px solid #f59e0b;
+       color: #92400e;
+   }
+   .budget-info.danger {
+       background: #fee2e2;
+       border: 1px solid #ef4444;
+       color: #991b1b;
+   }
+   .budget-option {
+       display: flex;
+       justify-content: space-between;
+       align-items: center;
+       padding: 8px 10px;
+       border-bottom: 1px solid #f1f5f9;
+       font-size: 13px;
+   }
+   .budget-option:last-child {
+       border-bottom: none;
+   }
+   .budget-option .cat-name {
+       font-weight: 600;
+   }
+   .budget-option .cat-status {
+       font-size: 11px;
+       padding: 2px 8px;
+       border-radius: 10px;
+   }
+   .budget-option .cat-status.ok {
+       background: #dcfce7;
+       color: #166534;
+   }
+   .budget-option .cat-status.warning {
+       background: #fef3c7;
+       color: #92400e;
+   }
+   .budget-option .cat-status.danger {
+       background: #fee2e2;
+       color: #991b1b;
+   }
 </style>
 
 </head>  
@@ -212,13 +278,14 @@
              alt="MKA SHOP" 
              style="width: 85px; height: 85px; border-radius: 20px; border: 2px solid #facc15; box-shadow: 0 8px 15px rgba(0,0,0,0.5);">
         <h1 style="margin: 12px 0 0 0; font-size: 22px; color: #facc15; text-transform: uppercase; letter-spacing: 1px; font-weight: 800;">
-            MKA SHOP V5.3.5
+            MKA SHOP V5.3.8
         </h1>
+        <p style="margin: 5px 0 0 0; font-size: 11px; color: #94a3b8;">Budget Intégré</p>
     </div>
     
     <div style="text-align: center; margin: 15px auto;">
     <button id="installBtn" style="display: none; background: #3b82f6; color: white; border: none; padding: 12px 20px; border-radius: 25px; font-size: 14px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">
-      📲 Installer MKA Shop V5.3.5
+      📲 Installer MKA Shop V5.3.8
      </button>
     </div>
 
@@ -432,10 +499,20 @@
             <div id="clientNameSuggestions" class="client-name-suggestions"></div>
         </div>
     </div>  
-        
+    
+    <!-- Sélecteur de catégorie budget (uniquement pour les dépenses) -->
+    <div id="budgetCategoryBox" class="budget-selector hidden">
+        <label class="label-sm" style="color:#0f172a; font-size:12px; margin-bottom:5px;">📂 Catégorie Budget (Obligatoire pour les dépenses) :</label>
+        <select id="budgetCategorySelect" onchange="updateBudgetInfo()" style="border: 2px solid #0f172a; font-weight: bold;">
+            <option value="">-- Sélectionner une catégorie --</option>
+        </select>
+        <div id="budgetInfoDisplay" class="budget-info hidden"></div>
+    </div>
+    
     <input type="text" id="motif" placeholder="Référence / Client" oninput="togglePaySim()">  
     <button onclick="addTransaction()" style="background:#16a34a; margin-top:10px;">ENREGISTRER L'OPÉRATION</button>  
     <button onclick="showFullHistory('general')" style="background:#64748b; margin-top:10px;">HISTORIQUES DÉTAILLÉS</button>  
+    <button onclick="openBudgetModal()" style="background:#f59e0b; margin-top:10px; color:#0f172a;">📊 GESTION DU BUDGET</button>  
 
     <div id="adminSection" class="hidden">  
         <div class="admin-box">  
@@ -519,9 +596,89 @@
         </div>  
         <div id="fullHistoryList"></div>  
     </div>  
-</div>    <script type="module">  
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";  
-    import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-database.js";  
+</div>
+
+<!-- MODAL BUDGET -->
+<div id="budgetModal" class="modal hidden">
+    <div class="modal-content" style="max-width: 600px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <h3 style="margin:0; color:#0f172a;">📊 Gestion du Budget</h3>
+            <button onclick="closeBudgetModal()" style="background:#ef4444; width:auto; padding:8px 15px; border-radius:8px;">X</button>
+        </div>
+        
+        <!-- Navigation mois -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; background:#f1f5f9; padding:10px; border-radius:10px;">
+            <button onclick="budgetPrevMonth()" style="width:auto; padding:8px 15px; background:#64748b;">◀</button>
+            <h4 id="budgetMonthYear" style="margin:0; color:#0f172a;">Janvier 2026</h4>
+            <button onclick="budgetNextMonth()" style="width:auto; padding:8px 15px; background:#64748b;">▶</button>
+        </div>
+        
+        <!-- Capital & Revenu -->
+        <div style="background:#f8fafc; border-radius:12px; padding:15px; margin-bottom:15px; border-left:4px solid #facc15;">
+            <h4 style="margin:0 0 10px 0; color:#0f172a;">💰 Capital & Revenu mensuel</h4>
+            <div class="grid-2">
+                <div>
+                    <label class="label-sm">Capital initial ($)</label>
+                    <input type="number" id="budgetCapitalInput" step="0.01" placeholder="ex: 1000">
+                </div>
+                <div>
+                    <label class="label-sm">Revenu minimum ($)</label>
+                    <input type="number" id="budgetRevenuInput" step="0.01" placeholder="ex: 500">
+                </div>
+            </div>
+            <button onclick="updateBudgetCapitalRevenu()" style="background:#16a34a; margin-top:8px;">Mettre à jour</button>
+            <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px; margin-top:12px;">
+                <div style="text-align:center; background:white; padding:10px; border-radius:8px;">
+                    <div style="font-size:10px; color:#64748b;">Capital initial</div>
+                    <div style="font-weight:bold; font-size:16px;" id="budgetDisplayCapital">0.00 $</div>
+                </div>
+                <div style="text-align:center; background:white; padding:10px; border-radius:8px;">
+                    <div style="font-size:10px; color:#64748b;">Revenu minimum</div>
+                    <div style="font-weight:bold; font-size:16px;" id="budgetDisplayRevenu">0.00 $</div>
+                </div>
+                <div style="text-align:center; background:#fef3c7; padding:10px; border-radius:8px;">
+                    <div style="font-size:10px; color:#92400e;">Capital final estimé</div>
+                    <div style="font-weight:bold; font-size:16px; color:#92400e;" id="budgetDisplayCapitalFinal">0.00 $</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Catégories -->
+        <div style="background:white; border-radius:12px; padding:15px; margin-bottom:15px; border:1px solid #e2e8f0;">
+            <h4 style="margin:0 0 10px 0; color:#0f172a;">📂 Catégories & Budgets</h4>
+            <div id="budgetCategoryList"></div>
+            <button onclick="openBudgetCatModal()" style="background:#0ea5e9; margin-top:10px;">+ Ajouter une Catégorie</button>
+        </div>
+        
+        <!-- Dépenses récentes -->
+        <div style="background:white; border-radius:12px; padding:15px; border:1px solid #e2e8f0;">
+            <h4 style="margin:0 0 10px 0; color:#0f172a;">📝 Dépenses du mois</h4>
+            <div id="budgetExpenseList" style="max-height:200px; overflow-y:auto;"></div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL AJOUT CATÉGORIE BUDGET -->
+<div id="budgetCatModal" class="modal hidden">
+    <div class="modal-content">
+        <h3 style="margin:0 0 15px 0; color:#0f172a;">Nouvelle Catégorie Budget</h3>
+        <label class="label-sm">Nom de la catégorie</label>
+        <input type="text" id="budgetCatName" placeholder="Ex: Loyer, Transport, Nourriture...">
+        <label class="label-sm">Budget mensuel ($)</label>
+        <input type="number" id="budgetCatBudgetM" placeholder="0.00" step="0.01">
+        <label class="label-sm">Crédit disponible ($) <span style="font-weight:400; color:#64748b;">(facultatif)</span></label>
+        <input type="number" id="budgetCatCredit" placeholder="0.00" step="0.01">
+        <p style="font-size:11px; color:#64748b; margin:4px 0 12px 0;">Le crédit se déduira au fur et à mesure des dépenses de cette catégorie.</p>
+        <div class="grid-2">
+            <button onclick="closeBudgetCatModal()" style="background:#64748b;">Annuler</button>
+            <button onclick="saveBudgetCategory()" style="background:#16a34a;">Ajouter</button>
+        </div>
+    </div>
+</div>
+
+<script type="module">  
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";  
+import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-database.js";  
 
 // --- 1. ENREGISTREMENT DU SERVICE WORKER ---
 if ('serviceWorker' in navigator) {
@@ -559,7 +716,10 @@ let data = {
     depensesJour: 0,
     cloturesHebdo: [],
     cloturesMensuelles: [],
-    derniereClotureHebdo: null // Nouveau : date de la dernière clôture hebdo
+    derniereClotureHebdo: null,
+    dernierMoisBudget: null,
+    budgetMonths: {},
+    budgetCurrentDate: new Date().toISOString()
 };
 
 let isDataLoaded = false;
@@ -589,6 +749,21 @@ onValue(ref(db, 'mka_data'), (snap) => {
     data.cloturesHebdo = incoming.cloturesHebdo || [];
     data.cloturesMensuelles = incoming.cloturesMensuelles || [];
     data.derniereClotureHebdo = incoming.derniereClotureHebdo || null;
+    data.dernierMoisBudget = incoming.dernierMoisBudget || null;
+    data.budgetCurrentDate = incoming.budgetCurrentDate || new Date().toISOString();
+
+    // 🔥 NORMALISATION CRITIQUE POUR FIREBASE (tableaux → objets → tableaux)
+    const rawBudgetMonths = incoming.budgetMonths || {};
+    data.budgetMonths = {};
+    Object.keys(rawBudgetMonths).forEach(monthKey => {
+        const m = rawBudgetMonths[monthKey] || {};
+        data.budgetMonths[monthKey] = {
+            categories: m.categories ? Object.values(m.categories) : [],
+            expenses: m.expenses ? Object.values(m.expenses) : [],
+            capital: m.capital || 0,
+            revenu: m.revenu || 0
+        };
+    });
 
     const obj = incoming.transactions || {};
     data.transactions = Object.values(obj).sort((a, b) => b.timestamp - a.timestamp);
@@ -598,6 +773,9 @@ onValue(ref(db, 'mka_data'), (snap) => {
 
     isDataLoaded = true;
     console.log("MKA Shop : Données Firebase synchronisées avec succès.");
+
+    // 🔥 VÉRIFIER ET CRÉER LE BUDGET DU NOUVEAU MOIS
+    verifierNouveauMoisBudget();
 
     try {
         render(); 
@@ -631,6 +809,9 @@ window.save = async function() {
         updates['mka_data/cloturesHebdo'] = data.cloturesHebdo;
         updates['mka_data/cloturesMensuelles'] = data.cloturesMensuelles;
         updates['mka_data/derniereClotureHebdo'] = data.derniereClotureHebdo;
+        updates['mka_data/dernierMoisBudget'] = data.dernierMoisBudget;
+        updates['mka_data/budgetMonths'] = data.budgetMonths;
+        updates['mka_data/budgetCurrentDate'] = data.budgetCurrentDate;
 
         await update(ref(db), updates);
         console.log("Synchronisation réussie ✅");
@@ -679,44 +860,593 @@ const normalizeStrict = (str) => {
         .trim();
 };
 
+// ============================================
+// 📂 FONCTIONS BUDGET INTÉGRÉ
+// ============================================
+
+function getBudgetMonthKey(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    return `${year}-${month}`;
+}
+
+// 🔥 FONCTION : Vérifier et créer automatiquement le budget du nouveau mois
+function verifierNouveauMoisBudget() {
+    const now = getGomaTime();
+    const currentKey = getBudgetMonthKey(now);
+    
+    // Si le budget du mois actuel n'existe pas, le créer à partir du mois précédent
+    if (!data.budgetMonths[currentKey]) {
+        // Chercher le mois précédent
+        const prevDate = new Date(now);
+        prevDate.setMonth(prevDate.getMonth() - 1);
+        const prevKey = getBudgetMonthKey(prevDate);
+        
+        const prevMonthData = data.budgetMonths[prevKey];
+        
+        if (prevMonthData && prevMonthData.categories && prevMonthData.categories.length > 0) {
+            // Calculer les restes pour chaque catégorie
+            const newCategories = prevMonthData.categories.map(cat => {
+                const info = getCategoryAvailableFunds(cat, prevMonthData);
+                
+                return {
+                    id: Date.now() + Math.floor(Math.random() * 10000),
+                    name: cat.name,
+                    budgetM: info.budgetRemaining > 0 ? info.budgetRemaining : 0,
+                    credit: info.creditRemaining > 0 ? info.creditRemaining : 0,
+                    reportFromPrev: true,
+                    prevMonth: prevKey
+                };
+            });
+            
+            data.budgetMonths[currentKey] = {
+                categories: newCategories,
+                expenses: [],
+                capital: prevMonthData.capital || 0,
+                revenu: prevMonthData.revenu || 0
+            };
+            
+            data.dernierMoisBudget = currentKey;
+            
+            console.log(`✅ Budget du mois ${currentKey} créé automatiquement à partir de ${prevKey}`);
+            
+            // Sauvegarder en arrière-plan
+            setTimeout(() => {
+                save();
+            }, 500);
+        } else {
+            // Initialiser un budget vide
+            data.budgetMonths[currentKey] = {
+                categories: [],
+                expenses: [],
+                capital: 0,
+                revenu: 0
+            };
+        }
+    }
+    
+    data.dernierMoisBudget = currentKey;
+}
+
+function getBudgetMonthData(date) {
+    const key = getBudgetMonthKey(date);
+    if (!data.budgetMonths) data.budgetMonths = {};
+    if (!data.budgetMonths[key]) {
+        data.budgetMonths[key] = {
+            categories: [],
+            expenses: [],
+            capital: 0,
+            revenu: 0
+        };
+    }
+    const m = data.budgetMonths[key];
+    
+    if (!Array.isArray(m.categories)) {
+        m.categories = m.categories ? Object.values(m.categories) : [];
+    }
+    if (!Array.isArray(m.expenses)) {
+        m.expenses = m.expenses ? Object.values(m.expenses) : [];
+    }
+    
+    return m;
+}
+
+function getBudgetCurrentDate() {
+    if (!data.budgetCurrentDate) {
+        data.budgetCurrentDate = new Date().toISOString();
+    }
+    return new Date(data.budgetCurrentDate);
+}
+
+// 🔥 FONCTION : Calcul du solde disponible (budget + crédit restant)
+function getCategoryAvailableFunds(cat, monthData) {
+    const totalSpent = monthData.expenses
+        .filter(e => Number(e.catId) === Number(cat.id))
+        .reduce((sum, e) => sum + e.amount, 0);
+    
+    const budgetM = cat.budgetM || 0;
+    const credit = cat.credit || 0;
+    
+    const budgetRemaining = Math.max(0, budgetM - totalSpent);
+    
+    // Le crédit n'est entamé que si le budget est dépassé
+    let creditUsed = 0;
+    if (totalSpent > budgetM) {
+        creditUsed = totalSpent - budgetM;
+    }
+    const creditRemaining = Math.max(0, credit - creditUsed);
+    
+    const totalAvailable = budgetRemaining + creditRemaining;
+    
+    return {
+        totalSpent,
+        budgetM,
+        credit,
+        budgetRemaining,
+        creditUsed,
+        creditRemaining,
+        totalAvailable,
+        percentBudget: budgetM > 0 ? (totalSpent / budgetM) * 100 : 0
+    };
+}
+
+// Rafraîchir le sélecteur de catégorie budget
+function refreshBudgetCategorySelect() {
+    const select = document.getElementById('budgetCategorySelect');
+    if (!select) return;
+    
+    const currentDate = getBudgetCurrentDate();
+    const monthData = getBudgetMonthData(currentDate);
+    
+    if (!monthData.categories || monthData.categories.length === 0) {
+        select.innerHTML = '<option value="">-- Aucune catégorie créée (voir Gestion Budget) --</option>';
+        return;
+    }
+    
+    let html = '<option value="">-- Sélectionner une catégorie --</option>';
+    
+    monthData.categories.forEach(cat => {
+        const info = getCategoryAvailableFunds(cat, monthData);
+        
+        let statusIcon = '✅';
+        let statusText = '';
+        
+        if (info.budgetM > 0) {
+            if (info.budgetRemaining <= 0) {
+                if (info.creditRemaining > 0) {
+                    statusIcon = '💳';
+                    statusText = `Budget épuisé — Crédit: ${fmt(info.creditRemaining)}$ restant`;
+                } else {
+                    statusIcon = '🔴';
+                    statusText = `ÉPUISÉ (${fmt(info.totalSpent)}/${fmt(info.budgetM)}$)`;
+                }
+            } else if (info.percentBudget >= 80) {
+                statusIcon = '🟡';
+                statusText = `${fmt(info.budgetRemaining)}$ restant sur ${fmt(info.budgetM)}$`;
+            } else {
+                statusIcon = '🟢';
+                statusText = `${fmt(info.budgetRemaining)}$ restant sur ${fmt(info.budgetM)}$`;
+            }
+        } else if (info.credit > 0) {
+            statusIcon = '💳';
+            statusText = `Crédit: ${fmt(info.creditRemaining)}$ / ${fmt(info.credit)}$`;
+        } else {
+            statusText = 'Budget non défini';
+        }
+        
+        html += `<option value="${cat.id}">${statusIcon} ${cat.name} — Dépensé: ${fmt(info.totalSpent)}$ | ${statusText}</option>`;
+    });
+    
+    select.innerHTML = html;
+}
+
+// Mettre à jour l'affichage des infos budget après sélection
+window.updateBudgetInfo = function() {
+    const select = document.getElementById('budgetCategorySelect');
+    const infoDiv = document.getElementById('budgetInfoDisplay');
+    const catId = select.value;
+    
+    if (!catId) {
+        infoDiv.classList.add('hidden');
+        return;
+    }
+    
+    const currentDate = getBudgetCurrentDate();
+    const monthData = getBudgetMonthData(currentDate);
+    const cat = monthData.categories.find(c => Number(c.id) === Number(catId));
+    
+    if (!cat) {
+        infoDiv.classList.add('hidden');
+        return;
+    }
+    
+    const info = getCategoryAvailableFunds(cat, monthData);
+    
+    let className = 'ok';
+    let statusText = '';
+    
+    if (info.budgetM > 0) {
+        if (info.budgetRemaining <= 0) {
+            if (info.creditRemaining > 0) {
+                className = 'warning';
+                statusText = `💳 Budget épuisé — Crédit utilisé: ${fmt(info.creditUsed)}$ | Restant: ${fmt(info.creditRemaining)}$`;
+            } else {
+                className = 'danger';
+                statusText = `🔴 Budget ET crédit épuisés ! Dépensé: ${fmt(info.totalSpent)}$ / ${fmt(info.budgetM + info.credit)}$`;
+            }
+        } else if (info.percentBudget >= 80) {
+            className = 'warning';
+            statusText = `🟡 Attention: ${fmt(info.budgetRemaining)}$ restant sur ${fmt(info.budgetM)}$`;
+        } else {
+            className = 'ok';
+            statusText = `🟢 Budget: ${fmt(info.budgetRemaining)}$ restant sur ${fmt(info.budgetM)}$`;
+        }
+    } else if (info.credit > 0) {
+        if (info.creditRemaining <= 0) {
+            className = 'danger';
+            statusText = `🔴 Crédit épuisé ! Dépensé: ${fmt(info.totalSpent)}$ / ${fmt(info.credit)}$`;
+        } else {
+            className = info.creditRemaining < info.credit * 0.2 ? 'warning' : 'ok';
+            statusText = `💳 Crédit: ${fmt(info.creditRemaining)}$ restant sur ${fmt(info.credit)}$`;
+        }
+    } else {
+        statusText = '⚠️ Aucun budget défini pour cette catégorie';
+        className = 'warning';
+    }
+    
+    infoDiv.className = `budget-info ${className}`;
+    infoDiv.innerHTML = `
+        <span>${statusText}</span>
+        <span style="font-size:11px; opacity:0.8;">Dépensé: ${fmt(info.totalSpent)}$</span>
+    `;
+    infoDiv.classList.remove('hidden');
+};
+
+// 🔥 VÉRIFICATION AVANT DÉPENSE : le budget OU le crédit doit être disponible
+function canSpendFromCategory(categoryId, amountUSD) {
+    const currentDate = getBudgetCurrentDate();
+    const monthData = getBudgetMonthData(currentDate);
+    const cat = monthData.categories.find(c => Number(c.id) === Number(categoryId));
+    
+    if (!cat) return { allowed: false, reason: 'Catégorie introuvable' };
+    
+    const info = getCategoryAvailableFunds(cat, monthData);
+    
+    if (info.budgetM <= 0 && info.credit <= 0) {
+        return { allowed: false, reason: 'Aucun budget ni crédit défini pour cette catégorie' };
+    }
+    
+    if (info.totalAvailable < amountUSD) {
+        return { 
+            allowed: false, 
+            reason: `Fonds insuffisants.\nBudget restant: ${fmt(info.budgetRemaining)}$\nCrédit restant: ${fmt(info.creditRemaining)}$\nTotal disponible: ${fmt(info.totalAvailable)}$\nMontant demandé: ${fmt(amountUSD)}$`,
+            info
+        };
+    }
+    
+    return { allowed: true, info };
+}
+
+// Déduire le montant du budget lors d'une dépense
+function deductFromBudget(categoryId, amountUSD, description, transactionId) {
+    const currentDate = getBudgetCurrentDate();
+    const monthData = getBudgetMonthData(currentDate);
+    const cat = monthData.categories.find(c => Number(c.id) === Number(categoryId));
+    
+    if (!cat) return false;
+    
+    monthData.expenses.push({
+        id: Date.now(),
+        date: currentDate.toISOString(),
+        catId: categoryId,
+        amount: amountUSD,
+        note: description || 'Dépense MKA Shop',
+        currency: 'USD',
+        source: 'mka_shop',
+        transactionId: transactionId || null
+    });
+    
+    console.log(`Budget: ${fmt(amountUSD)}$ déduit de "${cat.name}"`);
+    return true;
+}
+
+// 🔥 FONCTION : Annuler une dépense du budget (retirer l'expense liée)
+function refundBudgetExpense(categoryId, transactionId, amountUSD) {
+    const currentDate = getBudgetCurrentDate();
+    const monthData = getBudgetMonthData(currentDate);
+    
+    if (!monthData.expenses) return false;
+    
+    const before = monthData.expenses.length;
+    
+    // Filtrer par transactionId si disponible
+    if (transactionId) {
+        monthData.expenses = monthData.expenses.filter(e => {
+            if (Number(e.catId) === Number(categoryId) && e.transactionId === transactionId) {
+                return false;
+            }
+            return true;
+        });
+    } else {
+        // Fallback : supprimer la dépense la plus récente avec ce catId et ce montant
+        let removed = false;
+        const sorted = [...monthData.expenses].sort((a, b) => b.id - a.id);
+        for (const exp of sorted) {
+            if (!removed && Number(exp.catId) === Number(categoryId) && Math.abs(exp.amount - amountUSD) < 0.01) {
+                monthData.expenses = monthData.expenses.filter(e => e.id !== exp.id);
+                removed = true;
+            }
+        }
+    }
+    
+    const after = monthData.expenses.length;
+    console.log(`Budget: remboursement de ${fmt(amountUSD)}$ sur catégorie ${categoryId} (${before} → ${after} dépenses)`);
+    return true;
+}
+
+// ============================================
+// 🎨 INTERFACE BUDGET
+// ============================================
+
+window.openBudgetModal = function() {
+    const modal = document.getElementById('budgetModal');
+    modal.classList.remove('hidden');
+    renderBudgetModal();
+};
+
+window.closeBudgetModal = function() {
+    document.getElementById('budgetModal').classList.add('hidden');
+};
+
+window.budgetPrevMonth = function() {
+    const currentDate = getBudgetCurrentDate();
+    currentDate.setMonth(currentDate.getMonth() - 1);
+    data.budgetCurrentDate = currentDate.toISOString();
+    save();
+    renderBudgetModal();
+};
+
+window.budgetNextMonth = function() {
+    const currentDate = getBudgetCurrentDate();
+    currentDate.setMonth(currentDate.getMonth() + 1);
+    data.budgetCurrentDate = currentDate.toISOString();
+    save();
+    renderBudgetModal();
+};
+
+window.updateBudgetCapitalRevenu = function() {
+    const cap = parseFloat(document.getElementById('budgetCapitalInput').value);
+    const rev = parseFloat(document.getElementById('budgetRevenuInput').value);
+    const currentDate = getBudgetCurrentDate();
+    const monthData = getBudgetMonthData(currentDate);
+    
+    if (!isNaN(cap)) monthData.capital = cap;
+    if (!isNaN(rev)) monthData.revenu = rev;
+    
+    document.getElementById('budgetCapitalInput').value = '';
+    document.getElementById('budgetRevenuInput').value = '';
+    save();
+    renderBudgetModal();
+};
+
+window.openBudgetCatModal = function() {
+    document.getElementById('budgetCatModal').classList.remove('hidden');
+};
+
+window.closeBudgetCatModal = function() {
+    document.getElementById('budgetCatModal').classList.add('hidden');
+};
+
+window.saveBudgetCategory = function() {
+    const name = document.getElementById('budgetCatName').value.trim();
+    const budgetM = parseFloat(document.getElementById('budgetCatBudgetM').value) || 0;
+    const credit = parseFloat(document.getElementById('budgetCatCredit').value) || 0;
+    
+    if (!name) {
+        alert('Veuillez entrer un nom pour la catégorie.');
+        return;
+    }
+    
+    if (!isDataLoaded) {
+        alert('⚠️ Les données ne sont pas encore chargées. Veuillez patienter quelques secondes.');
+        return;
+    }
+    
+    if (!data.budgetMonths) data.budgetMonths = {};
+    
+    const currentDate = getBudgetCurrentDate();
+    const monthData = getBudgetMonthData(currentDate);
+    
+    if (!Array.isArray(monthData.categories)) {
+        monthData.categories = monthData.categories ? Object.values(monthData.categories) : [];
+    }
+    
+    const newCat = {
+        id: Date.now(),
+        name: name,
+        budgetM: budgetM,
+        credit: credit
+    };
+    
+    monthData.categories.push(newCat);
+    
+    document.getElementById('budgetCatName').value = '';
+    document.getElementById('budgetCatBudgetM').value = '';
+    document.getElementById('budgetCatCredit').value = '';
+    
+    closeBudgetCatModal();
+    
+    save().then(() => {
+        renderBudgetModal();
+        refreshBudgetCategorySelect();
+        alert('✅ Catégorie ajoutée avec succès !');
+    }).catch(err => {
+        console.error("Erreur sauvegarde:", err);
+        renderBudgetModal();
+        refreshBudgetCategorySelect();
+    });
+};
+
+window.deleteBudgetCategory = function(catId) {
+    if (!confirm('Supprimer cette catégorie et ses dépenses ?')) return;
+    
+    const currentDate = getBudgetCurrentDate();
+    const monthData = getBudgetMonthData(currentDate);
+    
+    monthData.categories = monthData.categories.filter(c => Number(c.id) !== Number(catId));
+    monthData.expenses = monthData.expenses.filter(e => Number(e.catId) !== Number(catId));
+    
+    save();
+    renderBudgetModal();
+    refreshBudgetCategorySelect();
+};
+
+window.editBudgetCategory = function(catId) {
+    const currentDate = getBudgetCurrentDate();
+    const monthData = getBudgetMonthData(currentDate);
+    const cat = monthData.categories.find(c => Number(c.id) === Number(catId));
+    
+    if (!cat) return;
+    
+    const newName = prompt('Nom de la catégorie:', cat.name);
+    if (newName === null) return;
+    
+    const newBudget = prompt('Budget mensuel ($):', cat.budgetM || 0);
+    if (newBudget === null) return;
+    
+    const newCredit = prompt('Crédit disponible ($):', cat.credit || 0);
+    if (newCredit === null) return;
+    
+    cat.name = newName.trim() || cat.name;
+    cat.budgetM = parseFloat(newBudget) || 0;
+    cat.credit = parseFloat(newCredit) || 0;
+    delete cat.reportFromPrev; // Enlever le flag de report car modifié manuellement
+    
+    save();
+    renderBudgetModal();
+    refreshBudgetCategorySelect();
+};
+
+function renderBudgetModal() {
+    const currentDate = getBudgetCurrentDate();
+    const monthData = getBudgetMonthData(currentDate);
+    const monthNames = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
+    
+    document.getElementById('budgetMonthYear').textContent = 
+        `${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear()}`;
+    
+    document.getElementById('budgetDisplayCapital').textContent = fmt(monthData.capital || 0) + ' $';
+    document.getElementById('budgetDisplayRevenu').textContent = fmt(monthData.revenu || 0) + ' $';
+    
+    const totalExpenses = monthData.expenses.reduce((sum, e) => sum + e.amount, 0);
+    const capitalFinal = (monthData.capital || 0) + (monthData.revenu || 0) - totalExpenses;
+    document.getElementById('budgetDisplayCapitalFinal').textContent = fmt(capitalFinal) + ' $';
+    
+    const catList = document.getElementById('budgetCategoryList');
+    
+    if (monthData.categories.length === 0) {
+        catList.innerHTML = '<p style="color:#64748b; text-align:center; padding:10px;">Aucune catégorie créée</p>';
+    } else {
+        catList.innerHTML = monthData.categories.map(cat => {
+            const info = getCategoryAvailableFunds(cat, monthData);
+            
+            let statusClass = 'ok';
+            let statusLabel = '';
+            
+            if (info.budgetM > 0) {
+                if (info.budgetRemaining <= 0) {
+                    if (info.creditRemaining > 0) {
+                        statusClass = 'warning';
+                        statusLabel = `💳 Crédit: ${fmt(info.creditRemaining)}$ restant`;
+                    } else {
+                        statusClass = 'danger';
+                        statusLabel = `🔴 Épuisé`;
+                    }
+                } else if (info.percentBudget >= 80) {
+                    statusClass = 'warning';
+                    statusLabel = `🟡 ${fmt(info.budgetRemaining)}$ restant`;
+                } else {
+                    statusClass = 'ok';
+                    statusLabel = `🟢 ${fmt(info.budgetRemaining)}$ restant`;
+                }
+            } else if (info.credit > 0) {
+                statusClass = info.creditRemaining <= 0 ? 'danger' : (info.creditRemaining < info.credit * 0.2 ? 'warning' : 'ok');
+                statusLabel = `💳 ${fmt(info.creditRemaining)}$ / ${fmt(info.credit)}$`;
+            } else {
+                statusClass = 'warning';
+                statusLabel = '⚠️ Non défini';
+            }
+            
+            const reportBadge = cat.reportFromPrev ? `<span style="background:#e0e7ff; color:#3730a3; padding:1px 6px; border-radius:4px; font-size:9px; font-weight:bold; margin-left:5px;">📥 REPORT</span>` : '';
+            
+            return `
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #f1f5f9; flex-wrap:wrap; gap:8px;">
+                    <div style="flex:1;">
+                        <div style="font-weight:700; color:#0f172a;">${cat.name}${reportBadge}</div>
+                        <div style="font-size:12px; color:#64748b;">
+                            Budget: ${fmt(info.budgetM)}$ | Dépensé: ${fmt(info.totalSpent)}$ 
+                            ${info.credit > 0 ? `| Crédit: ${fmt(info.credit)}$ (utilisé: ${fmt(info.creditUsed)}$)` : ''}
+                        </div>
+                        <div style="margin-top:4px;">
+                            <span class="cat-status ${statusClass}" style="font-size:11px; padding:2px 8px; border-radius:10px; font-weight:bold;">${statusLabel}</span>
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:5px;">
+                        <button onclick="editBudgetCategory(${cat.id})" style="background:#0ea5e9; width:auto; padding:5px 10px; font-size:11px;">✏️</button>
+                        <button onclick="deleteBudgetCategory(${cat.id})" style="background:#ef4444; width:auto; padding:5px 10px; font-size:11px;">🗑️</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+    
+    const expList = document.getElementById('budgetExpenseList');
+    
+    if (monthData.expenses.length === 0) {
+        expList.innerHTML = '<p style="color:#64748b; text-align:center; padding:10px;">Aucune dépense ce mois</p>';
+    } else {
+        const sortedExpenses = [...monthData.expenses].sort((a, b) => b.id - a.id);
+        expList.innerHTML = sortedExpenses.map(exp => {
+            const cat = monthData.categories.find(c => Number(c.id) === Number(exp.catId));
+            const dateStr = new Date(exp.date).toLocaleDateString('fr-FR');
+            const linkedTxt = exp.transactionId ? ' 🔗' : '';
+            return `
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #f1f5f9; font-size:13px;">
+                    <div>
+                        <div style="font-weight:600;">${cat ? cat.name : 'Catégorie supprimée'}${linkedTxt}</div>
+                        <div style="font-size:11px; color:#64748b;">${dateStr} ${exp.note ? '- ' + exp.note : ''}</div>
+                    </div>
+                    <div style="font-weight:bold; color:#dc2626;">-${fmt(exp.amount)}$</div>
+                </div>
+            `;
+        }).join('');
+    }
+    
+    refreshBudgetCategorySelect();
+}
+
+// ============================================
+// FONCTIONS MKA SHOP ORIGINALES
+// ============================================
+
 function ensureDebtOperators() {
     let changed = false;
     const hasClient = data.operators.some(op => normalize(op.name).includes('dette client'));
     if (!hasClient) {
-        data.operators.push({
-            name: 'Dette Client',
-            USD: 0,
-            CDF: 0,
-            stock: 0,
-            prixAchat: 0
-        });
+        data.operators.push({ name: 'Dette Client', USD: 0, CDF: 0, stock: 0, prixAchat: 0 });
         changed = true;
     }
     const hasMoi = data.operators.some(op => normalize(op.name).includes('dette moi'));
     if (!hasMoi) {
-        data.operators.push({
-            name: 'Dette Moi',
-            USD: 0,
-            CDF: 0,
-            stock: 0,
-            prixAchat: 0
-        });
+        data.operators.push({ name: 'Dette Moi', USD: 0, CDF: 0, stock: 0, prixAchat: 0 });
         changed = true;
     }
     const hasDepenses = data.operators.some(op => normalize(op.name).includes('depenses'));
     if (!hasDepenses) {
-        data.operators.push({
-            name: 'Dépenses',
-            USD: 0,
-            CDF: 0,
-            stock: 0,
-            prixAchat: 0
-        });
+        data.operators.push({ name: 'Dépenses', USD: 0, CDF: 0, stock: 0, prixAchat: 0 });
         changed = true;
     }
-    if (changed) {
-        save();
-    }
+    if (changed) save();
 }
 
 function syncDebtOperators(force = false) {
@@ -758,9 +1488,7 @@ function syncDebtOperators(force = false) {
         }
     });
     
-    if (changed) {
-        save();
-    }
+    if (changed) save();
 }
 
 function getAllClientNames() {
@@ -810,11 +1538,9 @@ function getAllClientNames() {
     });
 
     const deletedKeys = data.deletedNames.map(n => normalizeStrict(n));
-    const result = Array.from(nameMap.entries())
+    return Array.from(nameMap.entries())
         .filter(([key, value]) => {
-            if (deletedKeys.includes(key)) {
-                return value.hasDebtClient || value.hasDebtMoi;
-            }
+            if (deletedKeys.includes(key)) return value.hasDebtClient || value.hasDebtMoi;
             return true;
         })
         .map(([key, value]) => ({
@@ -826,15 +1552,12 @@ function getAllClientNames() {
             hasDebtMoi: value.hasDebtMoi
         }))
         .sort((a, b) => a.original.localeCompare(b.original));
-
-    return result;
 }
 
 window.filterClientNames = function() {
     const input = document.getElementById("personName");
     const suggestionsBox = document.getElementById("clientNameSuggestions");
     const query = input.value.trim();
-    
     const allNames = getAllClientNames();
     
     if (query.length === 0 || allNames.length === 0) {
@@ -921,7 +1644,7 @@ window.deleteClientName = async function(name) {
         document.getElementById("clientNameSuggestions").style.display = "none";
         document.getElementById("personName").value = "";
 
-        alert(`✅ Le nom "${name}" a été supprimé du système. Une trace est enregistrée dans l'historique des suppressions.`);
+        alert(`✅ Le nom "${name}" a été supprimé du système.`);
         render();
 
     } catch (error) {
@@ -1040,57 +1763,57 @@ document.addEventListener('click', function(e) {
     }
 });
 
-    window.login = () => {  
-        const p = document.getElementById("pinInput").value;  
-        if(p === data.config.pinAdmin) {  
-            document.getElementById("loginSection").classList.add("hidden");  
-            document.getElementById("appSection").classList.remove("hidden");  
-            document.getElementById("adminSection").classList.remove("hidden");  
-            document.getElementById("newPinAdmin").value = data.config.pinAdmin;  
-            document.getElementById("newPinUser").value = data.config.pinUser;  
-        } else if(p === data.config.pinUser) {  
-            document.getElementById("loginSection").classList.add("hidden");  
-            document.getElementById("appSection").classList.remove("hidden");  
-            document.getElementById("adminSection").classList.add("hidden");  
-        } else { alert("Code PIN Incorrect"); }  
-    };  
-  
-    window.logout = () => location.reload();  
-  
-    window.updatePins = () => {  
-        const pa = document.getElementById("newPinAdmin").value, pu = document.getElementById("newPinUser").value;  
-        if(pa && pu) { data.config.pinAdmin = pa; data.config.pinUser = pu; save(); alert("PIN mis à jour !"); }  
-    };  
+window.login = () => {  
+    const p = document.getElementById("pinInput").value;  
+    if(p === data.config.pinAdmin) {  
+        document.getElementById("loginSection").classList.add("hidden");  
+        document.getElementById("appSection").classList.remove("hidden");  
+        document.getElementById("adminSection").classList.remove("hidden");  
+        document.getElementById("newPinAdmin").value = data.config.pinAdmin;  
+        document.getElementById("newPinUser").value = data.config.pinUser;  
+    } else if(p === data.config.pinUser) {  
+        document.getElementById("loginSection").classList.add("hidden");  
+        document.getElementById("appSection").classList.remove("hidden");  
+        document.getElementById("adminSection").classList.add("hidden");  
+    } else { alert("Code PIN Incorrect"); }  
+};  
 
-    window.togglePaySim = () => {  
-        const mode = document.getElementById("payMode").value;  
-        const motif = normalize(document.getElementById("motif").value);  
-        const opIdx = document.getElementById("operatorSelect").value;  
-        const opName = data.operators[opIdx] ? normalize(data.operators[opIdx].name) : "";  
-        document.getElementById("paySimBox").classList.toggle("hidden", mode !== "virtuel");  
-        const isDebt = mode.includes("dette") || mode === "depense" || motif.includes("dette") || opName.includes("dette client") || opName.includes("dette moi");  
-        document.getElementById("debtNameBox").classList.toggle("hidden", !isDebt);  
-        if (isDebt) {
-            const personName = document.getElementById("personName");
-            if (personName && personName.value.trim().length > 0) {
-                filterClientNames();
-            }
-        }
-    };  
-  
-    window.checkDebtBalance = () => {  
+window.logout = () => location.reload();  
+
+window.updatePins = () => {  
+    const pa = document.getElementById("newPinAdmin").value, pu = document.getElementById("newPinUser").value;  
+    if(pa && pu) { data.config.pinAdmin = pa; data.config.pinUser = pu; save(); alert("PIN mis à jour !"); }  
+};  
+
+window.togglePaySim = () => {  
+    const mode = document.getElementById("payMode").value;  
+    const motif = normalize(document.getElementById("motif").value);  
+    const opIdx = document.getElementById("operatorSelect").value;  
+    const opName = data.operators[opIdx] ? normalize(data.operators[opIdx].name) : "";  
+    document.getElementById("paySimBox").classList.toggle("hidden", mode !== "virtuel");  
+    const isDebt = mode.includes("dette") || mode === "depense" || motif.includes("dette") || opName.includes("dette client") || opName.includes("dette moi");  
+    document.getElementById("debtNameBox").classList.toggle("hidden", !isDebt);  
+    
+    const isDepenseMode = mode === "depense" || opName.includes("depenses");
+    document.getElementById("budgetCategoryBox").classList.toggle("hidden", !isDepenseMode);
+    
+    if (isDepenseMode) refreshBudgetCategorySelect();
+    
+    if (isDebt) {
+        const personName = document.getElementById("personName");
+        if (personName && personName.value.trim().length > 0) filterClientNames();
+    }
+};  
+
+window.checkDebtBalance = () => {  
     const opIdx = document.getElementById("settleOpIdx").value;  
     const op = data.operators[opIdx];  
     const personRaw = document.getElementById("debtPersonName").value.trim();  
     const statusEl = document.getElementById("debtStatus");  
     
-    if(!personRaw || !op) { 
-        statusEl.classList.add("hidden"); 
-        return; 
-    }  
+    if(!personRaw || !op) { statusEl.classList.add("hidden"); return; }  
 
     const person = normalize(personRaw);
-    
     let typeDette = "dette client"; 
     if(normalize(op.name).includes("moi") || normalize(op.name).includes("fournisseur")) {
         typeDette = "dette moi";
@@ -1098,7 +1821,6 @@ document.addEventListener('click', function(e) {
 
     const debtKey = `${normalize(typeDette)}_${person}`;  
     const debt = data.debts[debtKey] || { USD: 0, CDF: 0 };  
-    
     const aDette = (Math.abs(debt.USD) > 0.01 || Math.abs(debt.CDF) > 50);
 
     if(aDette) {
@@ -1128,18 +1850,15 @@ document.addEventListener('click', function(e) {
     }
 };
 
-    window.autoCalcMix = () => {  
-        const total = parseFloat(document.getElementById("amount").value) || 0;  
-        const usd = parseFloat(document.getElementById("mixUSD").value) || 0;  
-        const t = parseFloat(data.taux) || 1;  
-        const reste = total - usd;  
-        if(reste > 0) document.getElementById("mixCDF").value = Math.round(reste * t);  
-    };  
-  
- function createTransaction({  
-    typeNom, operator, mode, amt, cur, person, stk, mix
-}){  
+window.autoCalcMix = () => {  
+    const total = parseFloat(document.getElementById("amount").value) || 0;  
+    const usd = parseFloat(document.getElementById("mixUSD").value) || 0;  
+    const t = parseFloat(data.taux) || 1;  
+    const reste = total - usd;  
+    if(reste > 0) document.getElementById("mixCDF").value = Math.round(reste * t);  
+};  
 
+function createTransaction({ typeNom, operator, mode, amt, cur, person, stk, mix }){  
     let safeMode = normalize(mode || "");
 
     if (safeMode.includes("credit")) mode = "dette_client";
@@ -1167,7 +1886,6 @@ document.addEventListener('click', function(e) {
 
     const finalUSD = (mix && mix.USD) ? mix.USD : (cur === "USD" ? amt : 0);
     const finalCDF = (mix && mix.CDF) ? mix.CDF : (cur === "CDF" ? amt : 0);
-
     const isReglement = normalize(typeNom).includes("reglement");
 
     return {  
@@ -1182,22 +1900,17 @@ document.addEventListener('click', function(e) {
     };  
 }
 
- function applyImpacts(t, reverse = false) {
-
+function applyImpacts(t, reverse = false) {
     if (!t) return;
     const factor = reverse ? -1 : 1;
 
-    // =========================
     // 1. CAISSE
-    // =========================
     if (t.impacts?.caisse) {
         data.caisse.USD += (t.impacts.caisse.USD || 0) * factor;
         data.caisse.CDF += (t.impacts.caisse.CDF || 0) * factor;
     }
 
-        // =========================
     // 2. OPÉRATEUR
-    // =========================
     let op = data.operators.find(o => o.name === t.operator);
     const isDettePrincipal = normalize(t.operator).includes("dette");
     const isDepensesPrincipal = normalize(t.operator).includes("depenses");
@@ -1212,116 +1925,65 @@ document.addEventListener('click', function(e) {
         }
     }
 
-    // =========================
-    // Gestion des Dépenses - CORRIGÉ
-    // =========================
+    // 3. GESTION DES DÉPENSES
     if (t.mode === "depense" || t.isDepense) {
-        // Trouver le compte Dépenses
         let depensesOp = data.operators.find(o => normalize(o.name).includes('depenses'));
         if (!depensesOp) {
-            // Créer le compte Dépenses s'il n'existe pas
-            depensesOp = {
-                name: 'Dépenses',
-                USD: 0,
-                CDF: 0,
-                stock: 0,
-                prixAchat: 0
-            };
+            depensesOp = { name: 'Dépenses', USD: 0, CDF: 0, stock: 0, prixAchat: 0 };
             data.operators.push(depensesOp);
         }
         
-        // Si l'opérateur sélectionné est le compte Dépenses lui-même
         if (isDepensesPrincipal) {
-            // Le montant principal total devient la dépense (pas de différence)
             let totalDepenseUSD = 0;
-            if (t.curSIM === "USD") {
-                totalDepenseUSD = t.amtSIM || 0;
-            } else if (t.curSIM === "CDF") {
+            if (t.curSIM === "USD") totalDepenseUSD = t.amtSIM || 0;
+            else if (t.curSIM === "CDF") {
                 const taux = parseFloat(data.taux) || 1;
                 totalDepenseUSD = (t.amtSIM || 0) / taux;
-            } else {
-                totalDepenseUSD = t.amt || 0;
-            }
+            } else totalDepenseUSD = t.amt || 0;
             
-            // Ajouter le total au compte Dépenses
             depensesOp.USD += totalDepenseUSD * factor;
             
-            // Enregistrer la dépense totale
-            if (!reverse) {
-                data.depensesJour += totalDepenseUSD;
-            } else {
-                data.depensesJour -= totalDepenseUSD;
-            }
-        } 
-        // Si c'est un autre opérateur mais mode "depense"
-        else {
-            // Calcul de la différence entre le montant principal et le cash
+            if (!reverse) data.depensesJour += totalDepenseUSD;
+            else data.depensesJour -= totalDepenseUSD;
+        } else {
             let diffUSD = 0;
-            if (t.curSIM === "USD") {
-                diffUSD = (t.amtSIM || 0) - (t.usdCash || 0);
-            } else if (t.curSIM === "CDF") {
+            if (t.curSIM === "USD") diffUSD = (t.amtSIM || 0) - (t.usdCash || 0);
+            else if (t.curSIM === "CDF") {
                 const taux = parseFloat(data.taux) || 1;
-                const amtUSD = (t.amtSIM || 0) / taux;
-                const cashUSD = (t.cdfCash || 0) / taux;
-                diffUSD = amtUSD - cashUSD;
-            } else {
-                diffUSD = (t.amtSIM || t.amt || 0) - (t.usdCash || t.realUSD || 0);
-            }
+                diffUSD = ((t.amtSIM || 0) / taux) - ((t.cdfCash || 0) / taux);
+            } else diffUSD = (t.amtSIM || t.amt || 0) - (t.usdCash || t.realUSD || 0);
             
-            // Ajouter la différence au compte Dépenses (seulement en USD)
             depensesOp.USD += diffUSD * factor;
             
-            // Enregistrer la dépense
-            if (!reverse) {
-                data.depensesJour += diffUSD;
-            } else {
-                data.depensesJour -= diffUSD;
-            }
+            if (!reverse) data.depensesJour += diffUSD;
+            else data.depensesJour -= diffUSD;
         }
-        
-        // Le CDF du compte Dépenses reste à 0 car on convertit tout en USD
     }
 
-// =========================
-// 🔵 INTER-SIM
-// =========================
-if (t.impacts?.virtuel) {
-
-    const v = t.impacts.virtuel;
-    const sourceSim = data.operators[v.opIdx];
-
-    if (sourceSim) {
-        sourceSim.USD += (v.USD || 0) * factor;
-        sourceSim.CDF += (v.CDF || 0) * factor;
+    // 4. INTER-SIM
+    if (t.impacts?.virtuel) {
+        const v = t.impacts.virtuel;
+        const sourceSim = data.operators[v.opIdx];
+        if (sourceSim) {
+            sourceSim.USD += (v.USD || 0) * factor;
+            sourceSim.CDF += (v.CDF || 0) * factor;
+        }
     }
-}
-    // =========================
-    // 3. DETTES
-    // =========================
+
+    // 5. DETTES
     if (t.person && t.typeDette) {
-
         const key = `${normalize(t.typeDette)}_${normalize(t.person)}`;
-
-        if (!data.debts[key]) {
-            data.debts[key] = { USD: 0, CDF: 0 };
-        }
+        if (!data.debts[key]) data.debts[key] = { USD: 0, CDF: 0 };
 
         const oldUSD = data.debts[key].USD;
         const oldCDF = data.debts[key].CDF;
 
-        let impUSD = 0;
-        let impCDF = 0;
+        let impUSD = 0, impCDF = 0;
 
-    if (t.isReglement) {
-
-    impUSD = (t.impacts?.dette?.USD || 0);
-    impCDF = (t.impacts?.dette?.CDF || 0);
-}
-
-        // =========================
-        // 📈 CRÉATION DETTE
-        // =========================
-        else {
+        if (t.isReglement) {
+            impUSD = (t.impacts?.dette?.USD || 0);
+            impCDF = (t.impacts?.dette?.CDF || 0);
+        } else {
             impUSD = (t.detteUSD || 0);
             impCDF = (t.detteCDF || 0);
         }
@@ -1330,23 +1992,15 @@ if (t.impacts?.virtuel) {
         impCDF *= factor;
 
         if (impUSD !== 0 || impCDF !== 0) {
-
             data.debts[key].USD += impUSD;
             data.debts[key].CDF += impCDF;
-
             data.debts[key].USD = Math.max(0, Math.round(data.debts[key].USD * 100) / 100);
             data.debts[key].CDF = Math.max(0, Math.round(data.debts[key].CDF));
 
             t.ancienneDette = { USD: oldUSD, CDF: oldCDF };
-            t.nouvelleDette = {
-                USD: data.debts[key].USD,
-                CDF: data.debts[key].CDF
-            };
+            t.nouvelleDette = { USD: data.debts[key].USD, CDF: data.debts[key].CDF };
 
-            let opG = data.operators.find(o =>
-                normalize(o.name).includes(normalize(t.typeDette))
-            );
-
+            let opG = data.operators.find(o => normalize(o.name).includes(normalize(t.typeDette)));
             if (opG) {
                 opG.USD += impUSD;
                 opG.CDF += impCDF;
@@ -1387,20 +2041,58 @@ window.addTransaction = async () => {
 
     const ty = data.types[tyI];
     const op = data.operators[opI];
-    if (!ty || !op) {
-        alert("Sélectionnez un type et un opérateur valides.");
-        return;
-    }
+    if (!ty || !op) { alert("Sélectionnez un type et un opérateur valides."); return; }
 
     const opNorm = normalize(op.name);
     const isDettePrincipal = opNorm.includes("dette client") || opNorm.includes("dette moi");
     const isDepensesPrincipal = opNorm.includes("depenses");
     const isDepenseMode = modeNorm === "depense" || isDepensesPrincipal;
     const isInterSim = (modeNorm.includes("inter") || modeNorm.includes("sim") || modeNorm.includes("virtuel"));
-
     const isDebtMode = modeNorm === "dette_client" || modeNorm === "dette_moi";
 
-    // Vérification du nom pour les dettes
+    // 🔥 VÉRIFICATION BUDGET + CRÉDIT OBLIGATOIRE
+    if (isDepenseMode) {
+        const budgetCatSelect = document.getElementById("budgetCategorySelect");
+        const selectedCatId = budgetCatSelect ? budgetCatSelect.value : "";
+        
+        if (!selectedCatId) {
+            alert("⚠️ Veuillez sélectionner une catégorie budget avant d'enregistrer une dépense.");
+            return;
+        }
+        
+        const currentDate = getBudgetCurrentDate();
+        const monthData = getBudgetMonthData(currentDate);
+        const selectedCat = monthData.categories.find(c => Number(c.id) === Number(selectedCatId));
+        
+        if (!selectedCat) {
+            alert("⚠️ La catégorie sélectionnée n'existe plus. Veuillez en choisir une autre.");
+            return;
+        }
+        
+        let depenseUSDCheck = 0;
+        if (isDepensesPrincipal) {
+            if (cur === "USD") depenseUSDCheck = amtSIM;
+            else if (cur === "CDF") {
+                const taux = parseFloat(data.taux) || 1;
+                depenseUSDCheck = amtSIM / taux;
+            }
+        } else {
+            if (cur === "USD") depenseUSDCheck = amtSIM - mixUSD;
+            else if (cur === "CDF") {
+                const taux = parseFloat(data.taux) || 1;
+                depenseUSDCheck = (amtSIM / taux) - (mixCDF / taux);
+            }
+        }
+        
+        if (depenseUSDCheck > 0) {
+            const check = canSpendFromCategory(selectedCatId, depenseUSDCheck);
+            if (!check.allowed) {
+                alert(`⚠️ DÉPENSE BLOQUÉE\n\n${check.reason}`);
+                return;
+            }
+        }
+    }
+
     if ((isDebtMode || isDettePrincipal) && (!person || person.trim() === "")) {
         alert("⚠️ Veuillez saisir le nom de la personne pour cette dette.");
         return;
@@ -1408,28 +2100,17 @@ window.addTransaction = async () => {
 
     const uniqueTimestamp = Date.now();
 
-    // Réactivation auto du nom
     if (person && data.deletedNames.includes(person.trim())) {
         data.deletedNames = data.deletedNames.filter(n => n.trim() !== person.trim());
         try {
             const updates = {};
             updates['mka_data/deletedNames'] = data.deletedNames;
             await update(ref(db), updates);
-            console.log(`✅ Nom "${person}" réactivé automatiquement.`);
-        } catch (e) {
-            console.warn("Impossible de réactiver le nom immédiatement.", e);
-        }
+        } catch (e) { console.warn("Impossible de réactiver le nom.", e); }
     }
 
-    // Création de la transaction
     const t = createTransaction({
-        typeNom: ty.name,
-        operator: op.name,
-        mode,
-        amt: amtSIM,
-        cur,
-        person,
-        stk: stkM,
+        typeNom: ty.name, operator: op.name, mode, amt: amtSIM, cur, person, stk: stkM,
         mix: { USD: mixUSD, CDF: mixCDF }
     });
 
@@ -1444,12 +2125,15 @@ window.addTransaction = async () => {
     t.cdfCash = mixCDF;
     t.curSIM = cur;
 
+    if (isDepenseMode) {
+        const budgetCatSelect = document.getElementById("budgetCategorySelect");
+        t.budgetCategoryId = budgetCatSelect.value;
+        t.isDepense = true;
+    }
+
     const impO = parseInt(ty.impO) || 0;
     const dirCaisse = parseInt(ty.impC) || 0;
 
-    // ==========================================
-    // 1. Détermination du type de dette
-    // ==========================================
     let typeDette = "";
     if (isDettePrincipal) {
         if (opNorm.includes("dette client")) typeDette = "dette client";
@@ -1458,73 +2142,35 @@ window.addTransaction = async () => {
         typeDette = modeNorm === "dette_client" ? "dette client" : "dette moi";
     }
 
-    // ==========================================
-    // 2. Application des impacts
-    // ==========================================
-
-    // --- a) Impact sur l'opérateur (sauf si opérateur de dette ou dépenses) ---
     if (!isDettePrincipal && !isDepensesPrincipal && impO !== 0) {
         t.impacts.operator.USD = (cur === "USD" ? amtSIM : 0) * impO;
         t.impacts.operator.CDF = (cur === "CDF" ? amtSIM : 0) * impO;
     }
 
-    // --- b) Impact sur la caisse ---
-    // Pour le compte Dépenses, la caisse est impactée selon dirCaisse
-    if (isDepensesPrincipal) {
-        // Le montant total est considéré comme sortie de caisse (si dirCaisse = -1)
-        // mais le cash joue son rôle selon impC
-        t.impacts.caisse.USD = (mixUSD * dirCaisse) + commUSD;
-        t.impacts.caisse.CDF = (mixCDF * dirCaisse) + commCDF;
-    } else {
-        // Pour les autres opérateurs
-        t.impacts.caisse.USD = (mixUSD * dirCaisse) + commUSD;
-        t.impacts.caisse.CDF = (mixCDF * dirCaisse) + commCDF;
-    }
+    t.impacts.caisse.USD = (mixUSD * dirCaisse) + commUSD;
+    t.impacts.caisse.CDF = (mixCDF * dirCaisse) + commCDF;
 
-    // --- c) Gestion du stock ---
-    if (stkM !== 0) {
-        t.impacts.stock = stkM;
-    }
+    if (stkM !== 0) t.impacts.stock = stkM;
 
-    // --- d) Gestion de la dette ---
     if (typeDette) {
         t.typeDette = typeDette;
         if (isDettePrincipal) {
             t.detteUSD = (cur === "USD") ? amtSIM : 0;
             t.detteCDF = (cur === "CDF") ? amtSIM : 0;
         } else if (isDebtMode) {
-            const montantNonPayeUSD = cur === "USD" ? Math.max(0, amtSIM - mixUSD) : 0;
-            const montantNonPayeCDF = cur === "CDF" ? Math.max(0, amtSIM - mixCDF) : 0;
-            t.detteUSD = montantNonPayeUSD;
-            t.detteCDF = montantNonPayeCDF;
+            t.detteUSD = cur === "USD" ? Math.max(0, amtSIM - mixUSD) : 0;
+            t.detteCDF = cur === "CDF" ? Math.max(0, amtSIM - mixCDF) : 0;
         }
     }
 
-    // --- e) Inter-SIM (si mode virtuel) ---
     if (isInterSim && !isDettePrincipal && !isDepensesPrincipal) {
         const paySimIdx = parseInt(document.getElementById("paySimSelect").value);
-        if (isNaN(paySimIdx)) {
-            alert("Veuillez sélectionner une SIM source.");
-            return;
-        }
+        if (isNaN(paySimIdx)) { alert("Veuillez sélectionner une SIM source."); return; }
         const montantNonPayeUSD = cur === "USD" ? Math.max(0, amtSIM - mixUSD) : 0;
         const montantNonPayeCDF = cur === "CDF" ? Math.max(0, amtSIM - mixCDF) : 0;
-        t.impacts.virtuel = {
-            opIdx: paySimIdx,
-            USD: -montantNonPayeUSD,
-            CDF: -montantNonPayeCDF
-        };
+        t.impacts.virtuel = { opIdx: paySimIdx, USD: -montantNonPayeUSD, CDF: -montantNonPayeCDF };
     }
 
-    // --- f) Dépense ---
-    if (isDepenseMode) {
-        t.isDepense = true;
-        // Le traitement des dépenses est fait dans applyImpacts
-    }
-
-    // ==========================================
-    // 3. Sauvegarde et envoi
-    // ==========================================
     const backupData = JSON.parse(JSON.stringify(data));
 
     try {
@@ -1545,16 +2191,10 @@ window.addTransaction = async () => {
         const gomaDate = formatGomaDate();
 
         const newEntry = {
-            ...t,
-            person,
-            date: gomaDate,
+            ...t, person, date: gomaDate,
             desc: `${ty.name} - ${op.name}${simSourceName} (${person ? `NOM: ${person} | ` : ''})${motif}`,
-            amtSIM,
-            curSIM: cur,
-            usdCash: mixUSD,
-            cdfCash: mixCDF,
-            commission: { usd: commUSD, cdf: commCDF },
-            opTaux: opTauxSaisi,
+            amtSIM, curSIM: cur, usdCash: mixUSD, cdfCash: mixCDF,
+            commission: { usd: commUSD, cdf: commCDF }, opTaux: opTauxSaisi,
         };
 
         data.transactions.unshift(newEntry);
@@ -1567,10 +2207,36 @@ window.addTransaction = async () => {
         updates['mka_data/deletedNames'] = data.deletedNames;
         updates['mka_data/depensesJour'] = data.depensesJour;
 
+        if (isDepenseMode && t.budgetCategoryId) {
+            let depenseUSD = 0;
+            
+            if (isDepensesPrincipal) {
+                if (cur === "USD") depenseUSD = amtSIM;
+                else if (cur === "CDF") {
+                    const taux = parseFloat(data.taux) || 1;
+                    depenseUSD = amtSIM / taux;
+                }
+            } else {
+                if (cur === "USD") depenseUSD = amtSIM - mixUSD;
+                else if (cur === "CDF") {
+                    const taux = parseFloat(data.taux) || 1;
+                    depenseUSD = (amtSIM / taux) - (mixCDF / taux);
+                }
+            }
+            
+            if (depenseUSD > 0) {
+                const success = deductFromBudget(t.budgetCategoryId, depenseUSD, `${ty.name} - ${motif || 'Dépense'}`, uniqueTimestamp);
+                
+                if (success) {
+                    updates['mka_data/budgetMonths'] = data.budgetMonths;
+                    updates['mka_data/budgetCurrentDate'] = data.budgetCurrentDate;
+                }
+            }
+        }
+
         await update(ref(db), updates);
 
         render();
-        console.log(`MKA Shop : Transaction ${uniqueTimestamp} synchronisée.`);
         alert("✅ Opération enregistrée et synchronisée !");
 
         ["amount","mixUSD","mixCDF","commUSD","commCDF","motif","personName","stkMove"].forEach(id => {
@@ -1579,16 +2245,20 @@ window.addTransaction = async () => {
         ["operatorSelect","typeSelect","currency","payMode"].forEach(id => {
             const el = document.getElementById(id); if (el) el.selectedIndex = 0;
         });
+        
+        const budgetSelect = document.getElementById("budgetCategorySelect");
+        if (budgetSelect) budgetSelect.value = "";
+        document.getElementById("budgetInfoDisplay").classList.add("hidden");
 
     } catch (error) {
         data = backupData; 
         console.error("Erreur critique Firebase ❌ :", error);
-        alert("⚠️ ERREUR RÉSEAU : Impossible d'atteindre Firebase. L'opération a été ANNULÉE localement pour protéger vos soldes.");
+        alert("⚠️ ERREUR RÉSEAU : Impossible d'atteindre Firebase. L'opération a été ANNULÉE localement.");
         render();
     }
 };
 
-  window.settleAccountV2 = async () => {
+window.settleAccountV2 = async () => {
     const opIdx = document.getElementById("settleOpIdx").value;
     const person = document.getElementById("debtPersonName").value.trim();
     const destIdx = document.getElementById("settleDest").value;
@@ -1597,19 +2267,14 @@ window.addTransaction = async () => {
     const taux = (!isNaN(settleRateInput) && settleRateInput > 0) ? settleRateInput : (parseFloat(data.taux) || 1); 
 
     const opDette = data.operators[opIdx];
-    if (!opDette || !person) {
-        alert("Sélectionnez un opérateur et entrez le nom de la personne.");
-        return;
-    }
+    if (!opDette || !person) { alert("Sélectionnez un opérateur et entrez le nom de la personne."); return; }
 
     const pOnUsd_USD = parseFloat(document.getElementById("payOnUsd_USD").value) || 0;
     const pOnUsd_CDF = parseFloat(document.getElementById("payOnUsd_CDF").value) || 0;
     const pOnCdf_USD = parseFloat(document.getElementById("payOnCdf_USD").value) || 0;
     const pOnCdf_CDF = parseFloat(document.getElementById("payOnCdf_CDF").value) || 0;
-
     const remiseUSD = parseFloat(document.getElementById("settleRemiseUSD").value) || 0;
     const remiseCDF = parseFloat(document.getElementById("settleRemiseCDF").value) || 0;
-
     const pourboireUSD = parseFloat(document.getElementById("settlePourboireUSD").value) || 0;
     const pourboireCDF = parseFloat(document.getElementById("settlePourboireCDF").value) || 0;
 
@@ -1617,15 +2282,13 @@ window.addTransaction = async () => {
     const totalPaidCDF = pOnUsd_CDF + pOnCdf_CDF;
 
     if (totalPaidUSD === 0 && totalPaidCDF === 0 && remiseUSD === 0 && remiseCDF === 0 && pourboireUSD === 0 && pourboireCDF === 0) {
-        alert("Veuillez saisir au moins un montant (paiement, commission ou pourboire).");
-        return;
+        alert("Veuillez saisir au moins un montant."); return;
     }
 
     const backupData = JSON.parse(JSON.stringify(data));
 
     try {
         const uniqueTimestamp = Date.now();
-        
         const isMoi = normalize(opDette.name).includes("moi");
         const typeDette = isMoi ? "dette moi" : "dette client";
         const key = `${normalize(typeDette)}_${normalize(person)}`;
@@ -1634,45 +2297,29 @@ window.addTransaction = async () => {
         const reductionTotaleUSD = pOnUsd_USD + (pOnUsd_CDF / taux) + remiseUSD + (remiseCDF / taux);
         const reductionTotaleCDF = pOnCdf_CDF + (pOnCdf_USD * taux) + remiseCDF + (remiseUSD * taux);
 
-        let redUSD = reductionTotaleUSD;
-        let surplusUSD = 0;
-        if (reductionTotaleUSD > oldDebt.USD) {
-            surplusUSD = reductionTotaleUSD - oldDebt.USD;
-            redUSD = oldDebt.USD;
-        }
+        let redUSD = reductionTotaleUSD, surplusUSD = 0;
+        if (reductionTotaleUSD > oldDebt.USD) { surplusUSD = reductionTotaleUSD - oldDebt.USD; redUSD = oldDebt.USD; }
 
-        let redCDF = reductionTotaleCDF;
-        let surplusCDF = 0;
-        if (reductionTotaleCDF > oldDebt.CDF) {
-            surplusCDF = reductionTotaleCDF - oldDebt.CDF;
-            redCDF = oldDebt.CDF;
-        }
+        let redCDF = reductionTotaleCDF, surplusCDF = 0;
+        if (reductionTotaleCDF > oldDebt.CDF) { surplusCDF = reductionTotaleCDF - oldDebt.CDF; redCDF = oldDebt.CDF; }
 
         const operatorName = destIdx === "caisse" ? "CAISSE" : (data.operators[destIdx]?.name || "INCONNU");
         const direction = isMoi ? -1 : 1;
 
         const t = createTransaction({
-            typeNom: "REGLEMENT",
-            operator: operatorName,
+            typeNom: "REGLEMENT", operator: operatorName,
             mode: isMoi ? "dette_moi" : "dette_client",
-            amt: totalPaidUSD, 
-            cur: "USD",
-            person,
+            amt: totalPaidUSD, cur: "USD", person,
             mix: { USD: totalPaidUSD, CDF: totalPaidCDF }
         });
 
         t.isReglement = true;
-        t.surplusUSD = surplusUSD; 
-        t.surplusCDF = surplusCDF; 
+        t.surplusUSD = surplusUSD; t.surplusCDF = surplusCDF;
         t.isMoi = isMoi;
         t.remise = { usd: remiseUSD, cdf: remiseCDF };
         t.pourboire = { usd: pourboireUSD, cdf: pourboireCDF };
-        t.payDetail = { 
-            onUsd: { usd: pOnUsd_USD, cdf: pOnUsd_CDF },
-            onCdf: { usd: pOnCdf_USD, cdf: pOnCdf_CDF }
-        };
-        t.debtBefore = oldDebt; 
-
+        t.payDetail = { onUsd: { usd: pOnUsd_USD, cdf: pOnUsd_CDF }, onCdf: { usd: pOnCdf_USD, cdf: pOnCdf_CDF } };
+        t.debtBefore = oldDebt;
         t.impacts.dette = { USD: -redUSD, CDF: -redCDF };
 
         if (destIdx === "caisse") {
@@ -1688,23 +2335,18 @@ window.addTransaction = async () => {
         applyImpacts(t);
 
         const newDebt = data.debts[key] || { USD: 0, CDF: 0 };
-        t.snapshotDette = { USD: newDebt.USD, CDF: newDebt.CDF }; 
+        t.snapshotDette = { USD: newDebt.USD, CDF: newDebt.CDF };
 
         let bonusDesc = "";
         if (remiseUSD > 0 || remiseCDF > 0) bonusDesc += ` [Com/Réduction: ${remiseUSD}$ / ${remiseCDF}FC]`;
         if (pourboireUSD > 0 || pourboireCDF > 0) bonusDesc += ` [Pourboire Caisse: ${pourboireUSD}$ / ${pourboireCDF}FC]`;
 
         const gomaDate = formatGomaDate();
-
         const finalEntry = {
-            ...t,
-            timestamp: uniqueTimestamp,
-            date: gomaDate,
+            ...t, timestamp: uniqueTimestamp, date: gomaDate,
             desc: `RÈGLEMENT: ${person.toUpperCase()} (${typeDette})${bonusDesc} vers ${operatorName}`,
-            usdCash: totalPaidUSD,
-            cdfCash: totalPaidCDF,
-            typeNom: "REGLEMENT",
-            tauxApplique: taux
+            usdCash: totalPaidUSD, cdfCash: totalPaidCDF,
+            typeNom: "REGLEMENT", tauxApplique: taux
         };
 
         data.transactions.unshift(finalEntry);
@@ -1716,13 +2358,11 @@ window.addTransaction = async () => {
         updates['mka_data/debts'] = data.debts;
 
         await update(ref(db), updates);
-
         render();
-        alert("✅ Règlement et pourboire enregistrés avec succès !");
+        alert("✅ Règlement et pourboire enregistrés !");
 
         ["payOnUsd_USD", "payOnUsd_CDF", "payOnCdf_USD", "payOnCdf_CDF", "debtPersonName", "settleRate", "settleRemiseUSD", "settleRemiseCDF", "settlePourboireUSD", "settlePourboireCDF"].forEach(id => {
-            const el = document.getElementById(id);
-            if(el) el.value = "";
+            const el = document.getElementById(id); if(el) el.value = "";
         });
 
     } catch (error) {
@@ -1740,11 +2380,8 @@ window.updateWhatsAppNumber = async function(person, inputId) {
     if (!person) return;
     
     const normalizedPerson = normalizeStrict(person);
-    if (number === "") {
-        delete data.whatsappNumbers[normalizedPerson];
-    } else {
-        data.whatsappNumbers[normalizedPerson] = number;
-    }
+    if (number === "") delete data.whatsappNumbers[normalizedPerson];
+    else data.whatsappNumbers[normalizedPerson] = number;
     
     try {
         const updates = {};
@@ -1752,57 +2389,49 @@ window.updateWhatsAppNumber = async function(person, inputId) {
         await update(ref(db), updates);
         alert("✅ Numéro WhatsApp enregistré !");
         const activeFilter = document.querySelector(".nav-hist button.active")?.id?.replace('btn-h-', '');
-        if (activeFilter) {
-            showFullHistory(activeFilter);
-        }
-    } catch (e) {
-        alert("❌ Erreur réseau : impossible d'enregistrer le numéro.");
-    }
+        if (activeFilter) showFullHistory(activeFilter);
+    } catch (e) { alert("❌ Erreur réseau."); }
 };
 
 window.sendWhatsAppReminder = (person, usd, cdf) => {
     const filter = document.querySelector(".nav-hist button.active")?.id;
     const estDetteMoi = (filter === "btn-h-dette_moi") || (filter === "btn-h-list_moi");
 
-    let message = "";
-    if (estDetteMoi) {
-        message = `Bonjour, nous vous confirmons une dette de ${fmt(usd)}$ et ${fmt(cdf)} FC en votre faveur. Nous sommes prêts à vous payer à votre demande. Merci.`;
-    } else {
-        message = `Bonjour, nous vous rappelons votre dette de ${fmt(usd)}$ et ${fmt(cdf)} FC chez MKA SHOP. Merci de régulariser dès que possible.`;
-    }
+    let message = estDetteMoi 
+        ? `Bonjour, nous vous confirmons une dette de ${fmt(usd)}$ et ${fmt(cdf)} FC en votre faveur. Nous sommes prêts à vous payer.`
+        : `Bonjour, nous vous rappelons votre dette de ${fmt(usd)}$ et ${fmt(cdf)} FC chez MKA SHOP. Merci.`;
 
     const encodedMsg = encodeURIComponent(message);
     const normalizedPerson = normalizeStrict(person);
     const numero = data.whatsappNumbers[normalizedPerson] || '';
-    if (numero) {
-        window.open(`https://wa.me/${numero}?text=${encodedMsg}`, '_blank');
-    } else {
-        window.open(`https://wa.me/?text=${encodedMsg}`, '_blank');
-    }
+    window.open(numero ? `https://wa.me/${numero}?text=${encodedMsg}` : `https://wa.me/?text=${encodedMsg}`, '_blank');
 };
 
+// 🔥 FONCTION CORRIGÉE : Message de confiance avec calcul correct du reste
 window.sendWhatsAppTrustMessage = (person, montantAjouteUsd, montantAjouteCdf, ancienTotalUsd, ancienTotalCdf) => {
     const filter = document.querySelector(".nav-hist button.active")?.id;
     const estDetteMoi = (filter === "btn-h-dette_moi") || (filter === "btn-h-list_moi");
-
-    const nouveauTotalUsd = (parseFloat(ancienTotalUsd) || 0) + (parseFloat(montantAjouteUsd) || 0);
-    const nouveauTotalCdf = (parseFloat(ancienTotalCdf) || 0) + (parseFloat(montantAjouteCdf) || 0);
+    
+    // CORRECTION : ancienTotal est le NOUVEAU solde après l'opération (snapshotDette)
+    // On ne doit PAS additionner montantAjoute car il est déjà inclus dans ancienTotal
+    const nouveauTotalUsd = parseFloat(ancienTotalUsd) || 0;
+    const nouveauTotalCdf = parseFloat(ancienTotalCdf) || 0;
+    const ajoutUsd = parseFloat(montantAjouteUsd) || 0;
+    const ajoutCdf = parseFloat(montantAjouteCdf) || 0;
 
     let message = "";
     if (estDetteMoi) {
-        message = `Bonjour, nous vous confirmons une dette complémentaire de ${fmt(montantAjouteUsd)}$ / ${fmt(montantAjouteCdf)} FC. Total dû : ${fmt(nouveauTotalUsd)}$ / ${fmt(nouveauTotalCdf)} FC. Merci pour votre confiance.`;
+        message = `Bonjour, nous vous confirmons une dette complémentaire de ${fmt(ajoutUsd)}$ / ${fmt(ajoutCdf)} FC. `;
+        message += `Total dû : ${fmt(nouveauTotalUsd)}$ / ${fmt(nouveauTotalCdf)} FC. Merci pour votre confiance.`;
     } else {
-        message = `Bonjour, nous vous confirmons un crédit de ${fmt(montantAjouteUsd)}$ / ${fmt(montantAjouteCdf)} FC. Votre solde débiteur total : ${fmt(nouveauTotalUsd)}$ / ${fmt(nouveauTotalCdf)} FC. Merci.`;
+        message = `Bonjour, nous vous confirmons un crédit de ${fmt(ajoutUsd)}$ / ${fmt(ajoutCdf)} FC. `;
+        message += `Votre solde débiteur total : ${fmt(nouveauTotalUsd)}$ / ${fmt(nouveauTotalCdf)} FC. Merci.`;
     }
 
     const encodedMsg = encodeURIComponent(message);
     const normalizedPerson = normalizeStrict(person);
     const numero = data.whatsappNumbers[normalizedPerson] || '';
-    if (numero) {
-        window.open(`https://wa.me/${numero}?text=${encodedMsg}`, '_blank');
-    } else {
-        window.open(`https://wa.me/?text=${encodedMsg}`, '_blank');
-    }
+    window.open(numero ? `https://wa.me/${numero}?text=${encodedMsg}` : `https://wa.me/?text=${encodedMsg}`, '_blank');
 };
 
 window.sendWhatsAppReceipt = (person, usdPaye, cdfPaye, resteUsd, resteCdf, canalPaiementArg = null) => {
@@ -1812,57 +2441,31 @@ window.sendWhatsAppReceipt = (person, usdPaye, cdfPaye, resteUsd, resteCdf, cana
     
     let canalPaiement = "en espèces";
     if (canalPaiementArg && canalPaiementArg.trim() !== "") {
-        if (canalPaiementArg.toLowerCase().includes("caisse") || canalPaiementArg.toLowerCase().includes("cash")) {
-            canalPaiement = "en espèces";
-        } else {
-            canalPaiement = `via ${canalPaiementArg}`;
-        }
-    } else {
-        const destSelect = document.getElementById("settleDest") || document.getElementById("settleSource");
-        if (destSelect && destSelect.value && destSelect.value.toLowerCase() !== "caisse") {
-            const nomCompte = destSelect.options[destSelect.selectedIndex].text;
-            canalPaiement = `via ${nomCompte}`;
-        }
+        if (canalPaiementArg.toLowerCase().includes("caisse") || canalPaiementArg.toLowerCase().includes("cash")) canalPaiement = "en espèces";
+        else canalPaiement = `via ${canalPaiementArg}`;
     }
 
-    let message = "";
-    if (estDetteMoi) {
-        message = `Bonjour, nous vous avons versé ${fmt(usdPaye)}$ / ${fmt(cdfPaye)} FC ${canalPaiement}.`;
-        if (estSolde) {
-            message += ` Dette totalement soldée. Merci !`;
-        } else {
-            message += ` Solde restant : ${fmt(resteUsd)}$ / ${fmt(resteCdf)} FC.`;
-        }
-    } else {
-        message = `Bonjour, nous avons bien reçu votre paiement de ${fmt(usdPaye)}$ / ${fmt(cdfPaye)} FC ${canalPaiement}.`;
-        if (estSolde) {
-            message += ` Compte soldé. Merci !`;
-        } else {
-            message += ` Solde restant : ${fmt(resteUsd)}$ / ${fmt(resteCdf)} FC.`;
-        }
-    }
+    let message = estDetteMoi
+        ? `Bonjour, nous vous avons versé ${fmt(usdPaye)}$ / ${fmt(cdfPaye)} FC ${canalPaiement}.`
+        : `Bonjour, nous avons bien reçu votre paiement de ${fmt(usdPaye)}$ / ${fmt(cdfPaye)} FC ${canalPaiement}.`;
+
+    message += estSolde ? ` Dette soldée. Merci !` : ` Solde restant : ${fmt(resteUsd)}$ / ${fmt(resteCdf)} FC.`;
 
     const encodedMsg = encodeURIComponent(message);
     const normalizedPerson = normalizeStrict(person);
     const numero = data.whatsappNumbers[normalizedPerson] || '';
-    if (numero) {
-        window.open(`https://wa.me/${numero}?text=${encodedMsg}`, '_blank');
-    } else {
-        window.open(`https://wa.me/?text=${encodedMsg}`, '_blank');
-    }
+    window.open(numero ? `https://wa.me/${numero}?text=${encodedMsg}` : `https://wa.me/?text=${encodedMsg}`, '_blank');
 };
 
 // ============================================
-// 📊 CLÔTURE JOURNALIÈRE - CORRIGÉE
+// 📊 CLÔTURE JOURNALIÈRE
 // ============================================
 
 function calculerVNC() {
     const taux = parseFloat(data.taux) || 1;
     const totalCaisse = (parseFloat(data.caisse.USD) || 0) + ((parseFloat(data.caisse.CDF) || 0) / taux);
     
-    let totalSims = 0;
-    let totalDetteClient = 0;
-    let totalDetteMoi = 0;
+    let totalSims = 0, totalDetteClient = 0, totalDetteMoi = 0;
     
     data.operators.forEach(o => {
         const usd = parseFloat(o.USD) || 0;
@@ -1872,23 +2475,13 @@ function calculerVNC() {
         const n = normalize(o.name);
         const valEquivUSD = usd + (cdf / taux);
         
-        if(n.includes("dette moi")) {
-            totalDetteMoi += valEquivUSD;
-        } else if(n.includes("dette client")) {
-            totalDetteClient += valEquivUSD;
-        } else if(n.includes("depenses")) {
-            // EXCLURE le compte Dépenses de la VNC
-        } else {
-            totalSims += (valEquivUSD + (stk * px));
-        }
+        if(n.includes("dette moi")) totalDetteMoi += valEquivUSD;
+        else if(n.includes("dette client")) totalDetteClient += valEquivUSD;
+        else if(n.includes("depenses")) { /* EXCLU */ }
+        else totalSims += (valEquivUSD + (stk * px));
     });
     
     return totalCaisse + totalSims + totalDetteClient - totalDetteMoi;
-}
-
-function calculerDepensesJour() {
-    // Les dépenses du jour sont déjà enregistrées dans data.depensesJour en USD
-    return data.depensesJour || 0;
 }
 
 function miseAJourCloture() {
@@ -1914,14 +2507,10 @@ window.updateVncHier = function() {
         miseAJourCloture();
         document.getElementById("manualVncHier").value = "";
         alert("✅ VNC Clôture Hier mise à jour !");
-    } else {
-        alert("Veuillez entrer un nombre valide.");
-    }
+    } else alert("Veuillez entrer un nombre valide.");
 };
 
-// ============================================
-// 📊 CLÔTURE CORRIGÉE - AVEC DÉTECTION HEBDOMADAIRE AMÉLIORÉE
-// ============================================
+// 🔥 FONCTION CORRIGÉE : Clôture avec hebdo non obligatoire + reset dépenses après mensuel
 window.enregistrerCloture = async function() {
     const vncActuelle = calculerVNC();
     const vncHier = data.vncHier || 0;
@@ -1932,154 +2521,111 @@ window.enregistrerCloture = async function() {
     
     const dateObj = getGomaTime();
     const gomaDate = formatGomaDate(dateObj);
-    const jourSemaine = dateObj.getDay(); // 0 = dimanche, 6 = samedi
+    const jourSemaine = dateObj.getDay();
     
-    // Vérifier si une clôture hebdomadaire doit être faite
-    let doitFaireHebdo = false;
-    let messageHebdo = "";
+    // 🔥 CLÔTURE HEBDOMADAIRE : Uniquement si assez de clôtures journalières
+    let doitFaireHebdo = false, messageHebdo = "";
     
-    if (jourSemaine === 0) {
-        // C'est dimanche, on fait toujours une clôture hebdo
-        doitFaireHebdo = true;
-        messageHebdo = "\n📅 CLÔTURE HEBDOMADAIRE (Dimanche)";
-    } else {
-        // Vérifier si on n'a pas fait de clôture hebdo depuis plus de 7 jours
-        const dateDerniereHebdo = data.derniereClotureHebdo ? new Date(data.derniereClotureHebdo) : null;
-        if (dateDerniereHebdo) {
-            const diffJours = (dateObj - dateDerniereHebdo) / (1000 * 60 * 60 * 24);
-            if (diffJours >= 7) {
-                doitFaireHebdo = true;
-                messageHebdo = `\n📅 CLÔTURE HEBDOMADAIRE (${Math.floor(diffJours)} jours depuis la dernière)`;
-            }
-        } else if (data.clotures && data.clotures.length >= 7) {
-            // Si aucune clôture hebdo n'a été faite mais qu'on a assez de données
-            doitFaireHebdo = true;
-            messageHebdo = "\n📅 CLÔTURE HEBDOMADAIRE (Première)";
+    // Compter les clôtures journalières depuis la dernière hebdo
+    const cloturesJourDepuisDerniereHebdo = data.clotures.filter(c => {
+        if (!c.date) return false;
+        const d = new Date(c.date);
+        if (data.derniereClotureHebdo) {
+            const lastHebdo = new Date(data.derniereClotureHebdo);
+            return d > lastHebdo;
         }
+        return true;
+    });
+    
+    const nbJoursDepuisDerniereHebdo = cloturesJourDepuisDerniereHebdo.length;
+    
+    // Hebdo seulement si :
+    // - C'est dimanche OU plus de 7 jours depuis la dernière hebdo
+    // - ET il y a au moins 7 clôtures journalières accumulées
+    const estDimanche = (jourSemaine === 0);
+    const plusDeSeptJours = data.derniereClotureHebdo 
+        ? ((dateObj - new Date(data.derniereClotureHebdo)) / (1000 * 60 * 60 * 24)) >= 7
+        : nbJoursDepuisDerniereHebdo >= 7;
+    
+    // Ne déclencher l'hebdo que si on a au moins 7 clôtures journalières
+    if ((estDimanche || plusDeSeptJours) && nbJoursDepuisDerniereHebdo >= 7) {
+        doitFaireHebdo = true;
+        if (estDimanche) {
+            messageHebdo = `\n📅 CLÔTURE HEBDOMADAIRE (Dimanche - ${nbJoursDepuisDerniereHebdo} jours accumulés)`;
+        } else {
+            messageHebdo = `\n📅 CLÔTURE HEBDOMADAIRE (${nbJoursDepuisDerniereHebdo} jours accumulés)`;
+        }
+    } else if ((estDimanche || plusDeSeptJours) && nbJoursDepuisDerniereHebdo > 0 && nbJoursDepuisDerniereHebdo < 7) {
+        messageHebdo = `\n⚠️ Clôture hebdo reportée (seulement ${nbJoursDepuisDerniereHebdo}/7 jours)`;
     }
     
-    // Vérifier si c'est le dernier jour du mois pour la clôture mensuelle
+    // 🔥 CLÔTURE MENSUELLE : Fin du mois
     const dernierJourMois = new Date(dateObj.getFullYear(), dateObj.getMonth() + 1, 0).getDate();
     const estFinMois = dateObj.getDate() === dernierJourMois;
+    let messageMensuel = estFinMois ? `\n🗓️ CLÔTURE MENSUELLE` : "";
     
-    let messageMensuel = estFinMois ? `\n🗓️ CLÔTURE MENSUELLE (${dateObj.toLocaleString('fr-FR', { month: 'long', year: 'numeric' })})` : "";
-    
-    if (!confirm(`📊 Confirmer la clôture du jour ?\n\nVNC Actuelle : ${fmt(vncActuelle)}$\nVNC Hier : ${fmt(vncHier)}$\nDépenses Jour : ${fmt(depensesJour)}$\nIntérêt Brut : ${fmt(interetBrut)}$\nIntérêt Net : ${fmt(interetNet)}$\n${messageHebdo}${messageMensuel}\n\nCette action enregistrera la clôture et mettra à jour la VNC Hier.`)) {
-        return;
-    }
+    if (!confirm(`📊 Confirmer la clôture ?\n\nVNC: ${fmt(vncActuelle)}$\nHier: ${fmt(vncHier)}$\nDépenses: ${fmt(depensesJour)}$\nIntérêt Brut: ${fmt(interetBrut)}$\nIntérêt Net: ${fmt(interetNet)}$\n${messageHebdo}${messageMensuel}`)) return;
     
     try {
         const entry = {
-            timestamp: Date.now(),
-            date: gomaDate,
-            vncActuelle: vncActuelle,
-            vncHier: vncHier,
-            depensesJour: depensesJour,
-            interetBrut: interetBrut,
-            interetNet: interetNet,
+            timestamp: Date.now(), date: gomaDate,
+            vncActuelle, vncHier, depensesJour, interetBrut, interetNet,
             type: "CLOTURE_JOURNALIERE"
         };
         
-        // Ajouter à l'historique des clôtures
         if (!data.clotures) data.clotures = [];
         data.clotures.push(entry);
-        
-        // Mettre à jour la VNC Hier pour le jour suivant
         data.vncHier = vncActuelle;
-        
-        // Réinitialiser les dépenses du jour
         data.depensesJour = 0;
         
-        // Ajouter dans les transactions
         const transEntry = {
-            timestamp: Date.now(),
-            date: gomaDate,
-            typeNom: "CLOTURE",
-            desc: `📊 CLÔTURE DU JOUR - Intérêt Brut: ${fmt(interetBrut)}$ | Intérêt Net: ${fmt(interetNet)}$ | VNC: ${fmt(vncActuelle)}$`,
-            mode: "cloture",
-            isCloture: true,
-            isClotureJour: true,
-            vncActuelle: vncActuelle,
-            vncHier: vncHier,
-            depensesJour: depensesJour,
-            interetBrut: interetBrut,
-            interetNet: interetNet
+            timestamp: Date.now(), date: gomaDate, typeNom: "CLOTURE",
+            desc: `📊 CLÔTURE - Brut: ${fmt(interetBrut)}$ | Net: ${fmt(interetNet)}$ | VNC: ${fmt(vncActuelle)}$`,
+            mode: "cloture", isCloture: true, isClotureJour: true,
+            vncActuelle, vncHier, depensesJour, interetBrut, interetNet
         };
         data.transactions.unshift(transEntry);
         
         const updates = {};
         updates[`mka_data/transactions/${Date.now()}`] = transEntry;
         
-        // ==========================================
-        // 📅 CLÔTURE HEBDOMADAIRE (si conditions remplies)
-        // ==========================================
+        // 🔥 CLÔTURE HEBDOMADAIRE
         if (doitFaireHebdo) {
-            // Récupérer les clôtures depuis la dernière clôture hebdo ou les 7 derniers jours
-            const dateLimite = new Date(dateObj);
-            dateLimite.setDate(dateLimite.getDate() - 7);
-            
-            const cloturesSemaine = data.clotures.filter(c => {
-                const d = new Date(c.date);
-                return d >= dateLimite && d <= dateObj;
-            });
+            const cloturesSemaine = cloturesJourDepuisDerniereHebdo;
             
             if (cloturesSemaine.length > 0) {
-                const totalVNC = cloturesSemaine.reduce((sum, c) => sum + c.vncActuelle, 0);
-                const totalDepenses = cloturesSemaine.reduce((sum, c) => sum + c.depensesJour, 0);
-                const totalBrut = cloturesSemaine.reduce((sum, c) => sum + c.interetBrut, 0);
-                const totalNet = cloturesSemaine.reduce((sum, c) => sum + c.interetNet, 0);
+                const totalDepenses = cloturesSemaine.reduce((s, c) => s + (c.depensesJour || 0), 0);
+                const totalBrut = cloturesSemaine.reduce((s, c) => s + (c.interetBrut || 0), 0);
+                const totalNet = cloturesSemaine.reduce((s, c) => s + (c.interetNet || 0), 0);
                 
                 const hebdoEntry = {
-                    timestamp: Date.now() + 1,
-                    date: gomaDate,
-                    vncActuelle: vncActuelle,
-                    vncHier: vncHier,
-                    depensesJour: totalDepenses,
-                    interetBrut: totalBrut,
-                    interetNet: totalNet,
-                    type: "CLOTURE_HEBDOMADAIRE",
-                    period: "hebdomadaire",
-                    nbJours: cloturesSemaine.length,
-                    dateDebut: dateLimite.toISOString(),
-                    dateFin: dateObj.toISOString()
+                    timestamp: Date.now() + 1, date: gomaDate, vncActuelle, vncHier,
+                    depensesJour: totalDepenses, interetBrut: totalBrut, interetNet: totalNet,
+                    type: "CLOTURE_HEBDOMADAIRE", period: "hebdomadaire",
+                    nbJours: cloturesSemaine.length
                 };
                 
                 if (!data.cloturesHebdo) data.cloturesHebdo = [];
                 data.cloturesHebdo.push(hebdoEntry);
                 data.derniereClotureHebdo = dateObj.toISOString();
                 
-                // Ajouter aussi dans les transactions
                 const hebdoTrans = {
-                    timestamp: Date.now() + 1,
-                    date: gomaDate,
-                    typeNom: "CLOTURE_HEBDOMADAIRE",
-                    desc: `📊 CLÔTURE HEBDOMADAIRE (${cloturesSemaine.length} jours) - Intérêt Brut: ${fmt(totalBrut)}$ | Intérêt Net: ${fmt(totalNet)}$ | VNC: ${fmt(vncActuelle)}$`,
-                    mode: "cloture",
-                    isCloture: true,
-                    isClotureHebdo: true,
-                    vncActuelle: vncActuelle,
-                    vncHier: vncHier,
-                    depensesJour: totalDepenses,
-                    interetBrut: totalBrut,
-                    interetNet: totalNet,
-                    nbJours: cloturesSemaine.length,
-                    dateDebut: dateLimite.toISOString(),
-                    dateFin: dateObj.toISOString()
+                    timestamp: Date.now() + 1, date: gomaDate, typeNom: "CLOTURE_HEBDOMADAIRE",
+                    desc: `📊 CLÔTURE HEBDO (${cloturesSemaine.length}j) - Brut: ${fmt(totalBrut)}$ | Net: ${fmt(totalNet)}$`,
+                    mode: "cloture", isCloture: true, isClotureHebdo: true,
+                    vncActuelle, vncHier, depensesJour: totalDepenses, interetBrut: totalBrut, interetNet: totalNet,
+                    nbJours: cloturesSemaine.length
                 };
                 data.transactions.unshift(hebdoTrans);
                 updates[`mka_data/transactions/${Date.now() + 1}`] = hebdoTrans;
                 updates['mka_data/cloturesHebdo'] = data.cloturesHebdo;
                 updates['mka_data/derniereClotureHebdo'] = data.derniereClotureHebdo;
                 
-                document.getElementById("clotureStatusMsg").innerHTML = `✅ Clôture hebdomadaire enregistrée (${cloturesSemaine.length} jours)`;
-            } else {
-                document.getElementById("clotureStatusMsg").innerHTML = `⚠️ Pas assez de clôtures pour l'hebdomadaire (${cloturesSemaine.length} jours sur 7)`;
+                document.getElementById("clotureStatusMsg").innerHTML = `✅ Hebdo enregistrée (${cloturesSemaine.length} jours)`;
             }
         }
         
-        // ==========================================
-        // 🗓️ CLÔTURE MENSUELLE (si c'est le dernier jour du mois)
-        // ==========================================
+        // 🔥 CLÔTURE MENSUELLE : Réinitialiser le compte Dépenses
         if (estFinMois) {
             const cloturesMois = data.clotures.filter(c => {
                 const d = new Date(c.date);
@@ -2087,50 +2633,43 @@ window.enregistrerCloture = async function() {
             });
             
             if (cloturesMois.length > 0) {
-                const totalVNC = cloturesMois.reduce((sum, c) => sum + c.vncActuelle, 0);
-                const totalDepenses = cloturesMois.reduce((sum, c) => sum + c.depensesJour, 0);
-                const totalBrut = cloturesMois.reduce((sum, c) => sum + c.interetBrut, 0);
-                const totalNet = cloturesMois.reduce((sum, c) => sum + c.interetNet, 0);
+                const totalDepenses = cloturesMois.reduce((s, c) => s + (c.depensesJour || 0), 0);
+                const totalBrut = cloturesMois.reduce((s, c) => s + (c.interetBrut || 0), 0);
+                const totalNet = cloturesMois.reduce((s, c) => s + (c.interetNet || 0), 0);
                 
                 const mensuelEntry = {
-                    timestamp: Date.now() + 2,
-                    date: gomaDate,
-                    vncActuelle: vncActuelle,
-                    vncHier: vncHier,
-                    depensesJour: totalDepenses,
-                    interetBrut: totalBrut,
-                    interetNet: totalNet,
-                    type: "CLOTURE_MENSUELLE",
-                    period: "mensuel",
-                    nbJours: cloturesMois.length,
-                    mois: dateObj.toLocaleString('fr-FR', { month: 'long', year: 'numeric' })
+                    timestamp: Date.now() + 2, date: gomaDate, vncActuelle, vncHier,
+                    depensesJour: totalDepenses, interetBrut: totalBrut, interetNet: totalNet,
+                    type: "CLOTURE_MENSUELLE", period: "mensuel",
+                    nbJours: cloturesMois.length, mois: dateObj.toLocaleString('fr-FR', { month: 'long', year: 'numeric' })
                 };
                 
                 if (!data.cloturesMensuelles) data.cloturesMensuelles = [];
                 data.cloturesMensuelles.push(mensuelEntry);
                 
-                // Ajouter aussi dans les transactions
                 const mensuelTrans = {
-                    timestamp: Date.now() + 2,
-                    date: gomaDate,
-                    typeNom: "CLOTURE_MENSUELLE",
-                    desc: `📊 CLÔTURE MENSUELLE (${dateObj.toLocaleString('fr-FR', { month: 'long', year: 'numeric' })}) - Intérêt Brut: ${fmt(totalBrut)}$ | Intérêt Net: ${fmt(totalNet)}$ | VNC: ${fmt(vncActuelle)}$`,
-                    mode: "cloture",
-                    isCloture: true,
-                    isClotureMensuel: true,
-                    vncActuelle: vncActuelle,
-                    vncHier: vncHier,
-                    depensesJour: totalDepenses,
-                    interetBrut: totalBrut,
-                    interetNet: totalNet,
-                    nbJours: cloturesMois.length,
-                    mois: dateObj.toLocaleString('fr-FR', { month: 'long', year: 'numeric' })
+                    timestamp: Date.now() + 2, date: gomaDate, typeNom: "CLOTURE_MENSUELLE",
+                    desc: `📊 CLÔTURE MENSUELLE - Brut: ${fmt(totalBrut)}$ | Net: ${fmt(totalNet)}$`,
+                    mode: "cloture", isCloture: true, isClotureMensuel: true,
+                    vncActuelle, vncHier, depensesJour: totalDepenses, interetBrut: totalBrut, interetNet: totalNet,
+                    nbJours: cloturesMois.length, mois: dateObj.toLocaleString('fr-FR', { month: 'long', year: 'numeric' })
                 };
                 data.transactions.unshift(mensuelTrans);
                 updates[`mka_data/transactions/${Date.now() + 2}`] = mensuelTrans;
                 updates['mka_data/cloturesMensuelles'] = data.cloturesMensuelles;
                 
-                document.getElementById("clotureStatusMsg").innerHTML += ` | ✅ Clôture mensuelle enregistrée`;
+                // 🔥 RÉINITIALISER LE COMPTE DÉPENSES À 0 APRÈS LA CLÔTURE MENSUELLE
+                const depensesOp = data.operators.find(o => normalize(o.name).includes('depenses'));
+                if (depensesOp) {
+                    depensesOp.USD = 0;
+                    depensesOp.CDF = 0;
+                    depensesOp.stock = 0;
+                    console.log("✅ Compte Dépenses réinitialisé à 0 après clôture mensuelle");
+                }
+                
+                updates['mka_data/operators'] = data.operators;
+                
+                document.getElementById("clotureStatusMsg").innerHTML += ` | ✅ Mensuel enregistré`;
             }
         }
         
@@ -2139,18 +2678,17 @@ window.enregistrerCloture = async function() {
         updates['mka_data/depensesJour'] = data.depensesJour;
         
         await update(ref(db), updates);
-        
-        alert("✅ Clôture enregistrée avec succès !");
+        alert("✅ Clôture enregistrée !");
         render();
         
     } catch (error) {
-        console.error("Erreur lors de la clôture :", error);
+        console.error("Erreur clôture :", error);
         alert("❌ Erreur réseau : Impossible d'enregistrer la clôture.");
     }
 };
 
 // ============================================
-// RESTAURATION DE LA LOGIQUE D'HISTORIQUE
+// HISTORIQUE
 // ============================================
 window.showFullHistory = (filter) => {     
     const isAdmin = !document.getElementById("adminSection").classList.contains("hidden");    
@@ -2163,72 +2701,36 @@ window.showFullHistory = (filter) => {
   
     let filtered = data.transactions;    
   
-    // --- FILTRES ---
-    if(filter === 'general') {
-        filtered = data.transactions; 
-    } 
-    else if(filter === 'ventes') {  
-        filtered = data.transactions.filter(t =>   
-            normalize(t.typeNom || "").includes("vente") ||   
-            normalize(t.desc || "").includes("vente")  
-        );  
+    if(filter === 'general') filtered = data.transactions; 
+    else if(filter === 'ventes') {
+        filtered = data.transactions.filter(t => 
+            normalize(t.typeNom || "").includes("vente") || normalize(t.desc || "").includes("vente"));
     }   
-    else if(filter === 'dette_client') {  
-        filtered = data.transactions.filter(t =>   
-            t.mode === "dette_client" ||   
-            normalize(t.desc || "").includes("dette client")  
-        );  
+    else if(filter === 'dette_client') {
+        filtered = data.transactions.filter(t => t.mode === "dette_client" || normalize(t.desc || "").includes("dette client"));
     }   
-    else if(filter === 'dette_moi') {  
-        filtered = data.transactions.filter(t =>   
-            t.mode === "dette_moi" ||   
-            normalize(t.desc || "").includes("dette moi")  
-        );  
+    else if(filter === 'dette_moi') {
+        filtered = data.transactions.filter(t => t.mode === "dette_moi" || normalize(t.desc || "").includes("dette moi"));
     }
     else if(filter === 'depenses') {
         filtered = data.transactions.filter(t => 
-            t.mode === "depense" || 
-            t.isDepense === true ||
-            normalize(t.operator || "").includes("depense") ||
-            normalize(t.desc || "").includes("depense")
-        );
+            t.mode === "depense" || t.isDepense === true ||
+            normalize(t.operator || "").includes("depense") || normalize(t.desc || "").includes("depense"));
     }
     else if(filter === 'clotures') {
-        // Récupérer toutes les clôtures (journalières, hebdomadaires, mensuelles)
         const cloturesJour = data.transactions.filter(t => 
-            t.isCloture === true || 
-            normalize(t.typeNom || "").includes("cloture") ||
-            normalize(t.desc || "").includes("clôture")
-        );
+            t.isCloture === true || normalize(t.typeNom || "").includes("cloture") || normalize(t.desc || "").includes("clôture"));
         
-        // Ajouter les clôtures hebdomadaires et mensuelles stockées
         const cloturesHebdo = data.cloturesHebdo || [];
         const cloturesMensuelles = data.cloturesMensuelles || [];
         
-        // Créer des objets de transaction pour les clôtures hebdo et mensuelles
-        const hebdoTrans = cloturesHebdo.map(c => ({
-            ...c,
-            isCloture: true,
-            isClotureHebdo: true,
-            desc: `📊 CLÔTURE HEBDOMADAIRE (${c.nbJours || 7} jours) - Intérêt Brut: ${fmt(c.interetBrut)}$ | Intérêt Net: ${fmt(c.interetNet)}$`
-        }));
-        
-        const mensuelTrans = cloturesMensuelles.map(c => ({
-            ...c,
-            isCloture: true,
-            isClotureMensuel: true,
-            desc: `📊 CLÔTURE MENSUELLE (${c.mois || ''}) - Intérêt Brut: ${fmt(c.interetBrut)}$ | Intérêt Net: ${fmt(c.interetNet)}$`
-        }));
+        const hebdoTrans = cloturesHebdo.map(c => ({ ...c, isCloture: true, isClotureHebdo: true }));
+        const mensuelTrans = cloturesMensuelles.map(c => ({ ...c, isCloture: true, isClotureMensuel: true }));
         
         filtered = [...cloturesJour, ...hebdoTrans, ...mensuelTrans];
         
-        // Si pas de transactions de clôture, afficher les clôtures enregistrées
         if (filtered.length === 0 && data.clotures && data.clotures.length > 0) {
-            filtered = data.clotures.map(c => ({
-                ...c,
-                isCloture: true,
-                desc: `📊 CLÔTURE - Intérêt Brut: ${fmt(c.interetBrut)}$ | Intérêt Net: ${fmt(c.interetNet)}$ | VNC: ${fmt(c.vncActuelle)}$`
-            }));
+            filtered = data.clotures.map(c => ({ ...c, isCloture: true }));
         }
     }
     else if(filter === 'money') {
@@ -2236,11 +2738,8 @@ window.showFullHistory = (filter) => {
             const type = normalize(t.typeNom || "");
             const desc = normalize(t.desc || "");
             const op = normalize(t.operator || "");
-            const mode = normalize(t.mode || "");
-
             const isFinancial = type.includes("retrait") || type.includes("depot");
             const isMoneyKeyword = desc.includes("money") || desc.includes("pesa") || op.includes("money") || op.includes("pesa");
-
             let isVirtualMoney = false;
             if(t.mode === "virtuel" && t.impacts && t.impacts.virtuel && t.impacts.virtuel.opIdx !== null) {
                 const sourceSim = data.operators[t.impacts.virtuel.opIdx];
@@ -2249,16 +2748,12 @@ window.showFullHistory = (filter) => {
                     isVirtualMoney = simName.includes("money") || simName.includes("pesa");
                 }
             }
-
             return isFinancial || isMoneyKeyword || isVirtualMoney;
         });
     }
     else if(filter === 'suppressions') {
         filtered = data.transactions.filter(t => 
-            t.isDeletion === true || 
-            normalize(t.typeNom || "").includes("suppression") ||
-            normalize(t.desc || "").includes("suppression")
-        );
+            t.isDeletion === true || normalize(t.typeNom || "").includes("suppression") || normalize(t.desc || "").includes("suppression"));
     }
     else if(filter === 'list_client') {
         const debtClientMap = new Map();
@@ -2267,20 +2762,13 @@ window.showFullHistory = (filter) => {
                 const name = key.substring('dette client_'.length);
                 if (name) {
                     const debt = data.debts[key] || { USD: 0, CDF: 0 };
-                    if (debt.USD > 0.01 || debt.CDF > 50) {
-                        debtClientMap.set(name, debt);
-                    }
+                    if (debt.USD > 0.01 || debt.CDF > 50) debtClientMap.set(name, debt);
                 }
             }
         });
         filtered = Array.from(debtClientMap.entries()).map(([name, debt]) => ({
-            isDebtList: true,
-            listType: 'client',
-            person: name,
-            debtUSD: debt.USD,
-            debtCDF: debt.CDF,
-            date: formatGomaDate(),
-            desc: `📋 CLIENT QUI DOIT : ${name} - ${fmt(debt.USD)}$ / ${fmt(debt.CDF)}FC`
+            isDebtList: true, listType: 'client', person: name,
+            debtUSD: debt.USD, debtCDF: debt.CDF, date: formatGomaDate()
         }));
     }
     else if(filter === 'list_moi') {
@@ -2290,103 +2778,59 @@ window.showFullHistory = (filter) => {
                 const name = key.substring('dette moi_'.length);
                 if (name) {
                     const debt = data.debts[key] || { USD: 0, CDF: 0 };
-                    if (debt.USD > 0.01 || debt.CDF > 50) {
-                        debtMoiMap.set(name, debt);
-                    }
+                    if (debt.USD > 0.01 || debt.CDF > 50) debtMoiMap.set(name, debt);
                 }
             }
         });
         filtered = Array.from(debtMoiMap.entries()).map(([name, debt]) => ({
-            isDebtList: true,
-            listType: 'moi',
-            person: name,
-            debtUSD: debt.USD,
-            debtCDF: debt.CDF,
-            date: formatGomaDate(),
-            desc: `📋 NOM QUE JE DOIS : ${name} - ${fmt(debt.USD)}$ / ${fmt(debt.CDF)}FC`
+            isDebtList: true, listType: 'moi', person: name,
+            debtUSD: debt.USD, debtCDF: debt.CDF, date: formatGomaDate()
         }));
     }
 
-    // Si le filtre est 'clotures', on affiche les clôtures de manière plus détaillée
     if (filter === 'clotures') {
         let html = `<div style="display:flex; flex-direction:column; gap:12px;">`;
         
         if (filtered.length === 0) {
             html += `<div style="text-align:center; padding:20px; color:#64748b;">Aucune clôture enregistrée.</div>`;
         } else {
-            // Trier par date décroissante
             filtered.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
             
-            filtered.forEach((t, idx) => {
-                const isClotureObj = t.isCloture || t.type === "CLOTURE" || t.type === "CLOTURE_JOURNALIERE";
-                const isHebdo = t.isClotureHebdo || t.period === "hebdomadaire";
-                const isMensuel = t.isClotureMensuel || t.period === "mensuel";
-                
-                if (isClotureObj || isHebdo || isMensuel) {
-                    const vncA = t.vncActuelle || 0;
-                    const vncH = t.vncHier || 0;
-                    const depJ = t.depensesJour || 0;
-                    const iBrut = t.interetBrut || 0;
-                    const iNet = t.interetNet || 0;
-                    const nbJours = t.nbJours || 1;
+            filtered.forEach((t) => {
+                if (t.isCloture || t.type === "CLOTURE" || t.type === "CLOTURE_JOURNALIERE") {
+                    const isHebdo = t.isClotureHebdo || t.period === "hebdomadaire";
+                    const isMensuel = t.isClotureMensuel || t.period === "mensuel";
                     
-                    let bgColor = "#f0fdf4";
-                    let borderColor = "#16a34a";
-                    let titleColor = "#166534";
-                    let icon = "📊";
-                    let title = "CLÔTURE DU JOUR";
+                    let bgColor = "#f0fdf4", borderColor = "#16a34a", titleColor = "#166534";
+                    let icon = "📊", title = "CLÔTURE DU JOUR";
                     
-                    if (isHebdo) {
-                        bgColor = "#fef3c7";
-                        borderColor = "#f59e0b";
-                        titleColor = "#92400e";
-                        icon = "📅";
-                        title = `CLÔTURE HEBDOMADAIRE (${nbJours} jours)`;
-                    } else if (isMensuel) {
-                        bgColor = "#fce4ec";
-                        borderColor = "#dc2626";
-                        titleColor = "#991b1b";
-                        icon = "🗓️";
-                        title = `CLÔTURE MENSUELLE (${t.mois || ''})`;
-                    }
+                    if (isHebdo) { bgColor = "#fef3c7"; borderColor = "#f59e0b"; titleColor = "#92400e"; icon = "📅"; title = `CLÔTURE HEBDOMADAIRE (${t.nbJours || 1} jours)`; }
+                    else if (isMensuel) { bgColor = "#fce4ec"; borderColor = "#dc2626"; titleColor = "#991b1b"; icon = "🗓️"; title = `CLÔTURE MENSUELLE`; }
                     
                     html += `
                     <div style="background:${bgColor}; border-radius:16px; padding:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); border-left:5px solid ${borderColor};">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                            <span style="font-size:11px; color:#64748b;">${t.date || 'Date inconnue'}</span>
+                            <span style="font-size:11px; color:#64748b;">${t.date || ''}</span>
                             <span style="font-weight:bold; color:${titleColor}; font-size:12px;">${icon} ${title}</span>
                             ${isAdmin && !isHebdo && !isMensuel ? `
-                            <div style="display:flex; gap:5px;">
-                                <button onclick="cancelTransaction(${data.transactions.indexOf(t)})" style="background:#f59e0b;color:#fff;border:none;padding:4px 8px;border-radius:6px;font-size:10px;cursor:pointer;">↩ Annuler</button>
-                            </div>` : ""}
+                            <button onclick="cancelTransaction(${data.transactions.indexOf(t)})" style="background:#f59e0b;color:#fff;border:none;padding:4px 8px;border-radius:6px;font-size:10px;cursor:pointer;">↩ Annuler</button>
+                            ` : ""}
                         </div>
                         <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; background:white; padding:12px; border-radius:10px;">
-                            <div>
-                                <div style="font-size:9px; color:#64748b; text-transform:uppercase;">VNC Actuelle</div>
-                                <div style="font-weight:bold; color:#0f172a;">${fmt(vncA)}$</div>
-                            </div>
-                            <div>
-                                <div style="font-size:9px; color:#64748b; text-transform:uppercase;">VNC Hier</div>
-                                <div style="font-weight:bold; color:#0f172a;">${fmt(vncH)}$</div>
-                            </div>
-                            <div>
-                                <div style="font-size:9px; color:#64748b; text-transform:uppercase;">Dépenses Jour</div>
-                                <div style="font-weight:bold; color:#dc2626;">${fmt(depJ)}$</div>
-                            </div>
+                            <div><div style="font-size:9px; color:#64748b;">VNC Actuelle</div><div style="font-weight:bold;">${fmt(t.vncActuelle)}</div></div>
+                            <div><div style="font-size:9px; color:#64748b;">VNC Hier</div><div style="font-weight:bold;">${fmt(t.vncHier)}</div></div>
+                            <div><div style="font-size:9px; color:#64748b;">Dépenses</div><div style="font-weight:bold; color:#dc2626;">${fmt(t.depensesJour)}</div></div>
                         </div>
                         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-top:8px;">
                             <div style="background:#fef3c7; padding:8px; border-radius:8px; text-align:center;">
-                                <div style="font-size:9px; color:#92400e; text-transform:uppercase;">Intérêt Brut</div>
-                                <div style="font-weight:bold; color:#92400e; font-size:16px;">${fmt(iBrut)}$</div>
-                                <div style="font-size:8px; color:#92400e;">(VNC Actuelle - VNC Hier + Dépenses)</div>
+                                <div style="font-size:9px; color:#92400e;">Intérêt Brut</div>
+                                <div style="font-weight:bold; color:#92400e; font-size:16px;">${fmt(t.interetBrut)}$</div>
                             </div>
                             <div style="background:#dcfce7; padding:8px; border-radius:8px; text-align:center;">
-                                <div style="font-size:9px; color:#166534; text-transform:uppercase;">Intérêt Net</div>
-                                <div style="font-weight:bold; color:#166534; font-size:16px;">${fmt(iNet)}$</div>
-                                <div style="font-size:8px; color:#166534;">(VNC Actuelle - VNC Hier)</div>
+                                <div style="font-size:9px; color:#166534;">Intérêt Net</div>
+                                <div style="font-weight:bold; color:#166534; font-size:16px;">${fmt(t.interetNet)}$</div>
                             </div>
                         </div>
-                        ${t.desc ? `<div style="font-size:10px; margin-top:6px; color:#64748b; text-align:center; font-style:italic;">${t.desc}</div>` : ''}
                     </div>`;
                 }
             });
@@ -2397,7 +2841,6 @@ window.showFullHistory = (filter) => {
         return;
     }
 
-    // Le reste du code de showFullHistory reste identique
     let html = `<div style="display:flex; flex-direction:column; gap:12px;">`;  
   
     html += filtered.map((t) => {  
@@ -2416,33 +2859,25 @@ window.showFullHistory = (filter) => {
             const inputId = `whatsapp-${normalizedPerson}-${Date.now()}`;
 
             return `
-            <div style="background:${bgColor}; border-radius:16px; padding:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); border-left:5px solid ${borderColor};">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <div style="background:${bgColor}; border-radius:16px; padding:12px; border-left:5px solid ${borderColor};">
+                <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
                     <span style="font-size:11px; color:#64748b;">${t.date}</span>
-                    <span style="font-weight:bold; color:#1e293b; font-size:12px;">${icon} ${title}</span>
+                    <span style="font-weight:bold; font-size:12px;">${icon} ${title}</span>
                 </div>
                 <div style="background:white; padding:12px; border-radius:8px;">
-                    <div style="font-weight:bold; font-size:14px; color:#0f172a;">${person}</div>
+                    <div style="font-weight:bold; font-size:14px;">${person}</div>
                     <div style="display:flex; gap:15px; margin-top:5px;">
                         <span style="color:#dc2626; font-weight:bold;">${fmt(t.debtUSD)}$</span>
                         <span style="color:#dc2626; font-weight:bold;">${fmt(t.debtCDF)} FC</span>
                     </div>
-                    
                     <div style="display:flex; gap:6px; margin-top:10px; align-items:center; flex-wrap:wrap;">
-                        <input type="text" id="${inputId}" placeholder="Numéro WhatsApp (ex: 243...)" value="${currentNumber}" style="flex:1; min-width:120px; padding:6px; font-size:12px; border-radius:6px; border:1px solid #cbd5e1;">
-                        <button onclick="updateWhatsAppNumber('${person.replace(/'/g, "\\'")}', '${inputId}')" style="background:#0ea5e9; color:white; border:none; padding:6px 12px; border-radius:6px; font-size:10px; cursor:pointer; font-weight:bold; width:auto;">💾 Enr.</button>
+                        <input type="text" id="${inputId}" placeholder="Numéro WhatsApp" value="${currentNumber}" style="flex:1; min-width:120px; padding:6px; font-size:12px; border-radius:6px; border:1px solid #cbd5e1;">
+                        <button onclick="updateWhatsAppNumber('${person.replace(/'/g, "\\'")}', '${inputId}')" style="background:#0ea5e9; color:white; border:none; padding:6px 12px; border-radius:6px; font-size:10px; cursor:pointer; font-weight:bold; width:auto;">💾</button>
                     </div>
-
-                    <div style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
+                    <div style="display:flex; gap:6px; margin-top:8px;">
                         ${isClient ? 
-                            `<button onclick="sendWhatsAppReminder('${person.replace(/'/g, "\\'")}', ${t.debtUSD}, ${t.debtCDF})" 
-                                style="background:#25D366; color:white; border:none; padding:6px 12px; border-radius:6px; font-size:10px; cursor:pointer; font-weight:bold; flex:1;">
-                                📱 Rappel
-                            </button>` :
-                            `<button onclick="sendWhatsAppTrustMessage('${person.replace(/'/g, "\\'")}', 0, 0, ${t.debtUSD}, ${t.debtCDF})" 
-                                style="background:#0ea5e9; color:white; border:none; padding:6px 12px; border-radius:6px; font-size:10px; cursor:pointer; font-weight:bold; flex:1;">
-                                📱 Reconnaissance
-                            </button>`
+                            `<button onclick="sendWhatsAppReminder('${person.replace(/'/g, "\\'")}', ${t.debtUSD}, ${t.debtCDF})" style="background:#25D366; color:white; border:none; padding:6px 12px; border-radius:6px; font-size:10px; cursor:pointer; font-weight:bold; flex:1;">📱 Rappel</button>` :
+                            `<button onclick="sendWhatsAppTrustMessage('${person.replace(/'/g, "\\'")}', 0, 0, ${t.debtUSD}, ${t.debtCDF})" style="background:#0ea5e9; color:white; border:none; padding:6px 12px; border-radius:6px; font-size:10px; cursor:pointer; font-weight:bold; flex:1;">📱 Reconnaissance</button>`
                         }
                     </div>
                 </div>
@@ -2451,18 +2886,13 @@ window.showFullHistory = (filter) => {
 
         if (t.isDeletion || normalize(t.typeNom || "").includes("suppression")) {
             return `
-            <div style="background:#fef2f2; border-radius:16px; padding:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); border-left:5px solid #ef4444;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <div style="background:#fef2f2; border-radius:16px; padding:12px; border-left:5px solid #ef4444;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
                     <span style="font-size:11px; color:#64748b;">${t.date}</span>
-                    <span style="font-weight:bold; color:#991b1b; font-size:12px;">🗑️ SUPPRESSION DE NOM</span>
-                    ${isAdmin ? `
-                    <div style="display:flex; gap:5px;">
-                        <button onclick="cancelTransaction(${realIdx})" style="background:#f59e0b;color:#fff;border:none;padding:4px 8px;border-radius:6px;font-size:10px;cursor:pointer;">↩ Annuler</button>
-                        <button onclick="deleteTransaction(${realIdx})" style="background:#ef4444;color:#fff;border:none;padding:4px 8px;border-radius:6px;font-size:10px;cursor:pointer;">Suppr</button>
-                    </div>` : ""}
+                    <span style="font-weight:bold; color:#991b1b; font-size:12px;">🗑️ SUPPRESSION</span>
                 </div>
                 <div style="background:white; padding:12px; border-radius:8px;">
-                    <div style="font-weight:bold; color:#dc2626; font-size:14px;">✕ Nom supprimé : ${t.person}</div>
+                    <div style="font-weight:bold; color:#dc2626; font-size:14px;">✕ ${t.person}</div>
                     <div style="font-size:11px; color:#64748b; margin-top:4px;">${t.desc}</div>
                 </div>
             </div>`;
@@ -2471,13 +2901,13 @@ window.showFullHistory = (filter) => {
         if (t.mode === 'transfert' && t.transferDetails) {
             const d = t.transferDetails;
             return `
-            <div style="background:#f0f9ff; border-radius:16px; padding:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); border-left:5px solid #0ea5e9;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <div style="background:#f0f9ff; border-radius:16px; padding:12px; border-left:5px solid #0ea5e9;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
                     <span style="font-size:11px; color:#64748b;">${t.date}</span>
                     ${isAdmin ? `
                     <div style="display:flex; gap:5px;">
-                        <button onclick="cancelTransaction(${realIdx})" style="background:#f59e0b;color:#fff;border:none;padding:4px 8px;border-radius:6px;font-size:10px;cursor:pointer;">↩ Annuler</button>
-                        <button onclick="deleteTransaction(${realIdx})" style="background:#ef4444;color:#fff;border:none;padding:4px 8px;border-radius:6px;font-size:10px;cursor:pointer;">Suppr</button>
+                        <button onclick="cancelTransaction(${realIdx})" style="background:#f59e0b;color:#fff;border:none;padding:4px 8px;border-radius:6px;font-size:10px;">↩</button>
+                        <button onclick="deleteTransaction(${realIdx})" style="background:#ef4444;color:#fff;border:none;padding:4px 8px;border-radius:6px;font-size:10px;">🗑️</button>
                     </div>` : ""}
                 </div>
                 <div style="display:flex; justify-content:space-around; align-items:center; background:white; padding:10px; border-radius:10px;">
@@ -2488,182 +2918,109 @@ window.showFullHistory = (filter) => {
                     </div>
                     <div style="font-size:20px; color:#0ea5e9;">➔</div>
                     <div style="text-align:center;">
-                        <div style="font-size:9px; color:#64748b;">DESTINATION</div>
+                        <div style="font-size:9px; color:#64748b;">DEST</div>
                         <div style="font-weight:bold; font-size:13px;">${d.destName}</div>
                         <div style="color:#16a34a; font-weight:bold;">+${fmt(d.dAmt)} ${d.dc}</div>
                     </div>
                 </div>
-                <div style="font-size:10px; margin-top:5px; color:#0369a1; text-align:center; font-style:italic;">${desc}</div>
             </div>`;
         }
 
-if (t.isReglement) {
-    const b = t.debtBefore || { USD: 0, CDF: 0 };
-    const a = t.snapshotDette || { USD: 0, CDF: 0 };
-    const p = t.payDetail || { onUsd: { usd: 0, cdf: 0 }, onCdf: { usd: 0, cdf: 0 } };
-    const rem = t.remise || { usd: 0, cdf: 0 };
-    
-    const estSolde = (a.USD <= 0.1 && a.CDF <= 100);
-    
-    const sUSD = parseFloat(t.surplusUSD || 0);
-    const sCDF = parseFloat(t.surplusCDF || 0);
-    const labelSurplus = t.isMoi ? "PERTE" : "INTÉRÊT";
+        if (t.isReglement) {
+            const b = t.debtBefore || { USD: 0, CDF: 0 };
+            const a = t.snapshotDette || { USD: 0, CDF: 0 };
+            const p = t.payDetail || { onUsd: { usd: 0, cdf: 0 }, onCdf: { usd: 0, cdf: 0 } };
+            const rem = t.remise || { usd: 0, cdf: 0 };
+            const estSolde = (a.USD <= 0.1 && a.CDF <= 100);
+            const sUSD = parseFloat(t.surplusUSD || 0);
+            const sCDF = parseFloat(t.surplusCDF || 0);
+            const labelSurplus = t.isMoi ? "PERTE" : "INTÉRÊT";
+            const person = t.person || '';
 
-    const pUSD = t.usdCash || 0;
-    const pCDF = t.cdfCash || 0;
-    const rUSD = a.USD;
-    const rCDF = a.CDF;
-
-    const person = t.person || '';
-    const normalizedPerson = normalizeStrict(person);
-    const currentNumber = data.whatsappNumbers[normalizedPerson] || '';
-    const receiptButton = `<button onclick="sendWhatsAppReceipt('${person.replace(/'/g, "\\'")}', ${pUSD}, ${pCDF}, ${rUSD}, ${rCDF}, '${t.operator ? t.operator.replace(/'/g, "\\'") : ''}')" 
-                        style="background:#25D366; color:white; border:none; padding:4px 8px; border-radius:6px; font-size:9px; margin-top:5px; cursor:pointer; width:100%; font-weight:bold;">
-                        ✉️ Envoyer Reçu
-                       </button>`;
-
-    return `
-    <div style="background:#fff7ed; border-radius:16px; padding:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); border-left:5px solid #eab308; margin-bottom:12px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-            <span style="font-size:11px; color:#64748b;">${t.date}</span>
-            <span style="font-weight:bold; color:#854d0e; font-size:12px;">💰 RÈGLEMENT ${person.toUpperCase()}</span>
-            
-            ${isAdmin ? `
-            <div style="display:flex; gap:6px;">
-                <button onclick="cancelTransaction(${realIdx})" style="background:#f59e0b; color:#fff; border:none; padding:4px 8px; border-radius:6px; font-size:10px; cursor:pointer; font-weight:bold;">↩ Annuler</button>
-                <button onclick="deleteTransaction(${realIdx})" style="background:#ef4444; color:#fff; border:none; padding:4px 8px; border-radius:6px; font-size:10px; cursor:pointer; font-weight:bold;">🗑️ Suppr</button>
-            </div>` : ""}
-        </div>
-
-        <div style="display:grid; grid-template-columns: 1fr 1.6fr 1fr; gap:8px; align-items:center; background:white; padding:10px; border-radius:10px;">
-            
-            <div style="text-align:center;">
-                <div style="font-size:9px; color:#9a3412; font-weight:bold; text-transform:uppercase;">Était Dû</div>
-                <div style="font-weight:bold; font-size:13px; color:#0f172a;">${fmt(b.USD)}$</div>
-                <div style="font-size:11px; color:#475569;">${fmt(b.CDF)} FC</div>
-            </div>
-
-            <div style="font-size:10px; border-left:1px solid #fed7aa; border-right:1px solid #fed7aa; padding:0 8px;">
-                <div style="font-weight:bold; color:#166534; font-size:9px; margin-bottom:4px; text-align:center; text-decoration:underline;">DÉTAIL DU VERSEMENT</div>
-                
-                <div style="display:flex; justify-content:space-between; margin-bottom:2px;">
-                    <span style="color:#64748b;">Sur Dette $:</span> 
-                    <b style="color:#166534;">${fmt(p.onUsd.usd)}$+${fmt(p.onUsd.cdf)}F</b>
+            return `
+            <div style="background:#fff7ed; border-radius:16px; padding:12px; border-left:5px solid #eab308; margin-bottom:12px;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                    <span style="font-size:11px; color:#64748b;">${t.date}</span>
+                    <span style="font-weight:bold; color:#854d0e; font-size:12px;">💰 RÈGLEMENT ${person.toUpperCase()}</span>
+                    ${isAdmin ? `
+                    <div style="display:flex; gap:6px;">
+                        <button onclick="cancelTransaction(${realIdx})" style="background:#f59e0b;color:#fff;border:none;padding:4px 8px;border-radius:6px;font-size:10px;">↩</button>
+                        <button onclick="deleteTransaction(${realIdx})" style="background:#ef4444;color:#fff;border:none;padding:4px 8px;border-radius:6px;font-size:10px;">🗑️</button>
+                    </div>` : ""}
                 </div>
-                
-                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                    <span style="color:#64748b;">Sur Dette FC:</span> 
-                    <b style="color:#166534;">${fmt(p.onCdf.usd)}$+${fmt(p.onCdf.cdf)}F</b>
-                </div>
-
-                ${(rem.usd > 0 || rem.cdf > 0) ? `
-                <div style="display:flex; justify-content:space-between; margin-bottom:4px; background:#fee2e2; padding:2px 4px; border-radius:4px;">
-                    <span style="color:#991b1b; font-weight:bold;">🎁 Com/Réduction:</span> 
-                    <b style="color:#b91c1c;">${fmt(rem.usd)}$+${fmt(rem.cdf)}F</b>
-                </div>` : ''}
-
-                ${(t.pourboire && (t.pourboire.usd > 0 || t.pourboire.cdf > 0)) ? `
-                <div style="display:flex; justify-content:space-between; margin-bottom:4px; background:#dcfce7; padding:2px 4px; border-radius:4px;">
-                    <span style="color:#166534; font-weight:bold;">💖 Pourboire (Caisse):</span> 
-                    <b style="color:#15803d;">${fmt(t.pourboire.usd)}$+${fmt(t.pourboire.cdf)}F</b>
-                </div>` : ''}
-
-                <div style="text-align:center; font-size:9px; color:#9a3412; border-top:1px dashed #fed7aa; padding-top:4px;">
-                    Dest: <b>${t.operator}</b>
-                </div>
-            </div>
-
-            <div style="text-align:center;">
-                ${estSolde ? 
-                    `<div style="background:#16a34a; color:white; padding:6px; border-radius:10px; font-weight:bold; font-size:12px; border:2px solid #bcf0da;">
-                        SOLDÉ
-                        ${(sUSD > 0 || sCDF > 0) ? `
-                            <div style="font-size:8px; background:rgba(0,0,0,0.15); margin-top:4px; padding:2px; border-radius:4px; line-height:1;">
-                                <span style="text-decoration:underline;">${labelSurplus}:</span><br>
-                                ${sUSD > 0 ? `+${fmt(sUSD)}$` : ''}
-                                ${sCDF > 0 ? (sUSD > 0 ? ' | ' : '') + `+${fmt(sCDF)}FC` : ''}
-                            </div>` : ''
+                <div style="display:grid; grid-template-columns: 1fr 1.6fr 1fr; gap:8px; align-items:center; background:white; padding:10px; border-radius:10px;">
+                    <div style="text-align:center;">
+                        <div style="font-size:9px; color:#9a3412;">ÉTAIT DÛ</div>
+                        <div style="font-weight:bold; font-size:13px;">${fmt(b.USD)}$</div>
+                        <div style="font-size:11px; color:#475569;">${fmt(b.CDF)} FC</div>
+                    </div>
+                    <div style="font-size:10px; border-left:1px solid #fed7aa; border-right:1px solid #fed7aa; padding:0 8px;">
+                        <div style="font-weight:bold; color:#166534; font-size:9px; text-align:center;">DÉTAIL</div>
+                        <div style="display:flex; justify-content:space-between;"><span>Sur $:</span><b style="color:#166534;">${fmt(p.onUsd.usd)}$+${fmt(p.onUsd.cdf)}F</b></div>
+                        <div style="display:flex; justify-content:space-between;"><span>Sur FC:</span><b style="color:#166534;">${fmt(p.onCdf.usd)}$+${fmt(p.onCdf.cdf)}F</b></div>
+                        ${(rem.usd > 0 || rem.cdf > 0) ? `<div style="background:#fee2e2; padding:2px 4px; border-radius:4px; margin-top:2px;"><span style="color:#991b1b;">🎁 Com:</span> <b style="color:#b91c1c;">${fmt(rem.usd)}$+${fmt(rem.cdf)}F</b></div>` : ''}
+                        ${(t.pourboire && (t.pourboire.usd > 0 || t.pourboire.cdf > 0)) ? `<div style="background:#dcfce7; padding:2px 4px; border-radius:4px; margin-top:2px;"><span style="color:#166534;">💖 Pourb:</span> <b style="color:#15803d;">${fmt(t.pourboire.usd)}$+${fmt(t.pourboire.cdf)}F</b></div>` : ''}
+                    </div>
+                    <div style="text-align:center;">
+                        ${estSolde ? 
+                            `<div style="background:#16a34a; color:white; padding:6px; border-radius:10px; font-weight:bold; font-size:12px;">SOLDÉ
+                                ${(sUSD > 0 || sCDF > 0) ? `<div style="font-size:8px; background:rgba(0,0,0,0.15); margin-top:4px; padding:2px; border-radius:4px;">${labelSurplus}: ${sUSD > 0 ? `+${fmt(sUSD)}$` : ''}${sCDF > 0 ? ` +${fmt(sCDF)}FC` : ''}</div>` : ''}
+                            </div>` : 
+                            `<div><div style="font-size:9px; color:#64748b;">RESTE</div><div style="font-weight:bold; font-size:13px; color:#dc2626;">${fmt(a.USD)}$</div><div style="font-size:11px; color:#dc2626;">${fmt(a.CDF)} FC</div></div>`
                         }
-                    </div>` : 
-                    `<div>
-                        <div style="font-size:9px; color:#64748b; font-weight:bold;">RESTE</div>
-                        <div style="font-weight:bold; font-size:13px; color:#dc2626;">${fmt(a.USD)}$</div>
-                        <div style="font-size:11px; color:#dc2626;">${fmt(a.CDF)} FC</div>
-                    </div>`
+                        <button onclick="sendWhatsAppReceipt('${person.replace(/'/g, "\\'")}', ${t.usdCash || 0}, ${t.cdfCash || 0}, ${a.USD}, ${a.CDF}, '${t.operator ? t.operator.replace(/'/g, "\\'") : ''}')" 
+                            style="background:#25D366; color:white; border:none; padding:4px 8px; border-radius:6px; font-size:9px; margin-top:5px; cursor:pointer; width:100%; font-weight:bold;">✉️ Reçu</button>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        // DÉPENSES
+        if (t.mode === 'depense' || t.isDepense || normalize(desc).includes("depense")) {
+            let stockDisplay = "";
+            const qteStock = parseFloat(t.stk || (t.impacts && t.impacts.stock) || 0);
+            if(qteStock !== 0) {
+                const sColor = qteStock > 0 ? "#16a34a" : "#ef4444";
+                stockDisplay = `<div style="color:${sColor}; font-weight:bold; font-size:10px;">Stock: ${qteStock > 0 ? "+" : ""}${fmt(qteStock)}</div>`;
+            }
+
+            let budgetCatDisplay = "";
+            if (t.budgetCategoryId) {
+                for (const monthKey of Object.keys(data.budgetMonths || {})) {
+                    const m = data.budgetMonths[monthKey];
+                    const cat = (m.categories || []).find(c => Number(c.id) === Number(t.budgetCategoryId));
+                    if (cat) {
+                        budgetCatDisplay = `<div style="color:#0ea5e9; font-weight:bold; font-size:10px; margin-top:2px;">📂 ${cat.name}</div>`;
+                        break;
+                    }
                 }
-                ${receiptButton}
-            </div>
-        </div>
+            }
 
-        ${t.desc ? `<div style="font-size:10px; margin-top:6px; color:#9a3412; text-align:center; font-style:italic; opacity:0.8;">${t.desc}</div>` : ""}
-    </div>`;
-}
-
-if (t.mode === 'depense' || t.isDepense || normalize(desc).includes("depense")) {
-    let stockDisplay = "";
-    const qteStock = parseFloat(t.stk || (t.impacts && t.impacts.stock) || 0);
-    if(qteStock !== 0) {
-        const sColor = qteStock > 0 ? "#16a34a" : "#ef4444";
-        const sSign = qteStock > 0 ? "+" : "";
-        stockDisplay = `<div style="color:${sColor}; font-weight:bold; font-size:10px; margin-top:2px;">Stock: ${sSign}${fmt(qteStock)}</div>`;
-    }
-
-    // Calcul du montant ajouté au compte Dépenses en USD
-    let diffUSD = 0;
-    const isDepensesPrincipal = normalize(t.operator || "").includes("depenses");
-    if (isDepensesPrincipal) {
-        // Pour le compte Dépenses, le montant total est la dépense
-        if (t.curSIM === "USD") {
-            diffUSD = t.amtSIM || 0;
-        } else if (t.curSIM === "CDF") {
-            const taux = parseFloat(data.taux) || 1;
-            diffUSD = (t.amtSIM || 0) / taux;
-        } else {
-            diffUSD = t.amt || 0;
+            return `
+            <div style="background:#fef2f2; border-radius:16px; padding:12px; border-left:5px solid #ef4444;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                    <span style="font-size:11px; color:#64748b;">${t.date}</span>
+                    <span style="font-weight:bold; color:#b91c1c; font-size:12px;">🚫 DÉPENSE</span>
+                    ${isAdmin ? `
+                    <div style="display:flex; gap:5px;">
+                        <button onclick="cancelTransaction(${realIdx})" style="background:#f59e0b;color:#fff;border:none;padding:4px 8px;border-radius:6px;font-size:10px;">↩ Annuler</button>
+                        <button onclick="deleteTransaction(${realIdx})" style="background:#ef4444;color:#fff;border:none;padding:4px 8px;border-radius:6px;font-size:10px;">Suppr</button>
+                    </div>` : ""}
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; background:white; padding:10px; border-radius:10px;">
+                    <div>
+                        <div style="font-weight:bold; font-size:13px;">${t.operator || "-"}</div>
+                        <div style="font-size:11px; color:#64748b;">${desc}</div>
+                        ${stockDisplay}
+                        ${budgetCatDisplay}
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-size:16px; font-weight:bold; color:#ef4444;">-${fmt(t.amtSIM || t.amt)} ${t.curSIM || t.cur}</div>
+                        <div style="font-size:10px; color:#94a3b8;">Cash: ${fmt(t.usdCash || 0)}$ | ${fmt(t.cdfCash || 0)}FC</div>
+                    </div>
+                </div>
+            </div>`;
         }
-    } else {
-        // Pour les autres opérateurs, c'est la différence
-        if (t.curSIM === "USD") {
-            diffUSD = (t.amtSIM || 0) - (t.usdCash || 0);
-        } else if (t.curSIM === "CDF") {
-            const taux = parseFloat(data.taux) || 1;
-            const amtUSD = (t.amtSIM || 0) / taux;
-            const cashUSD = (t.cdfCash || 0) / taux;
-            diffUSD = amtUSD - cashUSD;
-        } else {
-            diffUSD = (t.amtSIM || t.amt || 0) - (t.usdCash || t.realUSD || 0);
-        }
-    }
-    
-    const depensesDisplay = diffUSD > 0 ? 
-        `<div style="color:#ef4444; font-weight:bold; font-size:10px; margin-top:2px;">Dépenses: +${fmt(diffUSD)}$</div>` : '';
-
-    return `
-    <div style="background:#fef2f2; border-radius:16px; padding:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); border-left:5px solid #ef4444;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-            <span style="font-size:11px; color:#64748b;">${t.date}</span>
-            <span style="font-weight:bold; color:#b91c1c; font-size:12px;">🚫 SORTIE / DÉPENSE</span>
-            ${isAdmin ? `
-            <div style="display:flex; gap:5px;">
-                <button onclick="cancelTransaction(${realIdx})" style="background:#f59e0b;color:#fff;border:none;padding:4px 8px;border-radius:6px;font-size:10px;cursor:pointer;">↩ Annuler</button>
-                <button onclick="deleteTransaction(${realIdx})" style="background:#ef4444;color:#fff;border:none;padding:4px 8px;border-radius:6px;font-size:10px;cursor:pointer;">Suppr</button>
-            </div>` : ""}
-        </div>
-        <div style="display:flex; justify-content:space-between; align-items:center; background:white; padding:10px; border-radius:10px;">
-            <div>
-                <div style="font-weight:bold; font-size:13px; color:#1e293b;">${t.operator || "-"}</div>
-                <div style="font-size:11px; color:#64748b;">${desc}</div>
-                ${stockDisplay}
-                ${depensesDisplay}
-            </div>
-            <div style="text-align:right;">
-                <div style="font-size:16px; font-weight:bold; color:#ef4444;">-${fmt(t.amtSIM || t.amt)} ${t.curSIM || t.cur}</div>
-                <div style="font-size:10px; color:#94a3b8;">Cash: ${fmt(t.usdCash || 0)}$ | ${fmt(t.cdfCash || 0)}FC</div>
-            </div>
-        </div>
-    </div>`;
-}
-
 
         const parts = desc.split("-");  
         const type = parts[0] ? parts[0].trim() : "";  
@@ -2677,25 +3034,15 @@ if (t.mode === 'depense' || t.isDepense || normalize(desc).includes("depense")) 
         } else { opNameFromDesc = rest; }  
   
         let finalPerson = t.person || "";
-
         if (!finalPerson && t.desc && t.desc.includes("NOM:")) {
             finalPerson = t.desc.split("NOM:")[1].split("|")[0].trim();
         }
 
-        if (!finalPerson && t.payDetail && t.person) {
-            finalPerson = t.person;
-        }
-  
         let isOpDette = normalize(t.operator || "").includes("dette");
-
         let isModeDette = (
-             t.mode === "dette_client" || 
-             t.mode === "dette_moi" || 
-             t.isDette === true || 
-             t.isReglement === true ||
-             isOpDette ||
-             normalize(desc || "").includes("creance") ||
-             normalize(type || "").includes("dette")
+             t.mode === "dette_client" || t.mode === "dette_moi" || 
+             t.isDette === true || t.isReglement === true || isOpDette ||
+             normalize(desc || "").includes("creance") || normalize(type || "").includes("dette")
         );
 
         let resteTxt = "✔ Cash"; 
@@ -2707,61 +3054,48 @@ if (t.mode === 'depense' || t.isDepense || normalize(desc).includes("depense")) 
             const duCDF = t.snapshotDette.CDF;
             const isCleared = Math.abs(duUSD) < 0.1 && Math.abs(duCDF) < 100;
 
-            if (isCleared) {
-                resteTxt = "✔ SOLDÉ"; 
-                resteColor = "#16a34a";
-            } else {
+            if (isCleared) { resteTxt = "✔ SOLDÉ"; resteColor = "#16a34a"; }
+            else {
                 resteTxt = `Reste: ${fmt(duUSD)}$ | ${fmt(duCDF)}FC`;
                 resteColor = "#dc2626"; 
-                
                 if (isModeDette && finalPerson) {
-                    waButtonsHtml += `<button onclick="sendWhatsAppReminder('${finalPerson.replace(/'/g, "\\'")}', ${duUSD}, ${duCDF})" 
-                                    style="background:#25D366; color:white; border:none; padding:4px 8px; border-radius:6px; font-size:10px; margin-top:5px; cursor:pointer; font-weight:bold; display:block; width:100%;">
-                                    📱 Rappel WhatsApp
-                                    </button>`;
+                    waButtonsHtml += `<button onclick="sendWhatsAppReminder('${finalPerson.replace(/'/g, "\\'")}', ${duUSD}, ${duCDF})" style="background:#25D366; color:white; border:none; padding:4px 8px; border-radius:6px; font-size:10px; margin-top:5px; cursor:pointer; font-weight:bold; display:block; width:100%;">📱 Rappel</button>`;
                 }
             }
         } 
-        else if (t.person && (t.mode?.includes("dette") || t.typeDette)) {
-            resteTxt = "Ancienne dette";
-            resteColor = "#6b7280";
-        }
         else if (finalPerson && isModeDette) {  
             const typeDette = (t.mode === "dette_moi" || (t.typeDette && t.typeDette.includes("moi"))) ? "dette moi" : "dette client";
             const debtKey = `${normalize(typeDette)}_${normalize(finalPerson)}`;  
             const currentDebt = data.debts[debtKey] || { USD: 0, CDF: 0 };
-            
             resteTxt = `Reste: ${fmt(currentDebt.USD)}$ | ${fmt(currentDebt.CDF)}FC`;
             resteColor = "#dc2626"; 
-
             if (currentDebt.USD > 0.1 || currentDebt.CDF > 100) {
-                waButtonsHtml += `<button onclick="sendWhatsAppReminder('${finalPerson.replace(/'/g, "\\'")}', ${currentDebt.USD}, ${currentDebt.CDF})" 
-                                style="background:#25D366; color:white; border:none; padding:4px 8px; border-radius:6px; font-size:10px; margin-top:5px; cursor:pointer; font-weight:bold; display:block; width:100%;">
-                                📱 Rappel WhatsApp
-                                </button>`;
+                waButtonsHtml += `<button onclick="sendWhatsAppReminder('${finalPerson.replace(/'/g, "\\'")}', ${currentDebt.USD}, ${currentDebt.CDF})" style="background:#25D366; color:white; border:none; padding:4px 8px; border-radius:6px; font-size:10px; margin-top:5px; cursor:pointer; font-weight:bold; display:block; width:100%;">📱 Rappel</button>`;
             }
         }
 
+        // 🔥 CORRECTION : Utiliser snapshotDette (déjà le nouveau solde) au lieu de l'addition
         if (isModeDette && finalPerson && !t.isReglement) {
             const typeDette = (t.mode === "dette_moi" || (t.typeDette && t.typeDette.includes("moi"))) ? "dette moi" : "dette client";
             const debtKey = `${normalize(typeDette)}_${normalize(finalPerson)}`;  
             const currentDebt = data.debts[debtKey] || { USD: 0, CDF: 0 };
+            
+            // Le montant ajouté par cette transaction
+            const addedUsd = t.detteUSD || 0;
+            const addedCdf = t.detteCDF || 0;
+            
+            // Le nouveau solde total est déjà dans currentDebt
+            const nouveauTotalUsd = currentDebt.USD;
+            const nouveauTotalCdf = currentDebt.CDF;
 
-            const addedUsd = t.detteUSD || (t.curSIM === "USD" ? (t.amtSIM || t.amt) : 0);
-            const addedCdf = t.detteCDF || (t.curSIM === "CDF" ? (t.amtSIM || t.amt) : 0);
-
-            waButtonsHtml += `<button onclick="sendWhatsAppTrustMessage('${finalPerson.replace(/'/g, "\\'")}', ${addedUsd}, ${addedCdf}, ${currentDebt.USD}, ${currentDebt.CDF})" 
-                            style="background:#0ea5e9; color:white; border:none; padding:4px 8px; border-radius:6px; font-size:10px; margin-top:4px; cursor:pointer; font-weight:bold; display:block; width:100%;">
-                            🤝 Reçu de Confiance
-                            </button>`;
+            waButtonsHtml += `<button onclick="sendWhatsAppTrustMessage('${finalPerson.replace(/'/g, "\\'")}', ${addedUsd}, ${addedCdf}, ${nouveauTotalUsd}, ${nouveauTotalCdf})" style="background:#0ea5e9; color:white; border:none; padding:4px 8px; border-radius:6px; font-size:10px; margin-top:4px; cursor:pointer; font-weight:bold; display:block; width:100%;">🤝 Reçu</button>`;
         }
 
         let stockDisplay = "";
         const qteStock = parseFloat(t.stk || (t.impacts && t.impacts.stock) || 0);
         if(qteStock !== 0) {
             const sColor = qteStock > 0 ? "#16a34a" : "#ef4444";
-            const sSign = qteStock > 0 ? "+" : "";
-            stockDisplay = `<div style="color:${sColor}; font-weight:bold; font-size:10px; margin-top:2px;">Stock: ${sSign}${fmt(qteStock)}</div>`;
+            stockDisplay = `<div style="color:${sColor}; font-weight:bold; font-size:10px;">Stock: ${qteStock > 0 ? "+" : ""}${fmt(qteStock)}</div>`;
         }
 
         let icon = "📄"; 
@@ -2776,11 +3110,10 @@ if (t.mode === 'depense' || t.isDepense || normalize(desc).includes("depense")) 
         let simSourceName = "";
         if (t.impacts && t.impacts.virtuel && t.impacts.virtuel.opIdx !== null) {
             const sourceOp = data.operators[t.impacts.virtuel.opIdx];
-            simSourceName = sourceOp ? ` (via ${sourceOp.name})` : " (SIM inconnue)";
+            simSourceName = sourceOp ? ` (via ${sourceOp.name})` : "";
         }
 
         let rawMode = normalize(t.mode || "");
-        if (rawMode.includes("credit")) rawMode = "dette_client";
         if (!rawMode || rawMode === "-") {
             if ((t.usdCash || 0) > 0 || (t.cdfCash || 0) > 0) rawMode = "cash";
             else if (t.impacts && t.impacts.virtuel) rawMode = "virtuel";
@@ -2789,15 +3122,12 @@ if (t.mode === 'depense' || t.isDepense || normalize(desc).includes("depense")) 
         }
 
         const modeLabel = {
-            "cash": "💵 CASH",
-            "virtuel": `📱 INTER-SIM${simSourceName}`,
-            "depense": "🚫 DÉPENSE",
-            "dette_client": "📝 DETTE CLIENT",
-            "dette_moi": "📝 DETTE MOI",
-            "transfert": "🔄 TRANSFERT"
+            "cash": "💵 CASH", "virtuel": `📱 INTER-SIM${simSourceName}`,
+            "depense": "🚫 DÉPENSE", "dette_client": "📝 DETTE CLIENT",
+            "dette_moi": "📝 DETTE MOI", "transfert": "🔄 TRANSFERT"
         };
 
-        let displayMode = modeLabel[rawMode] || "❓ MODE INCONNU";
+        let displayMode = modeLabel[rawMode] || "❓";
         const badgeColor = isModeDette ? "#ef4444" : "#475569"; 
 
         let finalCashDisplay = `<div style="color:${badgeColor}; font-size:10px; font-weight:bold; background:#f1f5f9; padding:4px 8px; border-radius:6px; display:inline-block; border:1px solid ${badgeColor}44; text-transform: uppercase;">${displayMode}</div>`;
@@ -2805,65 +3135,49 @@ if (t.mode === 'depense' || t.isDepense || normalize(desc).includes("depense")) 
         if (t.usdCash > 0 || t.cdfCash > 0) {
             finalCashDisplay += `<div style="color:#16a34a; font-size:10px; font-weight:700;">CASH: ${fmt(t.usdCash || 0)}$ | ${fmt(t.cdfCash || 0)}FC</div>`;
         }
-        if (t.mode === "virtuel") {
-            finalCashDisplay += `<div style="color:#64748b; font-size:9px; font-style:italic;">Via SIM</div>`;
+
+        let budgetCatDisplay = "";
+        if (t.budgetCategoryId) {
+            for (const monthKey of Object.keys(data.budgetMonths || {})) {
+                const m = data.budgetMonths[monthKey];
+                const cat = (m.categories || []).find(c => Number(c.id) === Number(t.budgetCategoryId));
+                if (cat) {
+                    budgetCatDisplay = `<div style="color:#0ea5e9; font-size:9px; font-weight:bold;">📂 ${cat.name}</div>`;
+                    break;
+                }
+            }
         }
 
         return `  
         <div style="background:#ffffff; border-radius:16px; padding:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); border-left:5px solid ${isModeDette ? '#f59e0b' : '#0ea5e9'};">  
-
             ${isAdmin ? `  
             <div style="display:flex; gap:6px; justify-content:flex-end; margin-bottom: 5px;">  
-                <button onclick="cancelTransaction(${realIdx})" style="background:#f59e0b;color:#fff;border:none;padding:5px 10px;border-radius:8px;font-size:10px;cursor:pointer;">↩ Annuler</button>  
-                <button onclick="deleteTransaction(${realIdx})" style="background:#ef4444;color:#fff;border:none;padding:5px 10px;border-radius:8px;font-size:10px;cursor:pointer;">Suppr</button>  
+                <button onclick="cancelTransaction(${realIdx})" style="background:#f59e0b;color:#fff;border:none;padding:5px 10px;border-radius:8px;font-size:10px;">↩ Annuler</button>  
+                <button onclick="deleteTransaction(${realIdx})" style="background:#ef4444;color:#fff;border:none;padding:5px 10px;border-radius:8px;font-size:10px;">Suppr</button>  
             </div>` : ""}  
 
             <div style="display:grid; grid-template-columns: 1.2fr 1fr 1fr 1.6fr 1.5fr 1fr; gap:6px; align-items:center; font-size:12px;">  
-
                 <div style="color:#64748b;">${t.date}</div>  
-
-                <div style="font-weight:bold; color:#1e293b;">
-                    ${t.operator || opNameFromDesc}
-                </div>  
-
+                <div style="font-weight:bold; color:#1e293b;">${t.operator || opNameFromDesc}</div>  
                 <div style="background:#f1f5f9; padding:3px 6px; border-radius:6px; text-align:center; font-size:10px; border:1px solid #e2e8f0;">  
                     ${icon} ${type || "-"} ${stockDisplay} 
                 </div>  
-
                 <div style="color:#475569; font-weight:500;">
                     ${motif || "-"}
+                    ${budgetCatDisplay}
                 </div>  
-                
-
                 <div style="line-height:1.3;">  
-                <div style="font-weight:bold; color:#0f172a;">
-        SIM: ${fmt(t.amtSIM || t.amt)} ${t.curSIM || t.cur}
-    </div>
-
-                <div style="font-size:9px; color:#64748b; font-style:italic;">
-        Taux: ${t.tauxApplique || t.opTaux || (t.transferDetails && t.transferDetails.appliedRate) || data.taux} FC
-    </div>
-
-    ${finalCashDisplay}
-
-    ${(cUSD > 0 || cCDF > 0) ? 
-                `<div style="color:#0ea5e9; font-size:10px; font-weight:bold; background:#f0f9ff; border-radius:4px; padding:1px 3px;">
-            + COM: ${fmt(cUSD)}$ | ${fmt(cCDF)}FC
-        </div>` 
-        : ""
-    }
-</div>
-  
-
+                    <div style="font-weight:bold; color:#0f172a;">SIM: ${fmt(t.amtSIM || t.amt)} ${t.curSIM || t.cur}</div>
+                    <div style="font-size:9px; color:#64748b; font-style:italic;">Taux: ${t.tauxApplique || t.opTaux || data.taux} FC</div>
+                    ${finalCashDisplay}
+                    ${(cUSD > 0 || cCDF > 0) ? `<div style="color:#0ea5e9; font-size:10px; font-weight:bold; background:#f0f9ff; border-radius:4px; padding:1px 3px;">+ COM: ${fmt(cUSD)}$ | ${fmt(cCDF)}FC</div>` : ""}
+                </div>
                 <div style="font-weight:800; color:${resteColor}; text-align:right; font-size:11px;">
                     ${resteTxt}
                     <div style="margin-top: 5px;">${waButtonsHtml}</div>
                 </div>  
-
             </div>  
         </div>`;
-
-
     }).join("");  
   
     html += `</div>`;  
@@ -2871,8 +3185,11 @@ if (t.mode === 'depense' || t.isDepense || normalize(desc).includes("depense")) 
     document.getElementById("historyModal").classList.remove("hidden");     
 };
 
+// ============================================
+// 🔥 CANCELTRANSACTION CORRIGÉE : rembourse le budget si c'est une dépense
+// ============================================
 window.cancelTransaction = async function(index) {  
-    if(!confirm("Annuler cette opération ?")) return;  
+    if(!confirm("Annuler cette opération ?\n\nSi c'est une dépense, le montant sera remboursé au budget/crédit de la catégorie.")) return;  
   
     const t = data.transactions[index];  
     if(!t || !t.timestamp) {
@@ -2881,13 +3198,37 @@ window.cancelTransaction = async function(index) {
     }
 
     try {
+        // 🔥 REMBOURSEMENT BUDGET SI C'EST UNE DÉPENSE
+        if ((t.mode === 'depense' || t.isDepense) && t.budgetCategoryId) {
+            let depenseUSD = 0;
+            const isDepensesPrincipal = normalize(t.operator || "").includes("depenses");
+            
+            if (isDepensesPrincipal) {
+                if (t.curSIM === "USD") depenseUSD = t.amtSIM || 0;
+                else if (t.curSIM === "CDF") {
+                    const taux = parseFloat(data.taux) || 1;
+                    depenseUSD = (t.amtSIM || 0) / taux;
+                }
+            } else {
+                if (t.curSIM === "USD") depenseUSD = (t.amtSIM || 0) - (t.usdCash || 0);
+                else if (t.curSIM === "CDF") {
+                    const taux = parseFloat(data.taux) || 1;
+                    depenseUSD = ((t.amtSIM || 0) / taux) - ((t.cdfCash || 0) / taux);
+                }
+            }
+            
+            if (depenseUSD > 0) {
+                const refunded = refundBudgetExpense(t.budgetCategoryId, t.timestamp, depenseUSD);
+                console.log(`Budget remboursé: ${refunded ? 'OUI' : 'NON'} pour ${fmt(depenseUSD)}$`);
+            }
+        }
+
         if(t.mode === 'transfert' && t.impacts && t.impacts.isTransfer) {
             const { source, dest } = t.impacts;
             if(source.idx === "caisse") data.caisse[source.cur] += source.amt;
             else if(data.operators[source.idx]) data.operators[source.idx][source.cur] += source.amt;
             if(dest.idx === "caisse") data.caisse[dest.cur] -= dest.amt;
             else if(data.operators[dest.idx]) data.operators[dest.idx][dest.cur] -= dest.amt;
-            alert("Transfert/Change inversé avec succès ✅");
         } 
         else {
             applyImpacts(t, true);
@@ -2898,6 +3239,7 @@ window.cancelTransaction = async function(index) {
         updates['mka_data/operators'] = data.operators;
         if(data.debts) updates['mka_data/debts'] = data.debts;
         updates[`mka_data/transactions/${t.timestamp}`] = null;
+        updates['mka_data/budgetMonths'] = data.budgetMonths;
 
         await update(ref(db), updates);
 
@@ -2907,39 +3249,35 @@ window.cancelTransaction = async function(index) {
         if (typeof showFullHistory === "function") {
             showFullHistory(window.currentHistoryType || "general");  
         }
-        alert("🔄 Opération annulée et soldes mis à jour partout !");
+        alert("🔄 Opération annulée et budget remboursé si applicable !");
 
     } catch (error) {
         console.error("Erreur lors de l'annulation Firebase :", error);
-        alert("❌ Erreur réseau : Impossible d'annuler sur Firebase. Réessaye.");
+        alert("❌ Erreur réseau : Impossible d'annuler sur Firebase.");
     }
 };
 
-    window.quickEditOp = (i) => {  
-        const op = data.operators[i];  
-        const nName = prompt("Nom :", op.name), nUSD = prompt("USD :", op.USD), nCDF = prompt("CDF :", op.CDF), nStk = prompt("SIM :", op.stock);  
-        if(nName !== null) { data.operators[i] = { ...op, name: nName, USD: parseFloat(nUSD)||0, CDF: parseFloat(nCDF)||0, stock: parseInt(nStk)||0 }; save(); }  
-    };  
-  
-    window.calcDest = () => {  
+window.quickEditOp = (i) => {  
+    const op = data.operators[i];  
+    const nName = prompt("Nom :", op.name), nUSD = prompt("USD :", op.USD), nCDF = prompt("CDF :", op.CDF), nStk = prompt("SIM :", op.stock);  
+    if(nName !== null) { data.operators[i] = { ...op, name: nName, USD: parseFloat(nUSD)||0, CDF: parseFloat(nCDF)||0, stock: parseInt(nStk)||0 }; save(); }  
+};  
+
+window.calcDest = () => {  
     const amt = parseFloat(document.getElementById("srcAmt").value) || 0;
     const t = parseFloat(document.getElementById("transferRate").value) || parseFloat(data.taux) || 1;    
     const sc = document.getElementById("srcCurr").value;
     const dc = document.getElementById("destCurr").value;    
     
     let result = 0;
-    if (sc === "USD" && dc === "CDF") {
-        result = amt * t;
-    } else if (sc === "CDF" && dc === "USD") {
-        result = amt / t;
-    } else {
-        result = amt;
-    }
+    if (sc === "USD" && dc === "CDF") result = amt * t;
+    else if (sc === "CDF" && dc === "USD") result = amt / t;
+    else result = amt;
     
     document.getElementById("destAmt").value = result.toFixed(2);    
 };
 
-  window.executeGlobalChange = async () => {
+window.executeGlobalChange = async () => {
     const sIdx = document.getElementById("srcWallet").value;
     const dIdx = document.getElementById("destWallet").value;    
     const sAmt = parseFloat(document.getElementById("srcAmt").value) || 0;
@@ -2958,7 +3296,6 @@ window.cancelTransaction = async function(index) {
 
     try {
         const uniqueTimestamp = Date.now();
-        
         const sourceName = sIdx === "caisse" ? "Caisse" : data.operators[sIdx].name;
         const destName = dIdx === "caisse" ? "Caisse" : data.operators[dIdx].name;
 
@@ -2969,18 +3306,11 @@ window.cancelTransaction = async function(index) {
         else data.operators[dIdx][dc] += dAmt;
 
         const gomaDate = formatGomaDate();
-
         const t = { 
-            id: Date.now(),
-            timestamp: Date.now(),
-            date: gomaDate, 
-            typeNom: "TRANSFERT",
-            operator: sourceName, 
+            id: Date.now(), timestamp: Date.now(), date: gomaDate, 
+            typeNom: "TRANSFERT", operator: sourceName, 
             desc: sIdx === dIdx ? `CHANGE: ${sourceName} (${sc} ➔ ${dc})` : `TRANSFERT: ${sourceName} ➔ ${destName} (${motif})`, 
-            amt: sAmt, 
-            cur: sc, 
-            mode: 'transfert',
-            tauxApplique: tUsed,
+            amt: sAmt, cur: sc, mode: 'transfert', tauxApplique: tUsed,
             transferDetails: { sIdx, dIdx, sAmt, dAmt, sc, dc, sourceName, destName, appliedRate: tUsed },
             impacts: { isTransfer: true, source: { idx: sIdx, amt: sAmt, cur: sc }, dest: { idx: dIdx, amt: dAmt, cur: dc } }
         };
@@ -2993,7 +3323,6 @@ window.cancelTransaction = async function(index) {
         updates['mka_data/operators'] = data.operators;
 
         await update(ref(db), updates);
-
         render();
         alert("✅ Transfert/Change synchronisé !");
 
@@ -3004,19 +3333,20 @@ window.cancelTransaction = async function(index) {
 
     } catch (error) {
         data = backupData;
-        alert("❌ ÉCHEC FIREBASE : Le transfert a été annulé car la connexion est instable.");
+        alert("❌ ÉCHEC FIREBASE : Le transfert a été annulé.");
         render();
     }
 };
 
-  
-    window.updateAdminBasics = () => {  
-        const tX = document.getElementById("newTaux").value, uX = document.getElementById("editCashUSD").value, cX = document.getElementById("editCashCDF").value;  
-        if(tX) data.taux = parseFloat(tX); if(uX) data.caisse.USD = parseFloat(uX); if(cX) data.caisse.CDF = parseFloat(cX);  
-        save(); alert("Mis à jour !");  
-    };  
-  
-    window.addOperator = () => {  
+window.updateAdminBasics = () => {  
+    const tX = document.getElementById("newTaux").value, uX = document.getElementById("editCashUSD").value, cX = document.getElementById("editCashCDF").value;  
+    if(tX) data.taux = parseFloat(tX); 
+    if(uX) data.caisse.USD = parseFloat(uX); 
+    if(cX) data.caisse.CDF = parseFloat(cX);  
+    save(); alert("Mis à jour !");  
+};  
+
+window.addOperator = () => {  
     const op = { 
         name: document.getElementById("newOpName").value.trim(), 
         USD: parseFloat(document.getElementById("initUSD").value) || 0, 
@@ -3028,100 +3358,109 @@ window.cancelTransaction = async function(index) {
     if(op.name) { 
         data.operators.push(op); 
         save(); 
-        alert(`Compte "${op.name}" créé avec succès`); 
+        alert(`Compte "${op.name}" créé !`); 
         
         ["newOpName", "initUSD", "initCDF", "initStock", "initPrice"].forEach(id => {
-            if(document.getElementById(id)) document.getElementById(id).value = "";
+            const el = document.getElementById(id); if(el) el.value = "";
         });
-
         render();
-    } else {
-        alert("Veuillez entrer au moins un nom pour le compte.");
-    }
+    } else alert("Veuillez entrer un nom.");
 };
     
-    window.addType = () => {  
-        const name = document.getElementById("newTypeName").value, impO = parseInt(document.getElementById("impO").value), impC = parseInt(document.getElementById("impC").value), impS = parseInt(document.getElementById("impS").value);  
-        if(name) { data.types.push({ name, impO, impC, impS }); save(); alert("Type créé"); }  
-    };  
-  
-    window.deleteTransaction = async function(idx) {
-    if (!confirm("Supprimer définitivement cette opération ?")) return;
+window.addType = () => {  
+    const name = document.getElementById("newTypeName").value, impO = parseInt(document.getElementById("impO").value), impC = parseInt(document.getElementById("impC").value), impS = parseInt(document.getElementById("impS").value);  
+    if(name) { data.types.push({ name, impO, impC, impS }); save(); alert("Type créé"); }  
+};  
+
+window.deleteTransaction = async function(idx) {
+    if (!confirm("Supprimer définitivement ?\n\nSi c'est une dépense, le budget sera également remboursé.")) return;
     
     const t = data.transactions[idx];
     if (!t || !t.timestamp) {
-        alert("Impossible de trouver l'identifiant de la transaction.");
+        alert("Impossible de trouver l'identifiant.");
         return;
     }
 
     try {
+        if ((t.mode === 'depense' || t.isDepense) && t.budgetCategoryId) {
+            let depenseUSD = 0;
+            const isDepensesPrincipal = normalize(t.operator || "").includes("depenses");
+            
+            if (isDepensesPrincipal) {
+                if (t.curSIM === "USD") depenseUSD = t.amtSIM || 0;
+                else if (t.curSIM === "CDF") {
+                    const taux = parseFloat(data.taux) || 1;
+                    depenseUSD = (t.amtSIM || 0) / taux;
+                }
+            } else {
+                if (t.curSIM === "USD") depenseUSD = (t.amtSIM || 0) - (t.usdCash || 0);
+                else if (t.curSIM === "CDF") {
+                    const taux = parseFloat(data.taux) || 1;
+                    depenseUSD = ((t.amtSIM || 0) / taux) - ((t.cdfCash || 0) / taux);
+                }
+            }
+            
+            if (depenseUSD > 0) {
+                refundBudgetExpense(t.budgetCategoryId, t.timestamp, depenseUSD);
+            }
+        }
+
         const updates = {};
         updates[`mka_data/transactions/${t.timestamp}`] = null;
+        updates['mka_data/budgetMonths'] = data.budgetMonths;
         
         await update(ref(db), updates);
 
         data.transactions.splice(idx, 1);
-        
         render();
         
         if (typeof showFullHistory === "function") {
             showFullHistory(window.currentHistoryType || 'general');
         }
         
-        alert("🗑️ Supprimé définitivement de la base de données !");
+        alert("🗑️ Supprimé définitivement !");
     } catch (error) {
-        console.error("Erreur lors de la suppression :", error);
-        alert("❌ Erreur réseau : Impossible de supprimer sur Firebase.");
+        console.error("Erreur:", error);
+        alert("❌ Erreur réseau : Impossible de supprimer.");
     }
 };
 
+window.closeHistory = () => document.getElementById("historyModal").classList.add("hidden");    
+window.updateDefaultStockMove = () => { const ty = data.types[document.getElementById("typeSelect").value]; if(ty) document.getElementById("stkMove").value = ty.impS || 0; };  
 
-    window.closeHistory = () => document.getElementById("historyModal").classList.add("hidden");    
-    window.updateDefaultStockMove = () => { const ty = data.types[document.getElementById("typeSelect").value]; if(ty) document.getElementById("stkMove").value = ty.impS || 0; };  
-    window.exportHistory = async () => {
+window.exportHistory = async () => {
     const { jsPDF } = window.jspdf;
     const element = document.getElementById("fullHistoryList");
     
-    if (!element || element.children.length === 0) {
-        alert("L'historique est vide.");
-        return;
-    }
+    if (!element || element.children.length === 0) { alert("L'historique est vide."); return; }
 
-    alert("Génération du rapport MKA SHOP (Multi-pages)...");
+    alert("Génération du rapport...");
 
     try {
         const canvas = await html2canvas(element, {
-            scale: 2,
-            useCORS: true,
-            backgroundColor: "#f8fafc",
-            windowHeight: element.scrollHeight
+            scale: 2, useCORS: true, backgroundColor: "#f8fafc", windowHeight: element.scrollHeight
         });
 
         const imgData = canvas.toDataURL('image/png');
         const pdf = new jsPDF('p', 'mm', 'a4');
-        
         const pdfWidth = pdf.internal.pageSize.getWidth();
         const pdfHeight = pdf.internal.pageSize.getHeight();
-        
         const imgWidth = pdfWidth;
         const imgHeight = (canvas.height * pdfWidth) / canvas.width;
-        
         const firstPageContentHeight = pdfHeight - 40; 
         const otherPageContentHeight = pdfHeight - 20;
 
-        let heightLeft = imgHeight;
-        let position = 0;
-        let pageNumber = 1;
+        let heightLeft = imgHeight, position = 0, pageNumber = 1;
 
         pdf.setFillColor(15, 23, 42);
         pdf.rect(0, 0, pdfWidth, 25, 'F');
         pdf.setTextColor(255, 255, 255);
         pdf.setFontSize(16);
-        pdf.text("MKA SHOP - HISTORIQUE COMPLET", 10, 16);
+        pdf.text("MKA SHOP - HISTORIQUE", 10, 16);
         
         pdf.setTextColor(100, 116, 139);
         pdf.setFontSize(8);
-        pdf.text(`Document généré le ${formatGomaDate()}`, 10, 32);
+        pdf.text(`Généré le ${formatGomaDate()}`, 10, 32);
 
         pdf.addImage(imgData, 'PNG', 0, 35, imgWidth, imgHeight);
         heightLeft -= firstPageContentHeight;
@@ -3130,64 +3469,49 @@ window.cancelTransaction = async function(index) {
             pageNumber++;
             position = heightLeft - imgHeight; 
             pdf.addPage();
-            
             pdf.setFontSize(7);
             pdf.setTextColor(150);
             pdf.text(`MKA SHOP - Page ${pageNumber}`, 10, 10);
-            
             pdf.addImage(imgData, 'PNG', 0, position + 15, imgWidth, imgHeight);
             heightLeft -= otherPageContentHeight;
         }
 
-        pdf.save(`MKA_Rapport_Design_${Date.now()}.pdf`);
-        alert("PDF généré avec ton design original ! ✅");
+        pdf.save(`MKA_Rapport_${Date.now()}.pdf`);
+        alert("PDF généré ! ✅");
 
     } catch (error) {
         console.error("Erreur:", error);
-        alert("Erreur lors de la génération visuelle.");
+        alert("Erreur lors de la génération.");
     }
 };
     
-    function render() {
-      syncDebtOperators(true);
+function render() {
+    syncDebtOperators(true);
 
-      let totalClientUSD = 0, totalClientCDF = 0;
-      let totalMoiUSD = 0, totalMoiCDF = 0;
-      Object.keys(data.debts).forEach(key => {
-          const debt = data.debts[key];
-          if (key.startsWith('dette client_')) {
-              totalClientUSD += debt.USD || 0;
-              totalClientCDF += debt.CDF || 0;
-          } else if (key.startsWith('dette moi_')) {
-              totalMoiUSD += debt.USD || 0;
-              totalMoiCDF += debt.CDF || 0;
-          }
-      });
-      totalClientUSD = Math.round(totalClientUSD * 100) / 100;
-      totalClientCDF = Math.round(totalClientCDF);
-      totalMoiUSD = Math.round(totalMoiUSD * 100) / 100;
-      totalMoiCDF = Math.round(totalMoiCDF);
-
-      const fmt = (n) => parseFloat(n || 0).toLocaleString('fr-FR', { 
-    minimumFractionDigits: 0, 
-    maximumFractionDigits: 2 
-}).replace(/,/g, '.');
+    let totalClientUSD = 0, totalClientCDF = 0;
+    let totalMoiUSD = 0, totalMoiCDF = 0;
+    Object.keys(data.debts).forEach(key => {
+        const debt = data.debts[key];
+        if (key.startsWith('dette client_')) {
+            totalClientUSD += debt.USD || 0;
+            totalClientCDF += debt.CDF || 0;
+        } else if (key.startsWith('dette moi_')) {
+            totalMoiUSD += debt.USD || 0;
+            totalMoiCDF += debt.CDF || 0;
+        }
+    });
+    totalClientUSD = Math.round(totalClientUSD * 100) / 100;
+    totalClientCDF = Math.round(totalClientCDF);
+    totalMoiUSD = Math.round(totalMoiUSD * 100) / 100;
+    totalMoiCDF = Math.round(totalMoiCDF);
 
     data.transactions.forEach(t => {
         if (!t.mode) return;
         const m = normalize(t.mode);
-        if (m.includes("credit")) {
-            t.mode = "dette_client";
-        }
-        else if (m.includes("dette moi")) {
-            t.mode = "dette_moi";
-        }
-        else if (m.includes("cash")) {
-            t.mode = "cash";
-        }
-        else if (m.includes("virtuel") || m.includes("sim")) {
-            t.mode = "virtuel";
-        }
+        if (m.includes("credit")) t.mode = "dette_client";
+        else if (m.includes("dette moi")) t.mode = "dette_moi";
+        else if (m.includes("cash")) t.mode = "cash";
+        else if (m.includes("virtuel") || m.includes("sim")) t.mode = "virtuel";
     });
    
     const taux = parseFloat(data.taux) || 1;    
@@ -3196,11 +3520,7 @@ window.cancelTransaction = async function(index) {
     document.getElementById("rateM").innerText = taux;    
 
     let totalCaisse = (parseFloat(data.caisse.USD) || 0) + ((parseFloat(data.caisse.CDF) || 0) / taux);    
-    
-    let totalSims = 0;
-    let totalDetteClient = 0;
-    let totalDetteMoi = 0;
-    let totalS = 0;
+    let totalSims = 0, totalDetteClient = 0, totalDetteMoi = 0, totalS = 0;
 
     document.getElementById("operatorBalances").innerHTML = data.operators.map((o, i) => {    
         const usd = parseFloat(o.USD) || 0;
@@ -3212,41 +3532,22 @@ window.cancelTransaction = async function(index) {
         
         let cardClass = "";
 
-        if(n.includes("dette moi")) { 
-            cardClass = "negative";
-            totalDetteMoi += valEquivUSD; 
-        }     
-        else if(n.includes("dette client")) { 
-            cardClass = "negative"; 
-            totalDetteClient += valEquivUSD; 
-        }     
-        else if(n.includes("depenses")) {
-            // Le compte Dépenses est affiché mais exclu de la VNC
-            cardClass = "negative";
-        }
-        else { 
-            totalSims += (valEquivUSD + (stk * px)); 
-        }    
+        if(n.includes("dette moi")) { cardClass = "negative"; totalDetteMoi += valEquivUSD; }     
+        else if(n.includes("dette client")) { cardClass = "negative"; totalDetteClient += valEquivUSD; }     
+        else if(n.includes("depenses")) cardClass = "negative";
+        else totalSims += (valEquivUSD + (stk * px));    
         
         totalS += stk;
 
-        let displayUSD = usd;
-        let displayCDF = cdf;
-        if (n.includes('dette client')) {
-            displayUSD = totalClientUSD;
-            displayCDF = totalClientCDF;
-        } else if (n.includes('dette moi')) {
-            displayUSD = totalMoiUSD;
-            displayCDF = totalMoiCDF;
-        }
+        let displayUSD = usd, displayCDF = cdf;
+        if (n.includes('dette client')) { displayUSD = totalClientUSD; displayCDF = totalClientCDF; }
+        else if (n.includes('dette moi')) { displayUSD = totalMoiUSD; displayCDF = totalMoiCDF; }
 
         return `<div class="card ${cardClass}"><b>${o.name}</b>: ${fmt(displayUSD)}$ | ${fmt(displayCDF)}FC<br><small>Stock: ${fmt(o.stock)} SIM</small></div>`;    
     }).join("");    
 
     const totalClientEquivUSD = totalClientUSD + (totalClientCDF / taux);
     const totalMoiEquivUSD = totalMoiUSD + (totalMoiCDF / taux);
-    
-    // EXCLURE le compte Dépenses de la VNC
     const vncFinale = totalCaisse + totalSims + totalClientEquivUSD - totalMoiEquivUSD;
 
     document.getElementById("totalVNC").innerText = fmt(vncFinale) + " $";    
@@ -3274,133 +3575,89 @@ window.cancelTransaction = async function(index) {
             ${t.name}
             <button class="btn-del" onclick="deleteType(${i})">X</button>
         </div>`
-).join("");
+    ).join("");
 
-// Mise à jour des données de clôture
-miseAJourCloture();
-
-runAutoCleanup();
+    miseAJourCloture();
+    runAutoCleanup();
 }
-    let pendingCleanup = [];
+
+let pendingCleanup = [];
 
 const runAutoCleanup = () => {
     if (!data.transactions || data.transactions.length === 0) return;
 
     const now = Date.now();
-
     const H240 = 240 * 60 * 60 * 1000;
     const H120 = 120 * 60 * 60 * 1000;
     const H72  = 72  * 60 * 60 * 1000;
-
     let hasOldData = false;
 
     const filtered = data.transactions.filter(t => {
-
         let tTime = t.timestamp;
 
-        if (!tTime) {
-            if (t.date) {
-                let parsed = new Date(t.date).getTime();
-                if (isNaN(parsed)) {
-                    const parts = t.date.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-                    if (parts) {
-                        const [_, d, m, y] = parts;
-                        parsed = new Date(`${y}-${m}-${d}`).getTime();
-                    }
-                }
-                if (!isNaN(parsed)) {
-                    tTime = parsed;
-                    t.timestamp = parsed;
-                }
+        if (!tTime && t.date) {
+            let parsed = new Date(t.date).getTime();
+            if (isNaN(parsed)) {
+                const parts = t.date.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+                if (parts) { const [_, d, m, y] = parts; parsed = new Date(`${y}-${m}-${d}`).getTime(); }
             }
+            if (!isNaN(parsed)) { tTime = parsed; t.timestamp = parsed; }
         }
 
         if (!tTime || isNaN(tTime)) return true;
 
         const age = now - tTime;
-
         const mode = (t.mode || "").toLowerCase();
         const opName = (t.operator || "").toLowerCase();
 
-        const isDepense =
-            t.isDepense === true ||
-            mode.includes("depense") ||
-            opName.includes("depense");
-
-        const isDette =
-            t.isReglement ||
-            mode.includes("dette");
+        const isDepense = t.isDepense === true || mode.includes("depense") || opName.includes("depense");
+        const isDette = t.isReglement || mode.includes("dette");
 
         if (isDepense) {
-            if (age >= H240) {
-                hasOldData = true;
-                return false;
-            }
+            if (age >= H240) { hasOldData = true; return false; }
             return true;
         }
-
         if (isDette) {
-            const isSolded =
-                t.snapshotDette &&
-                Math.abs(t.snapshotDette.USD) < 0.1 &&
-                Math.abs(t.snapshotDette.CDF) < 100;
-
-            if (isSolded && age >= H72) {
-                hasOldData = true;
-                return false;
-            }
+            const isSolded = t.snapshotDette && Math.abs(t.snapshotDette.USD) < 0.1 && Math.abs(t.snapshotDette.CDF) < 100;
+            if (isSolded && age >= H72) { hasOldData = true; return false; }
             return true;
         }
-
-        if (age >= H120) {
-            hasOldData = true;
-            return false;
-        }
-
+        if (age >= H120) { hasOldData = true; return false; }
         return true;
     });
 
-        if (hasOldData) {
+    if (hasOldData) {
         pendingCleanup = filtered;
         document.getElementById("cleanupNotify").classList.remove("hidden");
-        console.log("🔥 Nettoyage disponible (En attente de l'admin) !");
     } else {
         document.getElementById("cleanupNotify").classList.add("hidden");
     }
 }; 
 
-    
-    window.confirmCleanup = async () => {
-    if (confirm("As-tu bien téléchargé ton PDF ? Les vieilles transactions affichées comme 'à nettoyer' seront définitivement supprimées.")) {
-        
+window.confirmCleanup = async () => {
+    if (confirm("As-tu bien téléchargé ton PDF ? Les vieilles transactions seront définitivement supprimées.")) {
         try {
             data.transactions = pendingCleanup;
-            
             const transObj = {};
-            data.transactions.forEach(t => {
-                if (t.timestamp) transObj[t.timestamp] = t;
-            });
+            data.transactions.forEach(t => { if (t.timestamp) transObj[t.timestamp] = t; });
             
             const updates = {};
             updates['mka_data/transactions'] = transObj;
             
             await update(ref(db), updates);
-            
             document.getElementById("cleanupNotify").classList.add("hidden");
-            alert("🧹 Application allégée avec succès sur tous les téléphones !");
+            alert("🧹 Application allégée !");
             render();
         } catch (error) {
             console.error(error);
-            alert("❌ Échec du nettoyage : Connexion instable.");
+            alert("❌ Échec du nettoyage.");
         }
     }
 };
 
 setInterval(runAutoCleanup, 30000);
 
-window.onload = () => {
-    runAutoCleanup();
-};
+window.onload = () => runAutoCleanup();
 
 window.deleteOperator = function(index){
     if(!confirm("Supprimer cet opérateur ?")) return;
@@ -3416,16 +3673,13 @@ window.deleteType = function(index){
     render();
 };
 
-  let deferredPrompt;
+let deferredPrompt;
 const installBtn = document.getElementById('installBtn');
 
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredPrompt = e;
-  if (installBtn) {
-    installBtn.style.display = 'block';
-  }
-  console.log("MKA Shop : Prêt pour l'installation manuelle.");
+  if (installBtn) installBtn.style.display = 'block';
 });
 
 if (installBtn) {
@@ -3433,7 +3687,6 @@ if (installBtn) {
     if (deferredPrompt) {
       deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
-      console.log(`Réponse de l'utilisateur : ${outcome}`);
       deferredPrompt = null;
       installBtn.style.display = 'none';
     }
@@ -3441,13 +3694,9 @@ if (installBtn) {
 }
 
 window.addEventListener('appinstalled', () => {
-  console.log('MKA Shop : Installation réussie !');
-  if (installBtn) {
-    installBtn.style.display = 'none';
-  }
+  if (installBtn) installBtn.style.display = 'none';
   deferredPrompt = null;
 });
 
-  
 </script>  </body>  
 </html>
